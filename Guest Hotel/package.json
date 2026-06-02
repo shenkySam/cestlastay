@@ -1,0 +1,36 @@
+{
+  "name": "guest-hotel-landing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Komorebi — premium Japandi single-page hotel landing (guest-facing). Standalone, decoupled from the Hotel-Manager monorepo.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/three": "^0.184.1",
+    "axios": "^1.8.4",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "embla-carousel-react": "^8.5.2",
+    "gsap": "^3.12.7",
+    "lenis": "^1.1.18",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.20",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.2"
+  }
+}

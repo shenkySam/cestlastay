@@ -1,0 +1,519 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserRole {
+  ADMIN
+  STAFF
+  GUEST
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  SUITE
+  DELUXE
+  PRESIDENTIAL
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+  CLEANING
+  OUT_OF_ORDER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingSource {
+  DIRECT
+  WALK_IN
+  BOOKING_COM
+  AIRBNB
+  EXPEDIA
+  AGODA
+  OTHER_OTA
+}
+
+enum ServiceType {
+  ROOM_SERVICE
+  LAUNDRY
+  SPA
+  RESTAURANT
+  MAINTENANCE
+  CONCIERGE
+  OTHER
+}
+
+enum ServiceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum HousekeepingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  INSPECTED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  CASH
+  BANK_TRANSFER
+  DIGITAL_WALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum NotificationType {
+  CHECK_IN
+  CHECK_OUT
+  BOOKING_CONFIRMATION
+  BOOKING_CANCELLATION
+  SERVICE_REQUEST
+  COMPLAINT
+  PAYMENT_RECEIVED
+  HOUSEKEEPING_ALERT
+  SYSTEM
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+enum EmailType {
+  WELCOME
+  BOOKING_CONFIRMATION
+  CHECK_IN_REMINDER
+  CHECK_OUT_THANK_YOU
+  LOYALTY_DISCOUNT
+  PROMOTIONAL
+  PASSWORD_RESET
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  FAILED
+  BOUNCED
+}
+
+// ==================== USER MANAGEMENT ====================
+
+model User {
+  id              String     @id @default(uuid())
+  email           String     @unique
+  passwordHash    String     @map("password_hash")
+  firstName       String     @map("first_name")
+  lastName        String     @map("last_name")
+  phone           String?
+  role            UserRole
+  status          UserStatus @default(ACTIVE)
+  profileImageUrl String?    @map("profile_image_url")
+  emailVerified   Boolean    @default(false) @map("email_verified")
+  lastLoginAt     DateTime?  @map("last_login_at")
+
+  staff           Staff?
+  guest           Guest?
+  notifications   Notification[]
+  createdBookings Booking[]  @relation("BookingCreatedBy")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([role, status])
+  @@map("users")
+}
+
+model Staff {
+  id         String   @id @default(uuid())
+  userId     String   @unique @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeId String   @unique @map("employee_id")
+  department String
+  position   String
+  hireDate   DateTime @map("hire_date")
+
+  assignedTasks    HousekeepingTask[]
+  handledServices  ServiceRequest[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([employeeId])
+  @@map("staff")
+}
+
+model Guest {
+  id           String  @id @default(uuid())
+  userId       String? @unique @map("user_id")
+  user         User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  firstName    String  @map("first_name")
+  lastName     String  @map("last_name")
+  email        String
+  phone        String
+  address      String?
+  city         String?
+  country      String?
+  zipCode      String? @map("zip_code")
+  idType       String? @map("id_type")
+  idNumber     String? @map("id_number")
+  loyaltyPoints Int    @default(0) @map("loyalty_points")
+  loyaltyTier  String? @map("loyalty_tier")
+
+  bookings        Booking[]
+  serviceRequests ServiceRequest[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([phone])
+  @@map("guests")
+}
+
+// ==================== PROPERTY MANAGEMENT ====================
+
+model RoomCategory {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  type         RoomType
+  description  String?
+  basePrice    Decimal  @map("base_price") @db.Decimal(10, 2)
+  maxOccupancy Int      @map("max_occupancy")
+  amenities    String[]
+  images       String[]
+
+  rooms Room[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("room_categories")
+}
+
+model Room {
+  id               String     @id @default(uuid())
+  roomNumber       String     @unique @map("room_number")
+  categoryId       String     @map("category_id")
+  category         RoomCategory @relation(fields: [categoryId], references: [id])
+  floor            Int
+  status           RoomStatus @default(AVAILABLE)
+  lastCleanedAt    DateTime?  @map("last_cleaned_at")
+  maintenanceNotes String?    @map("maintenance_notes")
+
+  bookings          Booking[]
+  housekeepingTasks HousekeepingTask[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([roomNumber])
+  @@index([status])
+  @@index([categoryId])
+  @@map("rooms")
+}
+
+// ==================== BOOKING MANAGEMENT ====================
+
+model Booking {
+  id              String        @id @default(uuid())
+  bookingNumber   String        @unique @map("booking_number")
+  guestId         String        @map("guest_id")
+  guest           Guest         @relation(fields: [guestId], references: [id])
+  roomId          String        @map("room_id")
+  room            Room          @relation(fields: [roomId], references: [id])
+  checkInDate     DateTime      @map("check_in_date")
+  checkOutDate    DateTime      @map("check_out_date")
+  numberOfGuests  Int           @map("number_of_guests")
+  status          BookingStatus @default(PENDING)
+  source          BookingSource @default(DIRECT)
+  roomRate        Decimal       @map("room_rate") @db.Decimal(10, 2)
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
+  discountCode    String?       @map("discount_code")
+  discountAmount  Decimal?      @map("discount_amount") @db.Decimal(10, 2)
+  specialRequests String?       @map("special_requests")
+  actualCheckInAt  DateTime?    @map("actual_check_in_at")
+  actualCheckOutAt DateTime?    @map("actual_check_out_at")
+  otaBookingId    String?       @map("ota_booking_id")
+  otaCommission   Decimal?      @map("ota_commission") @db.Decimal(10, 2)
+  createdById     String        @map("created_by_id")
+  createdBy       User          @relation("BookingCreatedBy", fields: [createdById], references: [id])
+
+  invoice         Invoice?
+  serviceRequests ServiceRequest[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([bookingNumber])
+  @@index([guestId])
+  @@index([roomId])
+  @@index([status])
+  @@index([checkInDate, checkOutDate])
+  @@index([source])
+  @@map("bookings")
+}
+
+// ==================== SERVICE MANAGEMENT ====================
+
+model ServiceRequest {
+  id            String        @id @default(uuid())
+  ticketNumber  String        @unique @map("ticket_number")
+  guestId       String        @map("guest_id")
+  guest         Guest         @relation(fields: [guestId], references: [id])
+  bookingId     String?       @map("booking_id")
+  booking       Booking?      @relation(fields: [bookingId], references: [id])
+  type          ServiceType
+  status        ServiceStatus @default(PENDING)
+  priority      Int           @default(1)
+  description   String
+  notes         String?
+  assignedToId  String?       @map("assigned_to_id")
+  assignedTo    Staff?        @relation(fields: [assignedToId], references: [id])
+  estimatedCost Decimal?      @map("estimated_cost") @db.Decimal(10, 2)
+  actualCost    Decimal?      @map("actual_cost") @db.Decimal(10, 2)
+  requestedAt   DateTime      @default(now()) @map("requested_at")
+  startedAt     DateTime?     @map("started_at")
+  completedAt   DateTime?     @map("completed_at")
+
+  invoiceItems InvoiceItem[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([ticketNumber])
+  @@index([guestId])
+  @@index([status])
+  @@index([type])
+  @@map("service_requests")
+}
+
+// ==================== HOUSEKEEPING ====================
+
+model HousekeepingTask {
+  id           String             @id @default(uuid())
+  roomId       String             @map("room_id")
+  room         Room               @relation(fields: [roomId], references: [id])
+  assignedToId String?            @map("assigned_to_id")
+  assignedTo   Staff?             @relation(fields: [assignedToId], references: [id])
+  taskType     String             @map("task_type")
+  status       HousekeepingStatus @default(PENDING)
+  priority     Int                @default(1)
+  notes        String?
+  scheduledFor DateTime           @map("scheduled_for")
+  startedAt    DateTime?          @map("started_at")
+  completedAt  DateTime?          @map("completed_at")
+  inspectedAt  DateTime?          @map("inspected_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([roomId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("housekeeping_tasks")
+}
+
+// ==================== BILLING & PAYMENTS ====================
+
+model Invoice {
+  id             String        @id @default(uuid())
+  invoiceNumber  String        @unique @map("invoice_number")
+  bookingId      String        @unique @map("booking_id")
+  booking        Booking       @relation(fields: [bookingId], references: [id])
+  status         InvoiceStatus @default(DRAFT)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxAmount      Decimal       @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  paidAmount     Decimal       @default(0) @map("paid_amount") @db.Decimal(10, 2)
+  balanceDue     Decimal       @map("balance_due") @db.Decimal(10, 2)
+  issuedAt       DateTime      @default(now()) @map("issued_at")
+  dueDate        DateTime      @map("due_date")
+  paidAt         DateTime?     @map("paid_at")
+
+  items    InvoiceItem[]
+  payments Payment[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([invoiceNumber])
+  @@index([bookingId])
+  @@index([status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id               String          @id @default(uuid())
+  invoiceId        String          @map("invoice_id")
+  invoice          Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  serviceRequestId String?         @map("service_request_id")
+  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+  description      String
+  quantity         Int             @default(1)
+  unitPrice        Decimal         @map("unit_price") @db.Decimal(10, 2)
+  totalPrice       Decimal         @map("total_price") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  paymentNumber   String        @unique @map("payment_number")
+  invoiceId       String        @map("invoice_id")
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id])
+  amount          Decimal       @db.Decimal(10, 2)
+  method          PaymentMethod
+  status          PaymentStatus @default(PENDING)
+  stripePaymentId String?       @unique @map("stripe_payment_id")
+  stripeChargeId  String?       @map("stripe_charge_id")
+  transactionId   String?       @map("transaction_id")
+  receiptUrl      String?       @map("receipt_url")
+  notes           String?
+  processedAt     DateTime?     @map("processed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([paymentNumber])
+  @@index([invoiceId])
+  @@index([status])
+  @@index([stripePaymentId])
+  @@map("payments")
+}
+
+// ==================== NOTIFICATIONS & CRM ====================
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String             @map("user_id")
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  status    NotificationStatus @default(UNREAD)
+  title     String
+  message   String
+  metadata  Json?
+  link      String?
+  readAt    DateTime?          @map("read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model EmailLog {
+  id             String      @id @default(uuid())
+  recipientEmail String      @map("recipient_email")
+  recipientName  String?     @map("recipient_name")
+  type           EmailType
+  status         EmailStatus @default(QUEUED)
+  subject        String
+  body           String      @db.Text
+  sendgridId     String?     @unique @map("sendgrid_id")
+  sentAt         DateTime?   @map("sent_at")
+  openedAt       DateTime?   @map("opened_at")
+  clickedAt      DateTime?   @map("clicked_at")
+  errorMessage   String?     @map("error_message")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([recipientEmail])
+  @@index([status])
+  @@index([type])
+  @@map("email_logs")
+}
+
+model LoyaltyDiscount {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  description   String
+  discountType  String   @map("discount_type")
+  discountValue Decimal  @map("discount_value") @db.Decimal(10, 2)
+  minStays      Int?     @map("min_stays")
+  validFrom     DateTime @map("valid_from")
+  validUntil    DateTime @map("valid_until")
+  maxUses       Int?     @map("max_uses")
+  usedCount     Int      @default(0) @map("used_count")
+  isActive      Boolean  @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([code])
+  @@index([validFrom, validUntil])
+  @@map("loyalty_discounts")
+}
+
+// ==================== AUDIT ====================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String   @map("entity_id")
+  changes   Json?
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

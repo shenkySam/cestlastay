@@ -1,0 +1,14 @@
+# Claude Code local data
+.claude/
+**/.claude/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Env
+.env
+.env.local

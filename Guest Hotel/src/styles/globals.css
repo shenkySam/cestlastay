@@ -1,0 +1,178 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ════════════════════════════════════════════════════════════════════
+   BASE  —  immersive dark theme (content floats over the WebGL scene)
+   ════════════════════════════════════════════════════════════════════ */
+@layer base {
+  :root {
+    --radius: 6px;
+    --hairline: rgba(238, 242, 239, 0.14); /* light divider on dark */
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-ink antialiased;
+    /* deep base; the fixed particle canvas (transparent) glows over this */
+    background-color: #06121a;
+    background-image: radial-gradient(135% 100% at 50% 0%, #0b2536 0%, #06121a 52%, #03090e 100%);
+    background-attachment: fixed;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-serif;
+    font-optical-sizing: auto;
+    text-wrap: balance;
+    /* lift headings off the moving scene */
+    text-shadow: 0 2px 20px rgba(3, 9, 14, 0.5);
+  }
+
+  /* body copy that sits directly on the scene stays crisp */
+  p, li, a, span, label {
+    text-shadow: 0 1px 12px rgba(3, 9, 14, 0.35);
+  }
+
+  ::selection {
+    background: theme('colors.ocean.400');
+    color: #03090e;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.ocean.400');
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar { width: 11px; }
+  ::-webkit-scrollbar-track { background: #06121a; }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(238, 242, 239, 0.18);
+    border: 3px solid #06121a;
+    border-radius: 99px;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   COMPONENTS
+   ════════════════════════════════════════════════════════════════════ */
+@layer components {
+  .container-x { @apply mx-auto w-full max-w-[1240px] px-6 md:px-10; }
+  .section { @apply py-24 md:py-32; }
+
+  /* Eyebrow — brighter ocean for dark backgrounds */
+  .eyebrow {
+    @apply font-sans text-[0.7rem] font-semibold uppercase tracking-eyebrow text-ocean-300;
+  }
+
+  .divider { height: 1px; background: var(--hairline); border: 0; }
+
+  /* Buttons ----------------------------------------------------------- */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-token
+           font-sans text-sm font-semibold tracking-wide
+           px-6 py-3 transition-all duration-300 ease-breath
+           focus:outline-none focus-visible:outline focus-visible:outline-2
+           focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-lg { @apply px-8 py-4 text-[0.95rem]; }
+
+  /* PRIMARY — sunset orange */
+  .btn-primary {
+    @apply btn bg-sunset-600 text-white shadow-soft
+           hover:-translate-y-0.5 hover:bg-sunset-500 hover:shadow-lift active:translate-y-0;
+  }
+
+  /* SECONDARY — ocean blue */
+  .btn-accent {
+    @apply btn bg-ocean-600 text-white shadow-soft
+           hover:-translate-y-0.5 hover:bg-ocean-500 hover:shadow-lift active:translate-y-0;
+  }
+
+  /* TERTIARY — light hairline outline (ink is light now) */
+  .btn-outline {
+    @apply btn border border-ink/25 bg-white/0 text-ink
+           hover:border-ink/50 hover:bg-white/[0.06];
+  }
+  /* alias kept for hero usage */
+  .btn-outline-light {
+    @apply btn border border-white/50 bg-white/5 text-white backdrop-blur-sm
+           hover:border-white hover:bg-white/15;
+  }
+
+  /* Surfaces — frosted glass floating over the scene --------------------- */
+  .card {
+    @apply rounded-card border border-white/10 bg-white/[0.055] shadow-soft backdrop-blur-md;
+  }
+  /* a flatter glass panel (nav, footer, form) */
+  .glass {
+    @apply border border-white/10 bg-[#06121a]/55 backdrop-blur-xl;
+  }
+
+  /* Form fields — dark glass ------------------------------------------- */
+  .field-label {
+    @apply mb-1.5 block font-sans text-xs font-semibold uppercase tracking-[0.12em] text-muted;
+  }
+  .field {
+    @apply block w-full rounded-token border border-white/15 bg-white/[0.05] px-4 py-3
+           font-sans text-sm text-ink placeholder-muted/60
+           transition-colors duration-300 ease-breath
+           focus:border-ocean-400 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-ocean-400;
+  }
+  /* native date/select pickers readable on dark */
+  .field option { color: #0e2029; }
+  .field::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.7); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ════════════════════════════════════════════════════════════════════ */
+@layer utilities {
+  /* Soft dark scrim to lift text off the busy parts of the scene */
+  .scrim-text {
+    background-image: radial-gradient(
+      65% 60% at 50% 50%,
+      rgba(3, 9, 14, 0.72) 0%,
+      rgba(3, 9, 14, 0.42) 48%,
+      rgba(3, 9, 14, 0) 78%
+    );
+  }
+
+  /* Warm sandy gradient shown behind images while loading / on error */
+  .img-fallback {
+    background-image: linear-gradient(135deg, #1a2c33 0%, #14333f 55%, #0c2530 100%);
+  }
+
+  /* Film grain — subtle tactile texture layered over the whole page */
+  .grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   LENIS (smooth scroll)
+   ════════════════════════════════════════════════════════════════════ */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+/* ════════════════════════════════════════════════════════════════════
+   REDUCED MOTION
+   ════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
