@@ -4,7 +4,7 @@
  *
  * In production set CORS_ORIGINS to a comma-separated list of the deployed frontend
  * URLs, e.g.:
- *   CORS_ORIGINS="https://komorebi.example.com,https://admin.example.com"
+ *   CORS_ORIGINS="https://cestlastay.com,https://app.cestlastay.com"
  * (the landing site AND the admin/web app both call this API).
  *
  * Falls back to FRONTEND_URL and the local dev ports when CORS_ORIGINS is unset.

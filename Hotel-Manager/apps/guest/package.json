@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Komorebi — premium Japandi single-page hotel landing (guest-facing). Part of the Hotel-Manager workspace.",
+  "description": "C'est La Stay — beachfront single-page hotel landing (guest-facing). Part of the Hotel-Manager workspace.",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

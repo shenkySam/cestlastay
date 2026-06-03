@@ -6,7 +6,7 @@ This monorepo deploys as **three independent services** that connect at runtime 
 |-----|------|----------|-----|
 | **API** (`@hms/api`) | `apps/api` | **Railway** | Long-running NestJS server: Socket.IO websockets + `@Cron` jobs + Prisma. Needs an always-on process. |
 | **Admin / portal** (`@hms/web`) | `apps/web` | **Vercel** | Static React/Vite SPA. |
-| **Landing** (`@hms/guest`) | `apps/guest` | **Vercel** | Static React/Vite SPA (Komorebi). Its **Login** button → the admin URL. |
+| **Landing** (`@hms/guest`) | `apps/guest` | **Vercel** | Static React/Vite SPA (the C'est La Stay landing). Its **Login** button → the admin URL. |
 
 > The repo root (`cestlastay`) has no app in it. **Every service must point at a subdirectory** —
 > that is why the first Railway deploy failed. Config files in this repo:
@@ -61,7 +61,7 @@ Push to GitHub first (Railway & Vercel deploy from the repo).
    - `VITE_API_URL` = `<railway-api-domain>/api/v1`
    - `VITE_PORTAL_URL` = `<vercel-admin-url>` (the **Login** button links here)
    - `VITE_ENABLE_BOOKING_API` = `true` only once you want the landing's booking form to call the API
-4. Deploy → note the URL (e.g. `https://komorebi.vercel.app`).
+4. Deploy → note the URL (e.g. `https://cestlastay.com` once the domain is attached).
 
 ---
 
@@ -72,7 +72,7 @@ Because the URLs reference each other, do it in this order:
 1. Deploy **API** (Railway) → copy its domain.
 2. Set `VITE_API_URL` in **both** Vercel projects → deploy **admin**, then **landing** → copy both URLs.
 3. Back on **Railway**, set `CORS_ORIGINS` to both Vercel URLs (comma-separated, no trailing slash):
-   `CORS_ORIGINS="https://hms-admin.vercel.app,https://komorebi.vercel.app"`
+   `CORS_ORIGINS="https://app.cestlastay.com,https://cestlastay.com"`
 4. **Redeploy the API** so the new CORS list takes effect.
 
 ---
