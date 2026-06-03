@@ -8,9 +8,10 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { getCorsOrigins } from '../../common/cors';
 
 @WebSocketGateway({
-  cors: { origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true },
+  cors: { origin: getCorsOrigins(), credentials: true },
   namespace: '/',
 })
 export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {

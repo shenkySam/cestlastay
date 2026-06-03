@@ -1,0 +1,14 @@
+# Keep build context small & force clean installs inside the image.
+**/node_modules
+**/dist
+**/.turbo
+.turbo
+**/coverage
+.git
+.gitignore
+**/.DS_Store
+
+# Never bake local secrets into the image (Railway provides env at runtime).
+**/.env
+**/.env.*
+!**/.env.example
