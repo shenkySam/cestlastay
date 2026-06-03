@@ -61,7 +61,7 @@ export async function submitReservation(
     // origin don't exist yet, so we acknowledge the request locally.
     await new Promise((resolve) => setTimeout(resolve, 900));
     // eslint-disable-next-line no-console
-    console.info('[Komorebi] Reservation request (booking API disabled):', payload);
+    console.info("[C'est La Stay] Reservation request (booking API disabled):", payload);
     return {
       ok: true,
       message:
