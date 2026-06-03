@@ -145,6 +145,14 @@
     );
   }
 
+  /* Lead copy that floats directly on the busy scene (no card backing).
+     Brightens to the primary foreground + a stronger dark halo so it reads
+     over bright particle clusters — same idea as the heading text-shadow. */
+  .copy-on-scene {
+    @apply text-ink;
+    text-shadow: 0 2px 18px rgba(3, 9, 14, 0.6);
+  }
+
   /* Warm sandy gradient shown behind images while loading / on error */
   .img-fallback {
     background-image: linear-gradient(135deg, #1a2c33 0%, #14333f 55%, #0c2530 100%);

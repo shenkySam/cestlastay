@@ -30,7 +30,7 @@ export default function Amenities() {
               {amenities.title}
             </h2>
           </div>
-          <p className="font-sans leading-relaxed text-muted md:col-span-5">{amenities.intro}</p>
+          <p className="font-sans leading-relaxed copy-on-scene md:col-span-5">{amenities.intro}</p>
         </Reveal>
 
         {/* Asymmetrical feature grid */}
