@@ -1,0 +1,12 @@
+{
+  "name": "C'est La Stay",
+  "short_name": "C'est La Stay",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#06121a",
+  "background_color": "#06121a",
+  "icons": [
+    { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

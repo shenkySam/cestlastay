@@ -15,7 +15,7 @@ export default function Packages() {
           <h2 className="font-serif text-[clamp(2rem,4.4vw,3.4rem)] font-medium leading-[1.08] text-ink">
             {packages.title}
           </h2>
-          <p className="mt-5 font-sans leading-relaxed text-muted">{packages.intro}</p>
+          <p className="mt-5 font-sans leading-relaxed copy-on-scene">{packages.intro}</p>
         </Reveal>
 
         {/* Three transform layers so entrance (GSAP) + idle float (CSS) +

@@ -94,7 +94,7 @@ export default function Rooms() {
           <h2 className="font-serif text-[clamp(2rem,4.4vw,3.4rem)] font-medium leading-[1.08] text-ink">
             {rooms.title}
           </h2>
-          <p className="mt-5 font-sans leading-relaxed text-muted">{rooms.intro}</p>
+          <p className="mt-5 font-sans leading-relaxed copy-on-scene">{rooms.intro}</p>
         </Reveal>
       </div>
 
