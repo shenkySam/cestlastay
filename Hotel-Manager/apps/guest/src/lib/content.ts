@@ -38,6 +38,10 @@ export interface Villa {
   occupancy: number;
   amenities: string[];
   image: string;
+  /** showcase badges — a rating OR a tag, plus a minimum-night-stay pill */
+  rating?: number;
+  tag?: string;
+  minNights?: number;
 }
 
 export interface Package {
@@ -140,7 +144,7 @@ export const rooms = {
   eyebrow: 'The Villas',
   title: 'Room to breathe by the sea',
   intro:
-    'Open-plan, sea-facing, and cooled by cross-breezes. Drag to explore each villa.',
+    'Open-plan, sea-facing, and cooled by cross-breezes — each one steps from the sand.',
   items: [
     {
       id: 'palm-cabana',
@@ -153,6 +157,8 @@ export const rooms = {
       occupancy: 2,
       amenities: ['Garden terrace', 'Outdoor shower', 'King bed', 'Palm views'],
       image: u('1505693416388-ac5ce068fe85', 1100),
+      rating: 4.6,
+      minNights: 2,
     },
     {
       id: 'garden-bungalow',
@@ -165,6 +171,8 @@ export const rooms = {
       occupancy: 2,
       amenities: ['Private courtyard', 'Soaking tub', 'Lounge', 'Garden access'],
       image: u('1618773928121-c32242e63f39', 1100),
+      rating: 4.7,
+      minNights: 2,
     },
     {
       id: 'ocean-view-suite',
@@ -177,6 +185,8 @@ export const rooms = {
       occupancy: 3,
       amenities: ['Sea-view balcony', 'Rainfall shower', 'King bed', 'Daybed'],
       image: u('1566073771259-6a8506099945', 1100),
+      tag: 'Guest Favorite',
+      minNights: 3,
     },
     {
       id: 'sunset-pavilion',
@@ -189,6 +199,8 @@ export const rooms = {
       occupancy: 3,
       amenities: ['Sunset terrace', 'Plunge pool', 'Reading nook', 'Workspace'],
       image: u('1571896349842-33c89424de2d', 1100),
+      rating: 4.8,
+      minNights: 3,
     },
     {
       id: 'beachfront-villa',
@@ -201,6 +213,8 @@ export const rooms = {
       occupancy: 5,
       amenities: ['Private pool', 'Direct beach access', 'Two bedrooms', 'Butler service'],
       image: u('1611892440504-42a792e24d32', 1100),
+      tag: 'Guest Favorite',
+      minNights: 4,
     },
   ] as Villa[],
 };

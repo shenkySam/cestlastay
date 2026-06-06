@@ -5,8 +5,9 @@ import { Check, Loader2 } from 'lucide-react';
 import { reserve as reserveContent, rooms, formatPrice } from '../../lib/content';
 import Reveal from '../ui/Reveal';
 import Button from '../ui/Button';
-import { submitReservation, isBookingApiEnabled } from '../../lib/booking';
+import { submitReservation, getRoomCategories, isBookingApiEnabled } from '../../lib/booking';
 import type { ReservationResult } from '../../lib/booking';
+import type { IRoomCategory } from '../../types/booking.types';
 import { ROOM_SELECT_EVENT } from '../../lib/events';
 
 const today = new Date().toISOString().slice(0, 10);
@@ -42,16 +43,44 @@ export default function Reserve() {
   const [status, setStatus] = useState<Status>('idle');
   const [result, setResult] = useState<ReservationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Real room categories from the API (only when booking wiring is enabled).
+  const [categories, setCategories] = useState<IRoomCategory[]>([]);
+
+  // When the booking API is on, populate the villa <select> from the real
+  // catalog so the form submits a valid IRoomCategory.id.
+  useEffect(() => {
+    if (!isBookingApiEnabled) return;
+    let active = true;
+    getRoomCategories()
+      .then((cats) => {
+        if (!active) return;
+        setCategories(cats);
+        if (cats.length) {
+          setForm((f) => ({
+            ...f,
+            roomId: cats.some((c) => c.id === f.roomId) ? f.roomId : cats[0].id,
+          }));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // "Book Now" on a villa card prefills the villa here, then scrolls down.
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
-      setForm((f) => ({ ...f, roomId: id }));
+      setForm((f) => {
+        // With real categories loaded, ignore demo content ids that don't map.
+        if (isBookingApiEnabled && !categories.some((c) => c.id === id)) return f;
+        return { ...f, roomId: id };
+      });
     };
     window.addEventListener(ROOM_SELECT_EVENT, handler);
     return () => window.removeEventListener(ROOM_SELECT_EVENT, handler);
-  }, []);
+  }, [categories]);
 
   const nights = useMemo(() => {
     if (!form.checkIn || !form.checkOut) return 0;
@@ -63,10 +92,12 @@ export default function Reserve() {
     }
   }, [form.checkIn, form.checkOut]);
 
-  const selectedPrice = useMemo(
-    () => rooms.items.find((r) => r.id === form.roomId)?.pricePerNight ?? 0,
-    [form.roomId],
-  );
+  const selectedPrice = useMemo(() => {
+    if (isBookingApiEnabled && categories.length) {
+      return categories.find((c) => c.id === form.roomId)?.basePrice ?? 0;
+    }
+    return rooms.items.find((r) => r.id === form.roomId)?.pricePerNight ?? 0;
+  }, [form.roomId, categories]);
 
   const update =
     (key: keyof FormState) =>
@@ -99,8 +130,8 @@ export default function Reserve() {
       checkInDate: form.checkIn,
       checkOutDate: form.checkOut,
       numberOfGuests: Number(form.guests),
-      // NOTE: local content villa id. Map to a real IRoomCategory.id when the
-      // booking API is wired (see src/lib/booking.ts).
+      // Real IRoomCategory.id when the booking API is enabled (the villa <select>
+      // is populated from GET /rooms/categories); demo content id otherwise.
       categoryId: form.roomId,
       specialRequests: form.specialRequests.trim() || undefined,
     });
@@ -225,9 +256,12 @@ export default function Reserve() {
                     <div>
                       <label className="field-label" htmlFor="roomId">Villa</label>
                       <select id="roomId" className="field" value={form.roomId} onChange={update('roomId')}>
-                        {rooms.items.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.name}
+                        {(isBookingApiEnabled && categories.length
+                          ? categories.map((c) => ({ id: c.id, name: c.name }))
+                          : rooms.items.map((r) => ({ id: r.id, name: r.name }))
+                        ).map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.name}
                           </option>
                         ))}
                       </select>

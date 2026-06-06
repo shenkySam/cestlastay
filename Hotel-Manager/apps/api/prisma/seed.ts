@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -92,6 +93,24 @@ async function main() {
   });
 
   console.log(`✅ Admin: ${admin.email}`);
+
+  // ── System user (creator for public / self-service bookings) ───────────────────
+  await prisma.user.upsert({
+    where: { email: 'system@hotel.com' },
+    update: {},
+    create: {
+      email: 'system@hotel.com',
+      // Random, non-bcrypt value → no password can match; non-interactive account.
+      passwordHash: randomBytes(32).toString('hex'),
+      firstName: 'Online',
+      lastName: 'Bookings',
+      role: 'STAFF',
+      status: 'ACTIVE',
+      emailVerified: true,
+    },
+  });
+
+  console.log('✅ System: system@hotel.com (online-booking creator)');
 
   // ── Staff user ────────────────────────────────────────────────────────────────
   const staffHash = await bcrypt.hash('Staff123!', 12);

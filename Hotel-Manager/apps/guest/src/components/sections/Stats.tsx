@@ -35,7 +35,7 @@ function StatItem({ stat, run }: { stat: Stat; run: boolean }) {
         {display}
         {stat.suffix}
       </p>
-      <p className="mt-3 font-sans text-xs uppercase tracking-[0.18em] text-ocean-200">{stat.label}</p>
+      <p className="mt-3 font-sans text-xs uppercase tracking-[0.18em] text-white">{stat.label}</p>
     </div>
   );
 }

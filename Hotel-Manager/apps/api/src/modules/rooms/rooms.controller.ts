@@ -8,6 +8,7 @@ import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
 import { CreateRoomCategoryDto } from './dto/create-room-category.dto';
 import { UpdateRoomCategoryDto } from './dto/update-room-category.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { UserRole, RoomStatus } from '@hms/shared';
 
 @Controller('rooms')
@@ -17,6 +18,7 @@ export class RoomsController {
   // ── Categories ───────────────────────────────────────────────
 
   @Get('categories')
+  @Public()
   findAllCategories() {
     return this.service.findAllCategories();
   }
@@ -42,6 +44,7 @@ export class RoomsController {
   // ── Availability check (before :id routes) ───────────────────
 
   @Get('availability')
+  @Public()
   checkAvailability(
     @Query('checkIn') checkIn: string,
     @Query('checkOut') checkOut: string,

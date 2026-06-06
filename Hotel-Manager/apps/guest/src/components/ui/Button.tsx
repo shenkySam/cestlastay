@@ -2,7 +2,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import clsx from 'clsx';
 import { scrollToSection } from '../../hooks/useSmoothScroll';
 
-type Variant = 'primary' | 'accent' | 'outline' | 'outline-light';
+type Variant = 'primary' | 'accent' | 'outline' | 'outline-light' | 'light';
 
 interface ButtonProps {
   children: ReactNode;
@@ -22,6 +22,7 @@ const variantClass: Record<Variant, string> = {
   accent: 'btn-accent',
   outline: 'btn-outline',
   'outline-light': 'btn-outline-light',
+  light: 'btn-light',
 };
 
 export default function Button({
