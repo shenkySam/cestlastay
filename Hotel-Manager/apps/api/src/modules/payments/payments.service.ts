@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -17,12 +17,15 @@ export class PaymentsService {
     });
   }
 
-  async createPaymentIntent(invoiceId: string) {
+  async createPaymentIntent(invoiceId: string, guestBookingId?: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: { booking: { include: { guest: true } } },
     });
     if (!invoice) throw new NotFoundException(`Invoice ${invoiceId} not found`);
+    if (guestBookingId && invoice.bookingId !== guestBookingId) {
+      throw new ForbiddenException();
+    }
     if (Number(invoice.balanceDue) <= 0) {
       throw new BadRequestException('Invoice is already fully paid');
     }
@@ -63,7 +66,15 @@ export class PaymentsService {
     return { received: true };
   }
 
-  async getPaymentsForInvoice(invoiceId: string) {
+  async getPaymentsForInvoice(invoiceId: string, guestBookingId?: string) {
+    if (guestBookingId) {
+      const invoice = await this.prisma.invoice.findUnique({
+        where: { id: invoiceId },
+        select: { bookingId: true },
+      });
+      if (!invoice) throw new NotFoundException(`Invoice ${invoiceId} not found`);
+      if (invoice.bookingId !== guestBookingId) throw new ForbiddenException();
+    }
     return this.prisma.payment.findMany({
       where: { invoiceId },
       orderBy: { createdAt: 'desc' },
