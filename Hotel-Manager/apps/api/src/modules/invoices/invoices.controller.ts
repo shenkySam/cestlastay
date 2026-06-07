@@ -1,7 +1,14 @@
-import { Controller, Get, Post, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, ForbiddenException } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@hms/shared';
+
+type AuthedUser = {
+  id: string;
+  role: string;
+  bookingId?: string;
+};
 
 @Controller('invoices')
 export class InvoicesController {
@@ -21,7 +28,11 @@ export class InvoicesController {
 
   // Accessible to guests too — they view their own invoice via booking ID
   @Get('booking/:bookingId')
-  findByBooking(@Param('bookingId') bookingId: string) {
+  findByBooking(@CurrentUser() user: AuthedUser, @Param('bookingId') bookingId: string) {
+    // Guests can only view the invoice for their own booking.
+    if (user.role === UserRole.GUEST && user.bookingId !== bookingId) {
+      throw new ForbiddenException();
+    }
     return this.service.findByBookingId(bookingId);
   }
 
