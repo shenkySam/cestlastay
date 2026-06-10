@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 const NAV = [
   { label: 'My Booking',  href: '/guest/home',      icon: '🏠' },
   { label: 'Services',    href: '/guest/services',   icon: '🛎' },
-  { label: 'Complaints',  href: '/guest/complaints', icon: '📝' },
   { label: 'My Bill',     href: '/guest/bill',       icon: '💳' },
 ];
 
