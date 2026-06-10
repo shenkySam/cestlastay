@@ -71,10 +71,13 @@ export async function submitReservation(
 
   try {
     const booking = await createBooking(payload);
+    const confirmed = booking.status === 'CONFIRMED';
     return {
       ok: true,
       bookingNumber: booking.bookingNumber,
-      message: `Your stay is confirmed — reservation ${booking.bookingNumber}. A confirmation is on its way to your inbox.`,
+      message: confirmed
+        ? `Your stay is confirmed — reservation ${booking.bookingNumber}. A confirmation is on its way to your inbox.`
+        : `Request submitted — reservation ${booking.bookingNumber}. Our team will confirm availability and email you shortly.`,
     };
   } catch {
     return {

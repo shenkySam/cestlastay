@@ -3,14 +3,23 @@ import {
 } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { CreatePublicBookingDto } from './dto/create-public-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole, BookingStatus } from '@hms/shared';
 
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly service: BookingsService) {}
+
+  // Public, unauthenticated self-service booking from the guest landing site.
+  @Public()
+  @Post('public')
+  createPublic(@Body() dto: CreatePublicBookingDto) {
+    return this.service.createPublic(dto);
+  }
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.STAFF)

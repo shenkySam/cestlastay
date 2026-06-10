@@ -107,6 +107,13 @@
            hover:border-white hover:bg-white/15;
   }
 
+  /* SOLID WHITE, capsule — dark text on white, for overlay photo cards */
+  .btn-light {
+    @apply btn bg-white text-[#06121a] shadow-soft
+           hover:-translate-y-0.5 hover:bg-sand-50 hover:shadow-lift active:translate-y-0;
+    border-radius: 9999px; /* pill — wins over .btn's rounded-token regardless of @apply order */
+  }
+
   /* Surfaces — frosted glass floating over the scene --------------------- */
   .card {
     @apply rounded-card border border-white/10 bg-white/[0.055] shadow-soft backdrop-blur-md;
@@ -142,6 +149,17 @@
       rgba(3, 9, 14, 0.72) 0%,
       rgba(3, 9, 14, 0.42) 48%,
       rgba(3, 9, 14, 0) 78%
+    );
+  }
+
+  /* Bottom-up dark gradient — lifts text/controls overlaid on a photo card */
+  .scrim-bottom {
+    background-image: linear-gradient(
+      to top,
+      rgba(3, 9, 14, 0.92) 0%,
+      rgba(3, 9, 14, 0.65) 30%,
+      rgba(3, 9, 14, 0.15) 62%,
+      rgba(3, 9, 14, 0) 100%
     );
   }
 
