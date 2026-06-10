@@ -98,7 +98,6 @@ export default function App() {
                 <Route index element={<Navigate to="home" replace />} />
                 <Route path="home"       element={<GuestHomePage />} />
                 <Route path="services"   element={<GuestServiceRequestPage />} />
-                <Route path="complaints" element={<GuestServiceRequestPage />} />
                 <Route path="bill"       element={<GuestBillPage />} />
               </Route>
 
