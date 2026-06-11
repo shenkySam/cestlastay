@@ -1,0 +1,26 @@
+# C'est La Stay — https://cestlastay.com
+
+User-agent: *
+Allow: /
+Disallow: /portal/
+Disallow: /admin/
+Disallow: /api/
+
+# Answer-engine crawlers — explicitly allowed so the FAQ and bot pages
+# can be cited by Gemini, Copilot, ChatGPT, Perplexity, and Claude.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://cestlastay.com/sitemap.xml
