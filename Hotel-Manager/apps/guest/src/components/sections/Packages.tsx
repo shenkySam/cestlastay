@@ -39,7 +39,7 @@ export default function Packages() {
                     />
                     <span
                       className={clsx(
-                        'absolute right-4 top-4 rounded-token px-3 py-1 font-sans text-[0.7rem] uppercase tracking-[0.16em] backdrop-blur-sm',
+                        'absolute right-4 top-4 rounded-full px-3 py-1 font-sans text-[0.7rem] uppercase tracking-[0.16em] backdrop-blur-sm',
                         p.featured ? 'bg-ocean-600 text-white' : 'border border-white/15 bg-[#06121a]/55 text-white',
                       )}
                     >

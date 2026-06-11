@@ -49,7 +49,7 @@ export default {
         script: ['Caveat', 'ui-sans-serif', 'cursive'], // logo wordmark — handwriting
       },
 
-      borderRadius: { token: '6px', card: '8px' },
+      borderRadius: { token: '6px', card: '24px' },
 
       boxShadow: {
         // Layered, diffuse shadows — soft tropical daylight

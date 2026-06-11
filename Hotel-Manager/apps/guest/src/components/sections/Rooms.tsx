@@ -1,40 +1,56 @@
+import clsx from 'clsx';
 import { Star, Award } from 'lucide-react';
 import { rooms } from '../../lib/content';
 import type { Villa } from '../../lib/content';
 import Img from '../ui/Img';
 import Button from '../ui/Button';
 import Reveal from '../ui/Reveal';
+import Carousel from '../ui/Carousel';
 import { selectRoom } from '../../lib/events';
 
 const pill =
-  'inline-flex items-center gap-1.5 rounded-token bg-white/15 px-3 py-1 font-sans text-xs text-white backdrop-blur-md';
+  'inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-sans text-xs text-white backdrop-blur-md';
 
-function VillaCard({ villa, index }: { villa: Villa; index: number }) {
+/**
+ * Tall "vertical capsule" photo card. The huge radius rounds the top and bottom
+ * into domes, so the overlaid copy is centred and lifted clear of the curves.
+ * Only the carousel's centred (active) card reveals its full detail + CTA;
+ * neighbours fade to a quiet, titled photo.
+ */
+function VillaCard({ villa, isActive }: { villa: Villa; isActive: boolean }) {
   return (
-    // Outer cell is the Reveal stagger target (GSAP animates its transform);
-    // the floaty bob lives on the inner article so the two never fight over transform.
-    <div>
-      <article
-        style={{ animationDelay: `${index * 0.5}s` }}
-        className="group relative animate-floaty overflow-hidden rounded-[20px] shadow-soft transition-shadow duration-500 ease-breath hover:shadow-lift"
-      >
-        <Img
-          src={villa.image}
-          alt={villa.name}
-          className="aspect-[4/5] w-full"
-          imgClassName="transition-transform duration-[1.6s] ease-breath group-hover:scale-[1.05]"
-        />
-        {/* Dark gradient so the overlaid copy stays legible over any photo */}
-        <div className="pointer-events-none absolute inset-0 scrim-bottom" aria-hidden />
+    <article
+      className={clsx(
+        'group relative aspect-[3/4] overflow-hidden rounded-[9999px] shadow-soft transition-shadow duration-500 ease-breath',
+        isActive && 'shadow-lift',
+      )}
+    >
+      <Img
+        src={villa.image}
+        alt={villa.name}
+        className="absolute inset-0 h-full w-full"
+        imgClassName="transition-transform duration-[1.6s] ease-breath group-hover:scale-[1.05]"
+      />
+      {/* Dark gradient so the overlaid copy stays legible over any photo */}
+      <div className="pointer-events-none absolute inset-0 scrim-bottom" aria-hidden />
 
-        <div className="absolute inset-x-0 bottom-0 p-6">
-          <h3 className="font-serif text-2xl text-white">{villa.name}</h3>
-          <p className="mt-2 line-clamp-3 font-sans text-sm leading-relaxed text-white/85">
+      {/* Centred overlay, padded up so it clears the capsule's curved bottom */}
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-10 pb-[15%] text-center">
+        <h3 className="font-serif text-2xl text-white md:text-[1.7rem]">{villa.name}</h3>
+
+        {/* Detail + CTA — revealed only on the centred card */}
+        <div
+          className={clsx(
+            'flex flex-col items-center transition-opacity duration-500 ease-breath',
+            isActive ? 'opacity-100' : 'pointer-events-none opacity-0',
+          )}
+        >
+          <p className="mt-2 line-clamp-2 max-w-[15rem] font-sans text-sm leading-relaxed text-white/85">
             {villa.description}
           </p>
 
           {/* Badge pills — a rating OR a tag, plus the minimum night stay */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             {villa.rating != null && (
               <span className={pill}>
                 {villa.rating.toFixed(1)}
@@ -59,14 +75,14 @@ function VillaCard({ villa, index }: { villa: Villa; index: number }) {
           <Button
             href="#reserve"
             variant="light"
-            className="mt-5 w-full"
+            className="mt-5"
             onClick={() => selectRoom(villa.id)}
           >
             Reserve now
           </Button>
         </div>
-      </article>
-    </div>
+      </div>
+    </article>
   );
 }
 
@@ -81,13 +97,17 @@ export default function Rooms() {
           </h2>
           <p className="mt-5 font-sans leading-relaxed copy-on-scene">{rooms.intro}</p>
         </Reveal>
-
-        <Reveal className="mt-12 grid grid-cols-1 gap-7 sm:grid-cols-2" stagger={0.12}>
-          {rooms.items.map((v, i) => (
-            <VillaCard key={v.id} villa={v} index={i} />
-          ))}
-        </Reveal>
       </div>
+
+      {/* Coverflow lives in the content column so cards stay a sane size on wide screens */}
+      <Reveal className="container-x mt-14">
+        <Carousel
+          items={rooms.items}
+          getKey={(v) => v.id}
+          ariaLabel="Villas"
+          renderItem={(v, isActive) => <VillaCard villa={v} isActive={isActive} />}
+        />
+      </Reveal>
     </section>
   );
 }
