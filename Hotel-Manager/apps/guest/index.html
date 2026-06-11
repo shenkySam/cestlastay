@@ -6,8 +6,35 @@
     <meta name="theme-color" content="#06121a" />
     <meta
       name="description"
-      content="C'est La Stay — a sun-warmed beachfront retreat of palm shade, open water, and unhurried mornings, moments from the Bay of Bengal at Auroville."
+      content="Private beachfront villas with infinity pool, coastal spa, and sunrise yoga on the Bay of Bengal — minutes from Auroville, Pondicherry. Book direct."
     />
+
+    <!-- SEO -->
+    <link rel="canonical" href="https://cestlastay.com/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="C'est La Stay" />
+    <meta property="og:title" content="Beachfront Villas & Yoga Retreat in Auroville | C'est La Stay" />
+    <meta
+      property="og:description"
+      content="Private beachfront villas with infinity pool, coastal spa, and sunrise yoga on the Bay of Bengal — minutes from Auroville, Pondicherry. Book direct."
+    />
+    <meta property="og:url" content="https://cestlastay.com/" />
+    <meta property="og:image" content="https://cestlastay.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Beachfront Villas & Yoga Retreat in Auroville | C'est La Stay" />
+    <meta
+      name="twitter:description"
+      content="Private beachfront villas with infinity pool, coastal spa, and sunrise yoga on the Bay of Bengal — minutes from Auroville, Pondicherry."
+    />
+    <meta name="twitter:image" content="https://cestlastay.com/og.png" />
 
     <!-- Favicons / app icons (files live in /public) -->
     <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -24,7 +51,58 @@
       rel="stylesheet"
     />
 
-    <title>C'est La Stay · Beachfront Villas, Auroville Coast</title>
+    <title>Beachfront Villas & Yoga Retreat in Auroville | C'est La Stay</title>
+
+    <!-- Structured data (schema.org Resort). Facts mirror src/lib/content.ts —
+         keep the two in sync. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Resort",
+        "name": "C'est La Stay",
+        "description": "Beachfront villa retreat with infinity pool, coastal spa, ocean-to-table dining, and a beachfront yoga deck on the Bay of Bengal at Auroville, near Pondicherry.",
+        "url": "https://cestlastay.com",
+        "image": "https://cestlastay.com/og.png",
+        "logo": "https://cestlastay.com/logo.png",
+        "telephone": "+91-413-262-0000",
+        "email": "stay@cestlastay.com",
+        "priceRange": "₹6,500–₹22,000",
+        "numberOfRooms": 14,
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "10, Auroville Rd, Edayanchavadi",
+          "addressLocality": "Auroville",
+          "addressRegion": "Tamil Nadu",
+          "postalCode": "605101",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 11.999652,
+          "longitude": 79.800917
+        },
+        "checkinTime": "14:00",
+        "checkoutTime": "11:00",
+        "amenityFeature": [
+          { "@type": "LocationFeatureSpecification", "name": "Beachfront access", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Heated infinity pool", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Coastal spa and wellness treatments", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Ocean-to-table restaurant", "value": true },
+          { "@type": "LocationFeatureSpecification", "name": "Beachfront yoga deck", "value": true }
+        ]
+      }
+    </script>
+
+    <!-- Google Analytics 4 — uncomment and replace G-XXXXXXXXXX with the real
+         measurement ID from analytics.google.com once the property is created.
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+    -->
   </head>
   <body>
     <div id="root"></div>
