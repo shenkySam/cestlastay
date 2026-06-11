@@ -56,11 +56,11 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/rooms/categories` | Any | List all room categories |
+| GET | `/rooms/categories` | [PUBLIC] | List all room categories (used by the guest landing) |
 | POST | `/rooms/categories` | ADMIN | Create room category |
 | PATCH | `/rooms/categories/:id` | ADMIN | Update room category |
 | DELETE | `/rooms/categories/:id` | ADMIN | Delete category (fails if rooms exist) |
-| GET | `/rooms/availability` | Any | Available rooms for date range — `?checkIn=&checkOut=&categoryId=` |
+| GET | `/rooms/availability` | [PUBLIC] | Available rooms for date range — `?checkIn=&checkOut=&categoryId=` (used by the guest landing) |
 | GET | `/rooms` | Any | List rooms — `?status=&floor=&categoryId=` |
 | GET | `/rooms/:id` | Any | Get single room with category |
 | POST | `/rooms` | ADMIN | Create room |
@@ -77,6 +77,7 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
+| POST | `/bookings/public` | [PUBLIC] | Self-service booking from the guest landing — find-or-create guest by email, creates booking (`CONFIRMED` if a room is free for the dates, else `PENDING`), `source=DIRECT`, owned by the `system` user |
 | GET | `/bookings` | ADMIN, STAFF | List bookings — `?status=&guestId=&roomId=&search=` |
 | GET | `/bookings/:id` | ADMIN, STAFF | Get booking with guest, room, createdBy |
 | POST | `/bookings` | ADMIN, STAFF | Create booking — validates no overlap, marks room RESERVED |
@@ -86,6 +87,22 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 | POST | `/bookings/:id/cancel` | ADMIN, STAFF | Cancel booking, frees room if RESERVED |
 
 **Booking number format:** `BKG-YYYYMMDD-XXXX` (sequential per day)
+
+**`POST /bookings/public` body** (mirrors `apps/guest` `CreatePublicBookingRequest`):
+```json
+{
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "email": "jane@example.com",
+  "phone": "+1...",            // optional
+  "checkInDate": "2026-07-01",
+  "checkOutDate": "2026-07-04",
+  "numberOfGuests": 2,
+  "categoryId": "category-uuid", // optional — picks an available room in the category
+  "specialRequests": "Sea view"  // optional
+}
+```
+> The guest landing only calls this when `VITE_ENABLE_BOOKING_API=true`. The endpoint is `@Public()` — no auth required.
 
 ---
 
@@ -105,9 +122,9 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/services` | ADMIN, STAFF | List requests — `?status=&type=&guestId=` |
+| GET | `/services` | ADMIN, STAFF, GUEST | List requests — `?status=&type=&guestId=`. **Guests see only their own** (`guestId` is forced to the token's guest, any client-sent `guestId` is ignored) |
 | GET | `/services/:id` | ADMIN, STAFF | Get single request |
-| POST | `/services` | Any authenticated | Create request — notifies all staff in real-time |
+| POST | `/services` | Any authenticated | Create request — notifies all staff in real-time. **For guests, `guestId`/`bookingId` are forced to the token's** (client-sent values ignored) |
 | PATCH | `/services/:id` | ADMIN, STAFF | Update status, notes, assignedToId, priority |
 
 **`POST /services` body:**
@@ -185,10 +202,12 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 **Invoice number format:** `INV-YYYYMMDD-XXXX`
 
 **Auto-generation logic:**
-- Subtotal = `roomRate × nights` + service request `actualCost` line items
-- Tax = `subtotal × 0.10` (10%)
-- Total = `subtotal + tax - discount`
-- One invoice per booking (`bookingId` is UNIQUE on `invoices`)
+- Creates a single room line item: `roomRate × nights`
+- Subtotal = sum of line items; Tax = `subtotal × 0.10` (10%); Total = `subtotal + tax − discount`
+- One invoice per booking (`bookingId` is UNIQUE on `invoices`) — acts as the stay's folio
+- `InvoiceItem` can link to a `serviceRequest` (`serviceRequestId`) for service charges, but staff-managed service billing is a planned feature; today only the room line is generated
+
+> ⚠️ Guests currently hit `GET /invoices/booking/:bookingId` (read-only). They must NOT call `POST .../generate` — it is `@Roles(ADMIN, STAFF)` and returns 403. Invoice creation is staff/admin-owned.
 
 **Status lifecycle:** `DRAFT → PENDING → PARTIALLY_PAID → PAID` (or `OVERDUE`, `CANCELLED`)
 
@@ -259,12 +278,27 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 ---
 
-## Upcoming Endpoints (Phase 6+)
+## OTA Management
 
-| Phase | Endpoint | Description |
-|-------|----------|-------------|
-| 6 | `GET/POST /ota/bookings` | OTA manual entry |
-| 6 | `GET /analytics/*` | Occupancy, revenue, OTA reports |
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| POST | `/ota/bookings` | ADMIN, STAFF | Manually record an OTA booking (Booking.com / Airbnb / Expedia / Agoda / Other). Computes commission (explicit or default rate per source); marks room RESERVED |
+| GET | `/ota/bookings` | ADMIN, STAFF | List OTA bookings — `?source=&from=&to=` |
+| GET | `/ota/revenue` | ADMIN, STAFF | Revenue report — gross / commission / net, totals + breakdown by source — `?from=&to=` |
+
+**Default commission rates** (when not supplied): Booking.com 15%, Airbnb 14%, Expedia 18%, Agoda 17%, Other 15%.
+
+---
+
+## Analytics
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| GET | `/analytics/overview` | ADMIN | Headline stats (occupancy, revenue, counts) |
+| GET | `/analytics/revenue-by-day` | ADMIN | Daily revenue series |
+| GET | `/analytics/occupancy-by-day` | ADMIN | Daily occupancy series |
+| GET | `/analytics/bookings-by-source` | ADMIN | Booking counts grouped by source |
+| GET | `/analytics/top-rooms` | ADMIN | Most-booked rooms |
 
 ---
 

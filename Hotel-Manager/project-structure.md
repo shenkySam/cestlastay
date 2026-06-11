@@ -10,7 +10,8 @@ Actual folder hierarchy as built. Only files that exist are listed.
 Hotel Manager/
 ├── apps/
 │   ├── api/              # NestJS backend — port 3000
-│   └── web/              # React + Vite frontend — port 5173
+│   ├── web/              # React + Vite admin/staff/guest portal — port 5173
+│   └── guest/           # React + Vite "C'est La Stay" marketing landing — port 5174
 ├── packages/
 │   └── shared/           # Shared TypeScript types and enums
 ├── turbo.json
@@ -38,7 +39,7 @@ apps/api/
 │       │   ├── auth.controller.ts      # /auth/register, /login, /guest-portal, /refresh, /me, /logout
 │       │   ├── auth.service.ts         # JWT signing, bcrypt, guest portal access
 │       │   ├── strategies/
-│       │   │   └── jwt.strategy.ts     # Validates JWT, looks up user in DB
+│       │   │   └── jwt.strategy.ts     # Validates JWT — looks up users table, or guests table for GUEST tokens
 │       │   ├── guards/
 │       │   │   ├── jwt-auth.guard.ts
 │       │   │   └── roles.guard.ts      # Allows through if no @Roles decorator
@@ -87,11 +88,12 @@ apps/api/
 │       │
 │       ├── bookings/
 │       │   ├── bookings.module.ts      # Imports NotificationsModule
-│       │   ├── bookings.controller.ts  # /bookings, /bookings/:id/check-in, /check-out, /cancel
-│       │   ├── bookings.service.ts     # create (overlap check), checkIn, checkOut (auto-HK task), cancel
+│       │   ├── bookings.controller.ts  # /bookings, /bookings/public [PUBLIC], /:id/check-in, /check-out, /cancel
+│       │   ├── bookings.service.ts     # create (overlap check), createPublic (self-service), checkIn, checkOut (auto-HK task), cancel
 │       │   ├── bookings.gateway.ts     # Thin wrapper — delegates to NotificationsGateway
 │       │   └── dto/
 │       │       ├── create-booking.dto.ts
+│       │       ├── create-public-booking.dto.ts  # payload for POST /bookings/public (guest landing)
 │       │       └── update-booking.dto.ts
 │       │
 │       ├── services/
@@ -112,19 +114,40 @@ apps/api/
 │       │
 │       ├── invoices/                   # Phase 4 — billing
 │       │   ├── invoices.module.ts
-│       │   ├── invoices.controller.ts  # /invoices, /invoices/:id, /invoices/booking/:bookingId, .../generate
+│       │   ├── invoices.controller.ts  # /invoices, /invoices/:id, /invoices/booking/:bookingId (guest read), .../generate
 │       │   └── invoices.service.ts     # generateForBooking (10% tax, line items, INV-YYYYMMDD-XXXX)
 │       │
-│       └── payments/                   # Phase 4 — Stripe
-│           ├── payments.module.ts
-│           ├── payments.controller.ts  # /payments, /payments/intent, /payments/webhook (PUBLIC, raw body)
-│           ├── payments.service.ts     # createPaymentIntent, handleWebhook (payment_intent.succeeded)
-│           └── dto/
-│               └── create-payment-intent.dto.ts
+│       ├── payments/                   # Phase 4 — Stripe
+│       │   ├── payments.module.ts
+│       │   ├── payments.controller.ts  # /payments, /payments/intent, /payments/webhook (PUBLIC, raw body)
+│       │   ├── payments.service.ts     # createPaymentIntent, handleWebhook (payment_intent.succeeded)
+│       │   └── dto/
+│       │       └── create-payment-intent.dto.ts
+│       │
+│       ├── crm/                        # Phase 5 — email automation
+│       │   ├── crm.module.ts
+│       │   ├── crm.controller.ts       # /crm/emails, /crm/triggers, /crm/discount-codes
+│       │   ├── crm.service.ts          # email log queries, @Cron triggers (check-in reminders, post-stay loyalty), codes
+│       │   ├── email.service.ts        # SendGrid sender (stub mode when no API key)
+│       │   ├── email-templates.ts      # HTML email bodies
+│       │   └── dto/
+│       │       └── create-discount.dto.ts
+│       │
+│       ├── ota/                        # Phase 6 — OTA manual entry
+│       │   ├── ota.module.ts
+│       │   ├── ota.controller.ts       # /ota/bookings (POST/GET), /ota/revenue
+│       │   ├── ota.service.ts          # create OTA booking (commission calc), revenue report by source
+│       │   └── dto/
+│       │       └── create-ota-booking.dto.ts
+│       │
+│       └── analytics/                  # Phase 6 — reporting
+│           ├── analytics.module.ts
+│           ├── analytics.controller.ts # /analytics/overview, /revenue-by-day, /occupancy-by-day, /bookings-by-source, /top-rooms
+│           └── analytics.service.ts    # ADMIN-only aggregate queries
 │
 ├── prisma/
-│   ├── schema.prisma               # Full DB schema — 18 models, 12 enums
-│   └── seed.ts                     # Upsert-safe seed (rooms, users, sample booking)
+│   ├── schema.prisma               # Full DB schema — 15 models, 16 enums
+│   └── seed.ts                     # Upsert-safe seed (3 categories, 7 rooms, users incl. system, sample booking + invoice)
 │
 ├── package.json
 ├── tsconfig.json
@@ -133,6 +156,8 @@ apps/api/
 
 ### Module registration order in `app.module.ts`
 ```
+AuthModule
+UsersModule
 NotificationsModule   ← must come before any module that imports it
 RoomsModule
 GuestsModule
@@ -141,6 +166,9 @@ ServicesModule
 HousekeepingModule
 InvoicesModule
 PaymentsModule
+CrmModule
+OtaModule
+AnalyticsModule
 ```
 
 ---
@@ -153,8 +181,6 @@ apps/web/src/
 ├── App.tsx                         # All routes defined here
 │
 ├── pages/
-│   ├── ComingSoonPage.tsx          # Placeholder for unbuilt phases
-│   │
 │   ├── auth/
 │   │   └── LoginPage.tsx           # Staff + admin login
 │   │
@@ -164,7 +190,9 @@ apps/web/src/
 │   │   ├── RoomsPage.tsx           # Room grid with create/edit/delete modal
 │   │   ├── BookingsPage.tsx        # Booking table with status + search filter
 │   │   ├── GuestsPage.tsx          # Guest table with search
-│   │   └── PaymentsPage.tsx        # Phase 4 — payment history + revenue stats
+│   │   ├── PaymentsPage.tsx        # Phase 4 — payment history + revenue stats
+│   │   ├── CrmPage.tsx             # Phase 5 — email logs, triggers, discount codes
+│   │   └── AnalyticsPage.tsx       # Phase 6 — occupancy/revenue/source charts
 │   │
 │   ├── staff/
 │   │   ├── DashboardPage.tsx       # Live stats + today's check-ins
@@ -173,19 +201,21 @@ apps/web/src/
 │   │   ├── CheckInPage.tsx         # Lookup by booking# or name → check-in / check-out / cancel
 │   │   ├── ServiceQueuePage.tsx    # Ticket list + detail panel, assign + status actions
 │   │   ├── HousekeepingPage.tsx    # Task cards, status progression, create modal
-│   │   └── GuestsPage.tsx          # Guest list with inline edit + booking history
+│   │   ├── GuestsPage.tsx          # Guest list with inline edit + booking history
+│   │   └── OtaBookingsPage.tsx     # Phase 6 — OTA manual entry + revenue by source
 │   │
 │   └── guest/
 │       ├── GuestPortalPage.tsx     # Login via booking number + last name
 │       ├── GuestHomePage.tsx       # Quick-action hub
-│       ├── ServiceRequestPage.tsx  # Submit + track service requests (also used for /complaints)
+│       ├── ServiceRequestPage.tsx  # Submit + track service requests (Services tab)
 │       └── BillPage.tsx            # Phase 4 — invoice view + inline Stripe Elements payment
 │
 ├── components/
 │   ├── layouts/
 │   │   ├── AdminLayout.tsx         # Sidebar + notification header
 │   │   ├── StaffLayout.tsx         # Sidebar + notification header
-│   │   ├── GuestLayout.tsx         # Tab navigation
+│   │   ├── GuestLayout.tsx         # Tab navigation (My Booking, Services, My Bill)
+│   │   ├── AuthBackground.tsx      # Decorative background for login / guest-portal
 │   │   └── Sidebar.tsx
 │   ├── routing/
 │   │   └── ProtectedRoute.tsx      # Role-based route guard
@@ -201,6 +231,34 @@ apps/web/src/
 └── lib/
     ├── api.ts                      # Axios instance — auto-attaches JWT, silent refresh, toast errors
     └── socket.ts                   # Socket.IO client factory
+```
+
+---
+
+## Guest Landing (`apps/guest/`)
+
+Standalone marketing single-page site for "C'est La Stay" (port 5174). No auth, no Socket.IO. Heavy on animation (GSAP, Lenis smooth-scroll, Three.js hero, Embla carousel). Booking form is gated behind `VITE_ENABLE_BOOKING_API` and calls the API's public endpoints when on.
+
+```
+apps/guest/src/
+├── main.tsx
+├── App.tsx
+├── components/
+│   ├── layout/        # Navbar, Footer
+│   ├── scenes/        # HeroScene, SceneBackground (Three.js)
+│   ├── sections/      # Hero, Rooms, Amenities, Packages, Stats, Reserve, FooterCta
+│   └── ui/            # Button, Card, Carousel, Img, Logo, Marquee, Reveal, WaveDivider, Divider
+├── hooks/             # useParallax, useReveal, useSmoothScroll
+├── lib/
+│   ├── api.ts         # Axios instance for the public API
+│   ├── booking.ts     # Calls POST /bookings/public (when VITE_ENABLE_BOOKING_API=true)
+│   ├── content.ts     # Static page copy / data
+│   ├── portal.ts      # Builds the ${VITE_PORTAL_URL}/guest-portal login link
+│   ├── events.ts
+│   └── gsap.ts        # GSAP registration
+├── types/
+│   └── booking.types.ts  # CreatePublicBookingRequest (mirrors the API DTO)
+└── styles/
 ```
 
 ---

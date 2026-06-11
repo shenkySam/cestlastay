@@ -21,12 +21,12 @@ Push to GitHub first (Railway & Vercel deploy from the repo).
 1. Open the failing service → **Settings → Source** → set **Root Directory = `Hotel-Manager`**, Save.
    - Railway then finds `Hotel-Manager/railway.json`, which builds `apps/api/Dockerfile` (whole workspace as context).
 2. **Settings → Networking → Generate Domain** (gives e.g. `https://hms-api-production.up.railway.app`).
-3. **Variables** — add (values from your Supabase/Stripe/etc. dashboards; see `apps/api/.env.example`):
+3. **Variables** — add (values from your Neon/Stripe/etc. dashboards; see `apps/api/.env.example`):
 
    | Variable | Notes |
    |----------|-------|
-   | `DATABASE_URL` | Supabase connection string (app runtime) |
-   | `DIRECT_URL` | **Direct** (port 5432) connection — used by `prisma migrate deploy` |
+   | `DATABASE_URL` | Postgres **pooled** connection string (Neon) — app runtime |
+   | `DIRECT_URL` | Postgres **direct** connection — used by `prisma migrate deploy` |
    | `JWT_SECRET`, `JWT_REFRESH_SECRET` | random ≥32-char strings |
    | `JWT_EXPIRES_IN` (`15m`), `JWT_REFRESH_EXPIRES_IN` (`7d`) | optional, have defaults |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | payments |
@@ -84,5 +84,6 @@ Because the URLs reference each other, do it in this order:
 - Landing loads; **Login** navigates to the admin URL; Socket.IO connects; if `VITE_ENABLE_BOOKING_API=true`, a booking request succeeds cross-origin (no CORS error).
 
 ## Notes / future hardening
+- **Keep the API region close to the Neon region.** Every DB query is a round-trip; a mismatched region (e.g. Railway in `europe-west4` while Neon is in `ap-southeast-1`) adds ~0.3s per query and stacks to multi-second page loads. Railway region is set when the service is created — it can't be changed in place, so create the service in the right region.
 - The API Docker image installs the full workspace for simplicity. To slim it later, use a filtered install or `pnpm deploy`.
 - `prisma migrate deploy` runs on every container start (idempotent). With multiple replicas, move migrations to a release step.

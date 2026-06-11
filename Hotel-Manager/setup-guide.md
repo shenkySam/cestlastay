@@ -36,21 +36,21 @@ Before starting, ensure you have the following installed:
 
 ### Required Accounts
 
-1. **Supabase** (Database & Auth)
-   - Create account at: https://supabase.com
-   - Free tier sufficient for development
+1. **Neon** (PostgreSQL database) — **required**
+   - Create a free project at: https://neon.tech
+   - Copy the **pooled** connection string (`DATABASE_URL`) and the **direct** connection string (`DIRECT_URL`)
+   - > The schema is standard PostgreSQL — any Postgres host works (Neon, Supabase, or a local Postgres). Only `DATABASE_URL` / `DIRECT_URL` change. This guide uses Neon.
 
-2. **Stripe** (Payment Processing)
-   - Create account at: https://stripe.com
-   - Use test mode for development
+2. **Stripe** (Payment Processing) — optional for local dev
+   - Create account at: https://stripe.com (test mode)
+   - Without a key, set `STRIPE_SECRET_KEY="sk_test_placeholder"` so the API boots (an empty string crashes it)
 
-3. **SendGrid** (Email Service)
-   - Create account at: https://sendgrid.com
-   - Free tier: 100 emails/day
+3. **SendGrid** (Email Service) — optional
+   - https://sendgrid.com — free tier 100 emails/day
+   - Without a key, emails run in **stub mode** (logged, not sent)
 
 4. **Twilio** (Optional - SMS)
-   - Create account at: https://twilio.com
-   - Pay-as-you-go pricing
+   - https://twilio.com — pay-as-you-go
 
 ---
 
@@ -99,27 +99,17 @@ Edit `apps/api/.env`:
 
 ```env
 # ===========================================
-# DATABASE (Supabase PostgreSQL)
+# DATABASE (PostgreSQL — Neon)
 # ===========================================
-DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+# DATABASE_URL = pooled connection (used by the running app)
+# DIRECT_URL   = direct connection (used by `prisma migrate`) — required, schema declares directUrl
+# Get both from the Neon dashboard > Connection Details (toggle "Pooled connection").
+DATABASE_URL="postgresql://USER:PASSWORD@ep-xxxx-pooler.REGION.aws.neon.tech/neondb?sslmode=require"
+DIRECT_URL="postgresql://USER:PASSWORD@ep-xxxx.REGION.aws.neon.tech/neondb?sslmode=require"
 
-# Get from: Supabase Dashboard > Project Settings > Database
-# Format: postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-
-
-# ===========================================
-# SUPABASE AUTH
-# ===========================================
-SUPABASE_URL="https://[PROJECT_REF].supabase.co"
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-SUPABASE_JWT_SECRET="your-super-secret-jwt-secret"
-
-# Get from: Supabase Dashboard > Project Settings > API
-# - URL: Your project URL
-# - anon key: Public anon key
-# - service_role key: Service role key (keep secret!)
-# - JWT Secret: JWT Settings > JWT Secret
+# (Any Postgres host works — Neon, Supabase, or local. Only these two URLs change.)
+# The SUPABASE_* vars below are LEGACY/UNUSED — the app uses custom JWT auth, not Supabase Auth.
+# Leave them blank/omit unless you intentionally run on Supabase.
 
 
 # ===========================================
@@ -207,43 +197,44 @@ VITE_SOCKET_URL="http://localhost:3000"
 VITE_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 
 # App Settings
-VITE_APP_NAME="Hotel Management System"
+VITE_APP_NAME="C'est La Stay"
 VITE_APP_VERSION="1.0.0"
+```
+
+#### Guest Landing Environment (`apps/guest/.env`)
+
+```bash
+cp apps/guest/.env.example apps/guest/.env
+```
+
+```env
+# Base URL of the API (only used when the booking flag below is ON)
+VITE_API_URL="http://localhost:3000/api/v1"
+
+# Booking form is OFF by default. Flip to true to wire it to POST /bookings/public.
+VITE_ENABLE_BOOKING_API=false
+
+# The portal (apps/web) — the landing's "Login" link points at ${VITE_PORTAL_URL}/guest-portal
+VITE_PORTAL_URL="http://localhost:5173"
 ```
 
 ---
 
-## Supabase Configuration
+## Database Configuration (Neon)
 
-### 1. Create Supabase Project
+### 1. Create a Neon Project
 
-1. Go to https://supabase.com/dashboard
-2. Click "New Project"
-3. Fill in:
-   - Project name: `hotel-management-system`
-   - Database password: (save this!)
-   - Region: Choose closest to you
-4. Wait for project to initialize (~2 minutes)
+1. Go to https://console.neon.tech and create a project (pick a region close to where the API runs).
+2. On the project dashboard, open **Connection Details**.
 
-### 2. Get Connection Details
+### 2. Copy both connection strings
 
-Navigate to: **Project Settings > Database**
+- **Pooled** connection (toggle "Pooled connection" ON) → `DATABASE_URL`
+- **Direct** connection (toggle OFF / "Direct") → `DIRECT_URL`
 
-Copy the connection string:
-```
-postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-```
+Paste both into `apps/api/.env`. That's the only DB setup needed — the app uses custom JWT auth, so there are no Supabase-style auth keys to configure.
 
-### 3. Enable Email Authentication
-
-Navigate to: **Authentication > Providers**
-- Enable "Email" provider
-- Configure email templates (optional)
-
-### 4. Get API Keys
-
-Navigate to: **Project Settings > API**
-- Copy `URL`, `anon public`, and `service_role` keys to `.env`
+> **Using a different Postgres host?** Supabase or a local Postgres work identically — just set `DATABASE_URL` and `DIRECT_URL` to that host. For local Postgres they can be the same URL.
 
 ---
 
@@ -273,30 +264,27 @@ This will:
 ### 3. Seed Database (Optional)
 
 ```bash
-npx prisma db seed
+# from apps/api
+pnpm prisma:seed          # or: npx ts-node prisma/seed.ts
 ```
 
-This will create:
-- 1 Admin user (email: `admin@hotel.com`, password: `Admin123!`)
-- 2 Staff users
-- 3 Guest users
-- 5 Room categories
-- 10 Rooms
-- 3 Sample bookings
+The seed is upsert-safe (re-runnable). It creates:
+- 1 Admin (`admin@hotel.com`)
+- 2 Staff (front desk `staff@hotel.com`, housekeeping `housekeeping@hotel.com`)
+- 1 System user (`system@hotel.com`, non-login — owns public/self-service bookings)
+- 1 Guest (`guest@hotel.com`) — note: guests normally access via the booking portal, not email/password
+- 3 Room categories, 7 rooms
+- 1 sample booking `BKG-20260501-0001` (+ its invoice `INV-20260501-0001`)
 
 **Test Credentials:**
 ```
-Admin:
-  Email: admin@hotel.com
-  Password: Admin123!
+Admin:        admin@hotel.com        / Admin123!
+Staff:        staff@hotel.com        / Staff123!
+Housekeeping: housekeeping@hotel.com / Staff123!
 
-Staff:
-  Email: staff@hotel.com
-  Password: Staff123!
-
-Guest:
-  Email: guest@hotel.com
-  Password: Guest123!
+Guest portal (apps/web → /guest-portal):
+  Booking #:  BKG-20260501-0001
+  Last name:  Smith
 ```
 
 ### 4. View Database (Optional)
@@ -389,9 +377,12 @@ stripe listen --forward-to localhost:3000/api/v1/payments/stripe/webhook
 pnpm dev
 ```
 
-This starts:
+This starts all three apps:
 - Backend API at `http://localhost:3000`
-- Frontend at `http://localhost:5173`
+- Portal (admin/staff/guest) at `http://localhost:5173`
+- Guest landing at `http://localhost:5174`
+
+> `pnpm dev` uses turbo and runs the apps together — if one crashes (e.g. the API on a bad env var), turbo tears down the others. During backend iteration, prefer separate terminals (Option 2).
 
 ### Option 2: Start Services Individually
 
@@ -401,9 +392,15 @@ cd apps/api
 pnpm dev
 ```
 
-**Terminal 2 - Frontend:**
+**Terminal 2 - Portal:**
 ```bash
 cd apps/web
+pnpm dev
+```
+
+**Terminal 3 - Guest landing:**
+```bash
+cd apps/guest
 pnpm dev
 ```
 
