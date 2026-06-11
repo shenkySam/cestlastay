@@ -1,5 +1,7 @@
 # Hotel Management System - Implementation Plan
 
+> **Status (current):** This is the original implementation plan, kept for historical context. All six phases below have shipped. Since then, a third app — the **`apps/guest` "C'est La Stay" marketing landing** (with a public `POST /bookings/public` self-service booking flow) — was added, and the database moved from Supabase to **Neon** (standard PostgreSQL). For the live picture see `context.md`, `project-structure.md`, and `api-endpoints.md`.
+
 ## Project Overview
 
 A comprehensive web-based Hotel Management System designed to streamline daily operations, manage staff, handle room inventory, and elevate the guest experience through role-based access controls, real-time notifications, and automated CRM.

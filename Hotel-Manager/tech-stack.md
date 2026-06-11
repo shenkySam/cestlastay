@@ -24,17 +24,16 @@ This document outlines the technology choices for the Hotel Management System an
 - Requires understanding of monorepo concepts
 - Worth it for type safety and code reuse benefits
 
-**Structure:**
+**Structure (as built):**
 ```
 apps/
-  ├── api/          # NestJS backend
-  ├── web/          # React frontend
-  └── mobile/       # React Native (future)
+  ├── api/          # NestJS backend (port 3000)
+  ├── web/          # React + Vite admin/staff/guest portal (port 5173)
+  └── guest/        # React + Vite "C'est La Stay" marketing landing (port 5174)
 packages/
-  ├── shared/       # Shared types and utilities
-  ├── ui/           # Shared React components
-  └── eslint-config/
+  └── shared/       # Shared TypeScript types and enums
 ```
+> A React Native mobile app and shared `ui` / `eslint-config` packages were envisioned but are not built. The three deployable apps each ship independently (see DEPLOYMENT.md).
 
 ---
 
@@ -67,28 +66,28 @@ packages/
 
 ## Database
 
-### Supabase (PostgreSQL)
+### Neon (serverless PostgreSQL)
 
-**Decision:** Use Supabase over self-hosted PostgreSQL or other databases
+**Decision:** PostgreSQL, currently hosted on **Neon**. The project was originally scaffolded against Supabase; it now runs on Neon.
 
-**Why?**
-- **Built-in authentication:** JWT token management, email auth, social logins out of the box
-- **Row-level security:** Database-level access control policies (bonus feature)
-- **Real-time subscriptions:** Listen to database changes (optional enhancement)
-- **PostgreSQL underneath:** Can migrate to self-hosted Postgres if needed
-- **Free tier:** 500MB database, 2GB bandwidth, 50MB file storage
-- **Managed infrastructure:** Zero server maintenance
-- **REST API auto-generated:** Direct database queries from frontend if needed
+> **The schema is provider-agnostic standard PostgreSQL.** Any Postgres host works — Neon, Supabase, or a local Postgres — only `DATABASE_URL` / `DIRECT_URL` change. Nothing in the app uses Supabase/Neon-specific features (no RLS, no Supabase Auth — auth is custom JWT; see Auth in `apps/api`).
 
-**Trade-offs:**
-- Vendor dependency (mitigated by PostgreSQL compatibility)
-- Open-source and self-hostable if needed
+**Why Postgres?**
+- **Relational fit:** bookings, rooms, invoices, payments are inherently relational
+- **Prisma support:** first-class type-safe client + migrations
+- **Mature + portable:** can move between managed hosts or self-host
+
+**Why Neon specifically?**
+- **Serverless:** scales to zero when idle (cost-efficient for an MVP)
+- **Pooled + direct connections:** `DATABASE_URL` (pooled) for the app, `DIRECT_URL` for `prisma migrate`
+- **Generous free tier**
+
+> ⚠️ Neon auto-suspends after ~5 min idle → first request after idle pays a cold start (~300–800ms).
 
 **Alternatives Considered:**
+- **Supabase:** original choice; fine, but we don't use its auth/RLS/realtime, so a plain Postgres host is simpler
 - **MongoDB:** NoSQL doesn't fit relational booking data well
-- **MySQL:** Supabase offers more features for same cost
-- **Firebase:** More expensive, less flexible for complex queries
-- **Self-hosted PostgreSQL:** Requires infrastructure management
+- **Self-hosted PostgreSQL:** requires infrastructure management
 
 ---
 
@@ -138,7 +137,18 @@ packages/
 - **Angular:** Too heavy, steeper learning curve
 - **Svelte:** Less mature ecosystem
 
-**UI Library:** TBD (Tailwind CSS + Headless UI or Material-UI)
+**UI / styling:** Tailwind CSS (utility classes + custom component classes in `globals.css`), `lucide-react` icons, `react-hot-toast` toasts.
+
+### Guest landing (`apps/guest`) — animation stack
+
+The marketing landing is a separate React + Vite SPA tuned for motion, not shared with the portal:
+- **GSAP** — scroll-triggered animations
+- **Lenis** — smooth scrolling
+- **Three.js** — hero 3D scene
+- **Embla Carousel** — room/villa carousels
+- **Tailwind CSS** — styling
+
+It has no auth and no Socket.IO; it optionally calls the API's public booking endpoints when `VITE_ENABLE_BOOKING_API=true`.
 
 ---
 
@@ -241,11 +251,12 @@ packages/
 - **Zero config:** Detects React/Vite automatically
 
 **Why Railway?**
-- **Free tier:** $5/month credit (sufficient for MVP)
-- **PostgreSQL included:** No separate database hosting needed
+- **Always-on process:** NestJS needs a long-running server for Socket.IO + `@Cron` jobs
 - **Auto-deployment:** Git integration
 - **Environment variables:** Easy config management
 - **WebSocket support:** Unlike some PaaS providers
+
+> The database is **Neon** (separate from Railway), not Railway's bundled Postgres. The repo deploys as **three** services: API → Railway; `apps/web` and `apps/guest` → two Vercel projects. See `DEPLOYMENT.md`. Mind the API↔DB region: keep Railway's region close to the Neon region to avoid per-query latency.
 
 **Alternatives Considered:**
 - **Netlify:** Similar to Vercel, slightly less popular
@@ -295,16 +306,17 @@ packages/
 |--------------------|------------------|----------------------------------------|
 | Monorepo           | Turborepo        | Code sharing, atomic commits           |
 | Backend Framework  | NestJS           | Enterprise architecture, TypeScript    |
-| Database           | Supabase (PostgreSQL) | Managed, free tier, built-in auth |
+| Database           | Neon (PostgreSQL) | Serverless Postgres; schema is provider-agnostic |
 | ORM                | Prisma           | Type-safe queries, migrations          |
-| Frontend           | React + Vite     | Industry standard, fast dev server     |
+| Portal frontend    | React + Vite + Tailwind | Admin/staff/guest SPA              |
+| Landing frontend   | React + Vite + GSAP/Three.js/Lenis/Embla | Animated marketing site |
 | Real-time          | Socket.IO        | Reliable, fallback support             |
 | Payments           | Stripe           | PCI-compliant, strong SDKs             |
 | Email              | SendGrid         | Free tier, good deliverability         |
 | SMS                | Twilio           | Pay-as-you-go, reliable                |
-| Deployment (Web)   | Vercel           | Free, auto-deploy, CDN                 |
-| Deployment (API)   | Railway          | Free tier, PostgreSQL included         |
-| Future Mobile      | React Native     | Code sharing with React web            |
+| Deployment (Web + Landing) | Vercel ×2 | Two static SPA projects, auto-deploy, CDN |
+| Deployment (API)   | Railway          | Always-on process for WS + cron        |
+| Future Mobile      | React Native     | Code sharing with React web (not built) |
 
 This stack prioritizes:
 - **Developer experience** (type safety, fast dev server, good tooling)
