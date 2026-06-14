@@ -120,6 +120,15 @@ A comprehensive web-based Hotel Management System designed to streamline daily o
 - `apps/web/src/pages/admin/PaymentsPage.tsx` - Admin payment history & revenue
 - `apps/api/src/main.ts` - `rawBody: true` for webhook signature verification
 
+**Folio update (June 2026 — branch `feat/staff-invoice-folio`):**
+- ✅ Staff/admin create the invoice as a DRAFT **folio** (`POST /invoices/booking/:bookingId`) — room charge included by default for direct bookings, excluded for OTA (toggleable)
+- ✅ Line-item CRUD with automatic recalc (tax from `TAX_RATE` env instead of hardcoded 10%)
+- ✅ Service-request billing: staff price tickets (`estimatedCost`/`actualCost` via `PATCH /services/:id`), completed+priced tickets pulled onto the folio via `serviceRequestId`
+- ✅ Issue flow: invoice hidden from guest while DRAFT, visible after `POST /invoices/:id/issue` (→ PENDING)
+- ✅ Manual payments (`POST /payments/manual` — cash/card/bank) alongside guest Stripe checkout
+- ✅ `<InvoiceEditor>` modal on Staff + Admin Bookings pages; Service Queue gained a cost field
+- ✅ Guest BillPage now read-only — fixed the "Insufficient permissions" toast (it auto-called the staff-only generate endpoint when no invoice existed)
+
 ---
 
 ### Phase 5: CRM & Email Automation (Week 7) ✅ Complete
