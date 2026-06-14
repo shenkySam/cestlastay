@@ -14,6 +14,7 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 | Phase 4 | Invoices, Stripe Payments | ✅ Complete |
 | Phase 5 | CRM, Email Automation | ✅ Complete |
 | Phase 6 | OTA Management, Analytics | ✅ Complete |
+| Folio update | Staff/admin-built invoice folio — line items, service-request billing, manual payments, guest read-only bill (hidden while DRAFT) | 🧪 Built on `feat/staff-invoice-folio` — local testing |
 
 ---
 

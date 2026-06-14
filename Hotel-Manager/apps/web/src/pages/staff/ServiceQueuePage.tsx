@@ -13,6 +13,8 @@ interface ServiceRequest {
   priority: number;
   description: string;
   notes?: string;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
   requestedAt: string;
   startedAt?: string;
   completedAt?: string;
@@ -41,8 +43,15 @@ export default function StaffServiceQueuePage() {
   const [selected, setSelected] = useState<ServiceRequest | null>(null);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [costDraft, setCostDraft] = useState('');
+  const [savingCost, setSavingCost] = useState(false);
 
   useEffect(() => { load(); loadStaff(); }, [filterStatus]);
+
+  useEffect(() => {
+    const cost = selected?.actualCost ?? selected?.estimatedCost;
+    setCostDraft(cost != null ? String(Number(cost)) : '');
+  }, [selected?.id]);
 
   useEffect(() => {
     if (!socket) return;
@@ -94,6 +103,22 @@ export default function StaffServiceQueuePage() {
       // errors shown by interceptor
     } finally {
       setAssigningId(null);
+    }
+  }
+
+  async function saveCost(sr: ServiceRequest) {
+    setSavingCost(true);
+    try {
+      const { data } = await api.patch(`/services/${sr.id}`, {
+        actualCost: parseFloat(costDraft) || 0,
+      });
+      setRequests((prev) => prev.map((r) => (r.id === sr.id ? data : r)));
+      setSelected(data);
+      toast.success('Cost saved — ready to bill from the folio');
+    } catch {
+      // errors shown by interceptor
+    } finally {
+      setSavingCost(false);
     }
   }
 
@@ -196,6 +221,36 @@ export default function StaffServiceQueuePage() {
                   <div><p className="text-gray-500 text-xs mb-1">Staff Notes</p>
                     <p className="text-gray-700">{selected.notes}</p>
                   </div>
+                )}
+              </div>
+
+              {/* Price the service — pulled onto the guest folio by billing staff */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Cost (billable to guest)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="input text-sm flex-1"
+                    placeholder="0.00"
+                    value={costDraft}
+                    onChange={(e) => setCostDraft(e.target.value)}
+                  />
+                  <button
+                    className="btn-secondary text-sm"
+                    disabled={savingCost || costDraft === ''}
+                    onClick={() => saveCost(selected)}
+                  >
+                    {savingCost ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+                {selected.actualCost != null && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Current: ${Number(selected.actualCost).toFixed(2)}
+                  </p>
                 )}
               </div>
 
