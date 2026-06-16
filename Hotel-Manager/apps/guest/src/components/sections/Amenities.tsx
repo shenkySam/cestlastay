@@ -1,21 +1,8 @@
 import clsx from 'clsx';
-import { Waves, Flower2, UtensilsCrossed, Sunrise } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { amenities } from '../../lib/content';
-import type { Amenity } from '../../lib/content';
-import Img from '../ui/Img';
 import Reveal from '../ui/Reveal';
 import Marquee from '../ui/Marquee';
-
-const iconMap: Record<Amenity['icon'], LucideIcon> = {
-  Waves,
-  Flower2,
-  UtensilsCrossed,
-  Sunrise,
-};
-
-// Asymmetrical 12-col rhythm: 7/5, then 5/7.
-const spans = ['md:col-span-7', 'md:col-span-5', 'md:col-span-5', 'md:col-span-7'];
+import ClothAmenities from '../scenes/ClothAmenities';
 
 export default function Amenities() {
   return (
@@ -32,40 +19,13 @@ export default function Amenities() {
           </div>
           <p className="font-sans leading-relaxed copy-on-scene md:col-span-5">{amenities.intro}</p>
         </Reveal>
+      </div>
 
-        {/* Asymmetrical feature grid */}
-        <Reveal className="mt-14 grid items-start gap-6 md:grid-cols-12" stagger={0.12}>
-          {amenities.items.map((a, i) => {
-            const Icon = iconMap[a.icon];
-            return (
-              <div key={a.title} className={spans[i % spans.length]}>
-                <article
-                  style={{ animationDelay: `${i * 0.7}s` }}
-                  className={clsx(
-                    'group card h-full animate-floaty overflow-hidden',
-                    i % 2 === 1 && 'md:mt-12', // grid-breaking stagger (right column dips)
-                  )}
-                >
-                <div className="relative">
-                  <Img
-                    src={a.image}
-                    alt={a.title}
-                    className={clsx('w-full', i % 2 === 0 ? 'aspect-[16/10]' : 'aspect-[4/3]')}
-                    imgClassName="transition-transform duration-[1.4s] ease-breath group-hover:scale-[1.06]"
-                  />
-                  <div className="pointer-events-none absolute inset-0 scrim-bottom opacity-90" aria-hidden />
-                  <div className="absolute bottom-0 left-0 p-6">
-                    <Icon size={26} strokeWidth={1.4} className="mb-3 text-white" />
-                    <h3 className="font-serif text-2xl text-white md:text-3xl">{a.title}</h3>
-                  </div>
-                </div>
-                  <p className="p-6 font-sans leading-relaxed text-muted">{a.description}</p>
-                </article>
-              </div>
-            );
-          })}
-        </Reveal>
+      {/* Scroll-driven 3D cloth experience (falls back to a static grid under
+          reduced-motion / no-WebGL — see ClothAmenities) */}
+      <ClothAmenities items={amenities.items} />
 
+      <div className="container-x">
         {/* Quiet luxuries — hairline-separated strip */}
         <Reveal className="mt-12 flex flex-wrap items-center justify-center" delay={0.05}>
           {amenities.highlights.map((h, i) => (
