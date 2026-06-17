@@ -77,6 +77,8 @@ export class ServicesService {
     if (dto.notes !== undefined) data.notes = dto.notes;
     if (dto.assignedToId !== undefined) data.assignedToId = dto.assignedToId;
     if (dto.priority !== undefined) data.priority = dto.priority;
+    if (dto.estimatedCost !== undefined) data.estimatedCost = dto.estimatedCost;
+    if (dto.actualCost !== undefined) data.actualCost = dto.actualCost;
 
     return this.prisma.serviceRequest.update({ where: { id }, data, include: SR_INCLUDE });
   }
