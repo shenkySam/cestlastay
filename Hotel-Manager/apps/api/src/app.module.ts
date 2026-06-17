@@ -15,6 +15,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { CrmModule } from './modules/crm/crm.module';
 import { OtaModule } from './modules/ota/ota.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { RatingsModule } from './modules/ratings/ratings.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     CrmModule,
     OtaModule,
     AnalyticsModule,
+    RatingsModule,
   ],
 })
 export class AppModule {}

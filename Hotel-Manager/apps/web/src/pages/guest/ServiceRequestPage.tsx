@@ -15,6 +15,8 @@ interface ServiceRequest {
   notes?: string;
   requestedAt: string;
   completedAt?: string;
+  serviceRating?: number | null;
+  ratedAt?: string | null;
 }
 
 const TYPE_ICONS: Record<ServiceType, string> = {
@@ -44,6 +46,44 @@ const STATUS_BADGE: Record<ServiceStatus, string> = {
   [ServiceStatus.CANCELLED]: 'badge-red',
 };
 
+function StarPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const [hover, setHover] = useState(0);
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHover(star)}
+          onMouseLeave={() => setHover(0)}
+          className="text-2xl transition-transform hover:scale-110"
+        >
+          <span className={(hover || value) >= star ? 'text-yellow-400' : 'text-gray-300'}>
+            ★
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StarDisplay({ value }: { value: number }) {
+  return (
+    <span className="text-sm">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <span key={s} className={s <= value ? 'text-yellow-400' : 'text-gray-300'}>★</span>
+      ))}
+    </span>
+  );
+}
+
 export default function GuestServiceRequestPage() {
   const { user } = useAuth();
   const [myRequests, setMyRequests] = useState<ServiceRequest[]>([]);
@@ -52,6 +92,12 @@ export default function GuestServiceRequestPage() {
   const [selectedType, setSelectedType] = useState<ServiceType | null>(null);
   const [description, setDescription] = useState('');
   const [showForm, setShowForm] = useState(false);
+
+  // Rating modal state
+  const [ratingTarget, setRatingTarget] = useState<ServiceRequest | null>(null);
+  const [srRating, setSrRating] = useState(0);
+  const [srComment, setSrComment] = useState('');
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
   const guestId = (user as any)?.guest?.id;
 
@@ -88,6 +134,24 @@ export default function GuestServiceRequestPage() {
     }
   }
 
+  async function submitServiceRating() {
+    if (!ratingTarget || !srRating) return;
+    setRatingSubmitting(true);
+    try {
+      await api.post(`/services/${ratingTarget.id}/rate`, {
+        rating: srRating,
+        comment: srComment.trim() || undefined,
+      });
+      toast.success('Thanks for rating this service!');
+      setRatingTarget(null);
+      setSrRating(0);
+      setSrComment('');
+      loadRequests();
+    } finally {
+      setRatingSubmitting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -120,16 +184,38 @@ export default function GuestServiceRequestPage() {
                   {sr.status.replace('_', ' ')}
                 </span>
               </div>
+
               <p className="text-sm text-gray-700">{sr.description}</p>
+
               {sr.notes && (
                 <p className="text-sm text-blue-700 bg-blue-50 rounded px-3 py-1.5">
                   Staff note: {sr.notes}
                 </p>
               )}
-              <p className="text-xs text-gray-400">
-                {format(new Date(sr.requestedAt), 'dd MMM yyyy HH:mm')}
-                {sr.completedAt && ` · Completed ${format(new Date(sr.completedAt), 'HH:mm')}`}
-              </p>
+
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-gray-400">
+                  {format(new Date(sr.requestedAt), 'dd MMM yyyy HH:mm')}
+                  {sr.completedAt && ` · Completed ${format(new Date(sr.completedAt), 'HH:mm')}`}
+                </p>
+
+                {/* Rating area */}
+                {sr.status === ServiceStatus.COMPLETED && (
+                  sr.serviceRating ? (
+                    <div className="flex items-center gap-1.5">
+                      <StarDisplay value={sr.serviceRating} />
+                      <span className="text-xs text-gray-400">Rated</span>
+                    </div>
+                  ) : (
+                    <button
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2"
+                      onClick={() => { setRatingTarget(sr); setSrRating(0); setSrComment(''); }}
+                    >
+                      Rate this service
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -141,7 +227,6 @@ export default function GuestServiceRequestPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-5">
             <h3 className="font-semibold text-gray-900 text-lg">New Service Request</h3>
 
-            {/* Service type picker */}
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">What do you need?</p>
               <div className="grid grid-cols-3 gap-2">
@@ -162,7 +247,6 @@ export default function GuestServiceRequestPage() {
               </div>
             </div>
 
-            {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Describe your request
@@ -187,6 +271,58 @@ export default function GuestServiceRequestPage() {
               <button
                 className="btn-secondary flex-1"
                 onClick={() => { setShowForm(false); setSelectedType(null); setDescription(''); }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Service rating modal */}
+      {ratingTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-5">
+            <div>
+              <h3 className="font-semibold text-gray-900 text-lg">Rate this Service</h3>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {TYPE_ICONS[ratingTarget.type]} {TYPE_LABELS[ratingTarget.type]} · {ratingTarget.ticketNumber}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  How satisfied were you?
+                </label>
+                <StarPicker value={srRating} onChange={setSrRating} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Comments <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  className="input"
+                  rows={2}
+                  placeholder="Any specific feedback?"
+                  value={srComment}
+                  onChange={(e) => setSrComment(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                className="btn-primary flex-1"
+                disabled={!srRating || ratingSubmitting}
+                onClick={submitServiceRating}
+              >
+                {ratingSubmitting ? 'Submitting...' : 'Submit'}
+              </button>
+              <button
+                className="btn-secondary flex-1"
+                onClick={() => setRatingTarget(null)}
               >
                 Cancel
               </button>

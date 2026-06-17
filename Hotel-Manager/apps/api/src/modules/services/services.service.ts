@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ServiceStatus, ServiceType } from '@hms/shared';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
@@ -79,6 +79,20 @@ export class ServicesService {
     if (dto.priority !== undefined) data.priority = dto.priority;
 
     return this.prisma.serviceRequest.update({ where: { id }, data, include: SR_INCLUDE });
+  }
+
+  async rateService(id: string, guestId: string, rating: number, comment?: string) {
+    const sr = await this.prisma.serviceRequest.findUnique({ where: { id }, include: SR_INCLUDE });
+    if (!sr) throw new NotFoundException(`Service request ${id} not found`);
+    if (sr.guestId !== guestId) throw new ForbiddenException('This service request does not belong to you');
+    if (sr.status !== 'COMPLETED' as any) throw new BadRequestException('Only completed service requests can be rated');
+    if (sr.ratedAt) throw new BadRequestException('This service request has already been rated');
+
+    return this.prisma.serviceRequest.update({
+      where: { id },
+      data: { serviceRating: rating, ratingComment: comment ?? null, ratedAt: new Date() },
+      include: SR_INCLUDE,
+    });
   }
 
   private async generateTicketNumber(): Promise<string> {

@@ -11,6 +11,7 @@ const NAV: NavItem[] = [
   { label: 'Analytics',        href: '/admin/analytics', icon: '📈' },
   { label: 'CRM & Emails',     href: '/admin/crm',       icon: '📧' },
   { label: 'Payments',         href: '/admin/payments',  icon: '💳' },
+  { label: 'Ratings',          href: '/admin/ratings',   icon: '⭐' },
 ];
 
 export function AdminLayout() {

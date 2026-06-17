@@ -209,6 +209,7 @@ model Guest {
 
   bookings        Booking[]
   serviceRequests ServiceRequest[]
+  ratings         Rating[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -288,6 +289,7 @@ model Booking {
 
   invoice         Invoice?
   serviceRequests ServiceRequest[]
+  rating          Rating?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -319,9 +321,12 @@ model ServiceRequest {
   assignedTo    Staff?        @relation(fields: [assignedToId], references: [id])
   estimatedCost Decimal?      @map("estimated_cost") @db.Decimal(10, 2)
   actualCost    Decimal?      @map("actual_cost") @db.Decimal(10, 2)
-  requestedAt   DateTime      @default(now()) @map("requested_at")
-  startedAt     DateTime?     @map("started_at")
-  completedAt   DateTime?     @map("completed_at")
+  requestedAt    DateTime      @default(now()) @map("requested_at")
+  startedAt      DateTime?     @map("started_at")
+  completedAt    DateTime?     @map("completed_at")
+  serviceRating  Int?          @map("service_rating")
+  ratingComment  String?       @map("rating_comment")
+  ratedAt        DateTime?     @map("rated_at")
 
   invoiceItems InvoiceItem[]
 
@@ -498,22 +503,10 @@ model LoyaltyDiscount {
   @@map("loyalty_discounts")
 }
 
-// ==================== AUDIT ====================
+// ==================== RATINGS ====================
 
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?  @map("user_id")
-  action    String
-  entity    String
-  entityId  String   @map("entity_id")
-  changes   Json?
-  ipAddress String?  @map("ip_address")
-  userAgent String?  @map("user_agent")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([userId])
-  @@index([entity, entityId])
-  @@index([createdAt])
-  @@map("audit_logs")
-}
+model Rating {
+  id            String   @id @default(uuid())
+  bookingId     String   @unique @map("booking_id")
+  booking       Booking  @relation(fields: [bookingId], references: [id])
+  guestId       String   @map("gu
