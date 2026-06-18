@@ -14,7 +14,6 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 | Phase 4 | Invoices, Stripe Payments | ✅ Complete |
 | Phase 5 | CRM, Email Automation | ✅ Complete |
 | Phase 6 | OTA Management, Analytics | ✅ Complete |
-| Folio update | Staff/admin-built invoice folio — line items, service-request billing, manual payments, guest read-only bill (hidden while DRAFT) | 🧪 Built on `feat/staff-invoice-folio` — local testing |
 
 ---
 
@@ -24,20 +23,16 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 Hotel Manager/
 ├── apps/
 │   ├── api/          # NestJS backend — port 3000
-│   ├── web/          # React + Vite admin/staff/guest portal — port 5173
-│   └── guest/        # React + Vite "C'est La Stay" marketing landing — port 5174
+│   └── web/          # React + Vite frontend — port 5173
 ├── packages/
 │   └── shared/       # Shared TypeScript types and enums
 ├── turbo.json
 └── pnpm-workspace.yaml
 ```
 
-**Run everything:** `pnpm dev` from root (starts api, web, and guest)
+**Run everything:** `pnpm dev` from root (starts both api and web)
 **Run API alone:** `cd apps/api && npx ts-node -r tsconfig-paths/register src/main.ts`
 **Run Web alone:** `cd apps/web && pnpm dev`
-**Run Landing alone:** `cd apps/guest && pnpm dev`
-
-> The **guest landing** (`apps/guest`) is a standalone marketing site. Its booking form is OFF by default (`VITE_ENABLE_BOOKING_API=false`); when enabled it calls the public API endpoints `GET /rooms/categories`, `GET /rooms/availability`, `POST /bookings/public`. Its nav "Login" links to `${VITE_PORTAL_URL}/guest-portal` (the `apps/web` portal).
 
 ---
 
@@ -84,13 +79,11 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 
 ## Database
 
-**Provider:** Neon (serverless PostgreSQL)
-**Connection:** `DATABASE_URL` (pooled) + `DIRECT_URL` (direct, used by `prisma migrate`) — see `apps/api/.env`
+**Provider:** Supabase (PostgreSQL)
+**Connection:** Session Pooler URL (IPv4 compatible) — see `apps/api/.env`
 **ORM:** Prisma — schema at `apps/api/prisma/schema.prisma`
 
-> The schema is **standard PostgreSQL** — any Postgres host works (Neon, Supabase, or a local Postgres). Only `DATABASE_URL` / `DIRECT_URL` change. The project was originally scaffolded against Supabase; it now runs on Neon.
-
-> ⚠️ Neon serverless databases auto-suspend after ~5 min of inactivity. The first request after idle pays a cold-start (~300–800ms). If the API ever errors with `P1001 Can't reach database`, the Neon project may be suspended/disabled — check the Neon dashboard.
+> ⚠️ Supabase free-tier projects auto-pause after ~1 week of inactivity. If the API crashes with `P1001 Can't reach database`, the project needs to be restored from the Supabase dashboard. Do NOT restart the project while the May 2026 systemd outage warning is active.
 
 ### Key tables
 
@@ -128,7 +121,6 @@ npx ts-node prisma/seed.ts                    # re-run seed (uses upsert, safe t
 | Admin | admin@hotel.com | Admin123! | Full access |
 | Staff (Front Desk) | staff@hotel.com | Staff123! | employeeId: EMP001 |
 | Staff (Housekeeping) | housekeeping@hotel.com | Staff123! | employeeId: EMP002 |
-| System | system@hotel.com | — | Non-login user; `createdById` owner for public/self-service bookings (`POST /bookings/public`) |
 
 | Room # | Category | Floor | Status |
 |--------|----------|-------|--------|
@@ -178,10 +170,9 @@ React Router v6 nested routes with `Outlet`.
 /guest              → ProtectedRoute(GUEST) → GuestLayout
   /guest/home       → GuestHomePage ✅
   /guest/services   → GuestServiceRequestPage ✅
+  /guest/complaints → GuestServiceRequestPage ✅ (reuses same page)
   /guest/bill       → GuestBillPage ✅
 ```
-
-> The separate **Complaints** tab/route was removed (it rendered the same `ServiceRequestPage` as Services). Complaints are filed as service requests of type `MAINTENANCE`/`OTHER`.
 
 ### API calls
 
@@ -207,8 +198,7 @@ if (isRole(UserRole.ADMIN)) { ... }
 
 - Guests use `guestLogin(bookingNumber, lastName)` → `POST /auth/guest-portal`
 - Gets a 24h token, no refresh token
-- Token has `sub = guestId` (not a userId) and a `bookingId` claim — `GET /auth/me` does NOT work for guests (it looks up the users table)
-- **`JwtStrategy` recognizes guest tokens** (`role === 'GUEST'`): it looks up the `guests` table and returns a guest principal `{ id, role:'GUEST', guest:{id,...}, bookingId }`. So guests CAN call their own endpoints (`GET/POST /services`, `GET /invoices/booking/:id`, `POST /payments/intent`) — ownership is enforced server-side (the controller forces `guestId`/`bookingId` to the token's, ignoring client-sent values).
+- Token has `sub = guestId` (not a userId) — `GET /auth/me` does NOT work for guests
 - On boot, guest session is restored from `localStorage.guestUser` (set at login), NOT from `/auth/me`
 - On logout, redirects to `/guest-portal` not `/login`
 - `NotificationContext` skips all API calls for guests (`user.role === GUEST`)
@@ -267,19 +257,16 @@ Guests do NOT subscribe (skipped in `NotificationContext` because their token su
 
 ```env
 # apps/api/.env
-DATABASE_URL=           # Postgres pooled connection (Neon)
-DIRECT_URL=             # Postgres direct connection — used by `prisma migrate`
+DATABASE_URL=           # Supabase session pooler URI (IPv4 compatible)
 JWT_SECRET=             # Random 32+ char string
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=     # Different random 32+ char string
 JWT_REFRESH_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:5173
-CORS_ORIGINS=           # comma-separated; falls back to FRONTEND_URL + localhost:5173/5174
 PORT=3000
-TAX_RATE=10
 
 # Phase 4 additions
-STRIPE_SECRET_KEY=      # use "sk_test_placeholder" locally — empty string crashes boot
+STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
 
@@ -291,9 +278,4 @@ SENDGRID_FROM_EMAIL=
 VITE_API_URL=http://localhost:3000/api/v1
 VITE_SOCKET_URL=http://localhost:3000
 VITE_STRIPE_PUBLISHABLE_KEY=   # Phase 4
-
-# apps/guest/.env
-VITE_API_URL=http://localhost:3000/api/v1
-VITE_ENABLE_BOOKING_API=false  # flip to true to wire the landing's booking form to the API
-VITE_PORTAL_URL=http://localhost:5173
 ```

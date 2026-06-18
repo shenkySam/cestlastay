@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
 import { format } from 'date-fns';
-import { RecordManualPaymentDto } from './dto/record-manual-payment.dto';
 
 @Injectable()
 export class PaymentsService {
@@ -65,50 +64,6 @@ export class PaymentsService {
     }
 
     return { received: true };
-  }
-
-  // Staff record cash/card/bank payments taken at the desk
-  async recordManualPayment(dto: RecordManualPaymentDto) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id: dto.invoiceId } });
-    if (!invoice) throw new NotFoundException(`Invoice ${dto.invoiceId} not found`);
-    if (invoice.status === 'CANCELLED') {
-      throw new BadRequestException('Invoice is cancelled');
-    }
-
-    const balance = Number(invoice.balanceDue);
-    if (balance <= 0) throw new BadRequestException('Invoice is already fully paid');
-    if (dto.amount > balance) {
-      throw new BadRequestException(`Amount exceeds balance due ($${balance.toFixed(2)})`);
-    }
-
-    const paymentNumber = await this.generatePaymentNumber();
-    const payment = await this.prisma.payment.create({
-      data: {
-        paymentNumber,
-        invoiceId: dto.invoiceId,
-        amount: dto.amount,
-        method: dto.method as any,
-        status: 'COMPLETED' as any,
-        notes: dto.notes,
-        processedAt: new Date(),
-      },
-    });
-
-    const newPaid = Math.round((Number(invoice.paidAmount) + dto.amount) * 100) / 100;
-    const newBalance = Math.max(0, Math.round((Number(invoice.totalAmount) - newPaid) * 100) / 100);
-    const newStatus = newBalance <= 0 ? 'PAID' : 'PARTIALLY_PAID';
-
-    await this.prisma.invoice.update({
-      where: { id: dto.invoiceId },
-      data: {
-        paidAmount: newPaid,
-        balanceDue: newBalance,
-        status: newStatus as any,
-        ...(newBalance <= 0 && { paidAt: new Date() }),
-      },
-    });
-
-    return payment;
   }
 
   async getPaymentsForInvoice(invoiceId: string, guestBookingId?: string) {

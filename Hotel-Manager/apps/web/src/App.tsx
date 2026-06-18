@@ -21,6 +21,7 @@ import AdminStaffPage from '@/pages/admin/StaffPage';
 import AdminPaymentsPage from '@/pages/admin/PaymentsPage';
 import AdminCrmPage from '@/pages/admin/CrmPage';
 import AdminAnalyticsPage from '@/pages/admin/AnalyticsPage';
+import AdminRatingsPage from '@/pages/admin/RatingsPage';
 
 // Staff pages
 import StaffDashboardPage from '@/pages/staff/DashboardPage';
@@ -65,6 +66,7 @@ export default function App() {
                 <Route path="analytics" element={<AdminAnalyticsPage />} />
                 <Route path="crm"       element={<AdminCrmPage />} />
                 <Route path="payments"  element={<AdminPaymentsPage />} />
+                <Route path="ratings"  element={<AdminRatingsPage />} />
               </Route>
 
               {/* Staff routes */}
@@ -97,7 +99,8 @@ export default function App() {
               >
                 <Route index element={<Navigate to="home" replace />} />
                 <Route path="home"       element={<GuestHomePage />} />
-                <Route path="services"   element={<GuestServiceRequestPage />} />
+                <Route path="services"    element={<GuestServiceRequestPage />} />
+                <Route path="complaints" element={<GuestServiceRequestPage />} />
                 <Route path="bill"       element={<GuestBillPage />} />
               </Route>
 

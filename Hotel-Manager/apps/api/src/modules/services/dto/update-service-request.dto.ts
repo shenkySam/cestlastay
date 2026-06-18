@@ -19,14 +19,4 @@ export class UpdateServiceRequestDto {
   @Min(1)
   @Max(5)
   priority?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  estimatedCost?: number;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  actualCost?: number;
 }

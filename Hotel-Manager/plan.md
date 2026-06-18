@@ -1,7 +1,5 @@
 # Hotel Management System - Implementation Plan
 
-> **Status (current):** This is the original implementation plan, kept for historical context. All six phases below have shipped. Since then, a third app — the **`apps/guest` "C'est La Stay" marketing landing** (with a public `POST /bookings/public` self-service booking flow) — was added, and the database moved from Supabase to **Neon** (standard PostgreSQL). For the live picture see `context.md`, `project-structure.md`, and `api-endpoints.md`.
-
 ## Project Overview
 
 A comprehensive web-based Hotel Management System designed to streamline daily operations, manage staff, handle room inventory, and elevate the guest experience through role-based access controls, real-time notifications, and automated CRM.
@@ -121,15 +119,6 @@ A comprehensive web-based Hotel Management System designed to streamline daily o
 - `apps/web/src/pages/guest/BillPage.tsx` - Guest invoice + Stripe payment form
 - `apps/web/src/pages/admin/PaymentsPage.tsx` - Admin payment history & revenue
 - `apps/api/src/main.ts` - `rawBody: true` for webhook signature verification
-
-**Folio update (June 2026 — branch `feat/staff-invoice-folio`):**
-- ✅ Staff/admin create the invoice as a DRAFT **folio** (`POST /invoices/booking/:bookingId`) — room charge included by default for direct bookings, excluded for OTA (toggleable)
-- ✅ Line-item CRUD with automatic recalc (tax from `TAX_RATE` env instead of hardcoded 10%)
-- ✅ Service-request billing: staff price tickets (`estimatedCost`/`actualCost` via `PATCH /services/:id`), completed+priced tickets pulled onto the folio via `serviceRequestId`
-- ✅ Issue flow: invoice hidden from guest while DRAFT, visible after `POST /invoices/:id/issue` (→ PENDING)
-- ✅ Manual payments (`POST /payments/manual` — cash/card/bank) alongside guest Stripe checkout
-- ✅ `<InvoiceEditor>` modal on Staff + Admin Bookings pages; Service Queue gained a cost field
-- ✅ Guest BillPage now read-only — fixed the "Insufficient permissions" toast (it auto-called the staff-only generate endpoint when no invoice existed)
 
 ---
 

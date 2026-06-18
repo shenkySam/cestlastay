@@ -56,11 +56,11 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/rooms/categories` | [PUBLIC] | List all room categories (used by the guest landing) |
+| GET | `/rooms/categories` | Any | List all room categories |
 | POST | `/rooms/categories` | ADMIN | Create room category |
 | PATCH | `/rooms/categories/:id` | ADMIN | Update room category |
 | DELETE | `/rooms/categories/:id` | ADMIN | Delete category (fails if rooms exist) |
-| GET | `/rooms/availability` | [PUBLIC] | Available rooms for date range — `?checkIn=&checkOut=&categoryId=` (used by the guest landing) |
+| GET | `/rooms/availability` | Any | Available rooms for date range — `?checkIn=&checkOut=&categoryId=` |
 | GET | `/rooms` | Any | List rooms — `?status=&floor=&categoryId=` |
 | GET | `/rooms/:id` | Any | Get single room with category |
 | POST | `/rooms` | ADMIN | Create room |
@@ -77,7 +77,6 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| POST | `/bookings/public` | [PUBLIC] | Self-service booking from the guest landing — find-or-create guest by email, creates booking (`CONFIRMED` if a room is free for the dates, else `PENDING`), `source=DIRECT`, owned by the `system` user |
 | GET | `/bookings` | ADMIN, STAFF | List bookings — `?status=&guestId=&roomId=&search=` |
 | GET | `/bookings/:id` | ADMIN, STAFF | Get booking with guest, room, createdBy |
 | POST | `/bookings` | ADMIN, STAFF | Create booking — validates no overlap, marks room RESERVED |
@@ -87,22 +86,6 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 | POST | `/bookings/:id/cancel` | ADMIN, STAFF | Cancel booking, frees room if RESERVED |
 
 **Booking number format:** `BKG-YYYYMMDD-XXXX` (sequential per day)
-
-**`POST /bookings/public` body** (mirrors `apps/guest` `CreatePublicBookingRequest`):
-```json
-{
-  "firstName": "Jane",
-  "lastName": "Doe",
-  "email": "jane@example.com",
-  "phone": "+1...",            // optional
-  "checkInDate": "2026-07-01",
-  "checkOutDate": "2026-07-04",
-  "numberOfGuests": 2,
-  "categoryId": "category-uuid", // optional — picks an available room in the category
-  "specialRequests": "Sea view"  // optional
-}
-```
-> The guest landing only calls this when `VITE_ENABLE_BOOKING_API=true`. The endpoint is `@Public()` — no auth required.
 
 ---
 
@@ -122,10 +105,10 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/services` | ADMIN, STAFF, GUEST | List requests — `?status=&type=&guestId=`. **Guests see only their own** (`guestId` is forced to the token's guest, any client-sent `guestId` is ignored) |
+| GET | `/services` | ADMIN, STAFF | List requests — `?status=&type=&guestId=` |
 | GET | `/services/:id` | ADMIN, STAFF | Get single request |
-| POST | `/services` | Any authenticated | Create request — notifies all staff in real-time. **For guests, `guestId`/`bookingId` are forced to the token's** (client-sent values ignored) |
-| PATCH | `/services/:id` | ADMIN, STAFF | Update status, notes, assignedToId, priority, `estimatedCost` / `actualCost` (pricing — makes a COMPLETED ticket billable on the folio) |
+| POST | `/services` | Any authenticated | Create request — notifies all staff in real-time |
+| PATCH | `/services/:id` | ADMIN, STAFF | Update status, notes, assignedToId, priority |
 
 **`POST /services` body:**
 ```json
@@ -143,11 +126,9 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 {
   "status": "IN_PROGRESS",
   "assignedToId": "staff-uuid",
-  "notes": "En route",
-  "actualCost": 25.00
+  "notes": "En route"
 }
 ```
-> `estimatedCost` / `actualCost` make the request billable: once the ticket is `COMPLETED` and priced, it appears in `GET /invoices/booking/:bookingId/billable-services` and can be pulled onto the folio (billing uses `actualCost ?? estimatedCost`).
 
 **Ticket number format:** `SRV-YYYYMMDD-XXXX`
 
@@ -192,38 +173,24 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 ---
 
-## Invoices (Folio)
-
-An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build it from line items (optional room charge, billed service requests, free-form extras), then **issue** it to the guest. One invoice per booking (`bookingId` is UNIQUE on `invoices`).
+## Invoices
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
 | GET | `/invoices` | ADMIN | List all invoices |
-| GET | `/invoices/:id` | ADMIN, STAFF | Get a single invoice with line items + payments + booking |
-| GET | `/invoices/booking/:bookingId` | Any authenticated (incl. GUEST) | Invoice for a booking — used by guest BillPage and the staff `<InvoiceEditor>`. **Guests get 404 while status is `DRAFT`** (folio hidden until issued) and can only access their own booking (403 otherwise) |
-| GET | `/invoices/booking/:bookingId/billable-services` | ADMIN, STAFF | `COMPLETED` service requests with a cost set and not yet on any invoice — the "pull unbilled services" picker |
-| POST | `/invoices/booking/:bookingId` | ADMIN, STAFF | Create the **DRAFT** folio. Body `{ "includeRoomCharge": bool }` (optional) — defaults to **false for OTA-source bookings** (room already paid via OTA), **true for DIRECT/WALK_IN**. 409 if a folio already exists |
-| PATCH | `/invoices/:id` | ADMIN, STAFF | Update `discountAmount` / `dueDate` → recalc |
-| POST | `/invoices/:id/issue` | ADMIN, STAFF | `DRAFT → PENDING` — reveals the invoice to the guest. 400 if not DRAFT |
-| POST | `/invoices/:id/items` | ADMIN, STAFF | Add line item → recalc. Either `{ "serviceRequestId" }` (description + cost pulled from the ticket) **or** `{ "description", "unitPrice", "quantity"? }` (manual line, quantity defaults 1) |
-| PATCH | `/invoices/:id/items/:itemId` | ADMIN, STAFF | Edit `description` / `quantity` / `unitPrice` → recalc |
-| DELETE | `/invoices/:id/items/:itemId` | ADMIN, STAFF | Remove line item → recalc |
+| GET | `/invoices/:id` | ADMIN, STAFF | Get a single invoice with line items + booking |
+| GET | `/invoices/booking/:bookingId` | Any authenticated (incl. GUEST) | Get invoice for a booking — used by guest BillPage |
+| POST | `/invoices/booking/:bookingId/generate` | ADMIN, STAFF | Auto-generate (or return existing) invoice for a booking |
 
 **Invoice number format:** `INV-YYYYMMDD-XXXX`
 
-**Recalc — runs after every item / discount change:**
-- `subtotal = Σ items.totalPrice` · `tax = subtotal × TAX_RATE/100` (env `TAX_RATE`, default 10) · `total = max(0, subtotal + tax − discount)` · `balanceDue = max(0, total − paidAmount)`
-- Auto-status: `paidAmount > 0 && balanceDue ≤ 0` → `PAID` (sets `paidAt`) · `paidAmount > 0` → `PARTIALLY_PAID` (clears `paidAt`) · else `DRAFT`/`PENDING` unchanged
-- Only `CANCELLED` invoices are locked — adding a charge to a `PAID` folio legitimately flips it back to `PARTIALLY_PAID`
+**Auto-generation logic:**
+- Subtotal = `roomRate × nights` + service request `actualCost` line items
+- Tax = `subtotal × 0.10` (10%)
+- Total = `subtotal + tax - discount`
+- One invoice per booking (`bookingId` is UNIQUE on `invoices`)
 
-**Billing a service request (`POST /invoices/:id/items` with `serviceRequestId`):**
-- Price = `actualCost ?? estimatedCost` (400 if neither set — price the ticket first via `PATCH /services/:id`)
-- Must belong to the same booking as the invoice and not already be on an invoice (400 otherwise)
-- Line description is generated as `"<Type> — <ticket description>"`, quantity 1; editable afterwards like any line
-
-> ⚠️ Guests are strictly read-only: `GET /invoices/booking/:bookingId` is their only invoice endpoint. All mutating routes are `@Roles(ADMIN, STAFF)`. The old `POST /invoices/booking/:bookingId/generate` route was replaced by the staff-only `POST /invoices/booking/:bookingId`.
-
-**Status lifecycle:** `DRAFT → (issue) → PENDING → PARTIALLY_PAID → PAID` (or `OVERDUE`, `CANCELLED`)
+**Status lifecycle:** `DRAFT → PENDING → PARTIALLY_PAID → PAID` (or `OVERDUE`, `CANCELLED`)
 
 ---
 
@@ -233,20 +200,8 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 |--------|------|--------|-------------|
 | GET | `/payments` | ADMIN | List all payments with invoice + guest |
 | GET | `/payments/invoice/:invoiceId` | Any authenticated (incl. GUEST) | List payments for an invoice |
-| POST | `/payments/manual` | ADMIN, STAFF | Record an offline payment (cash / card / bank) against an invoice — creates a `COMPLETED` payment and updates the invoice's paid/balance/status |
 | POST | `/payments/intent` | Any authenticated (incl. GUEST) | Create Stripe `PaymentIntent` → returns `clientSecret` |
 | POST | `/payments/webhook` | [PUBLIC] | Stripe webhook — signature-verified, raw body required |
-
-**`POST /payments/manual` body:**
-```json
-{
-  "invoiceId": "invoice-uuid",
-  "amount": 50,
-  "method": "CASH",        // CREDIT_CARD | DEBIT_CARD | CASH | BANK_TRANSFER | DIGITAL_WALLET
-  "notes": "front desk"     // optional
-}
-```
-**Rules:** 400 if the invoice is already fully paid, cancelled, or `amount > balanceDue`. Guest Stripe checkout (`/payments/intent` + webhook) is unchanged and coexists with manual payments.
 
 **`POST /payments/intent` body:**
 ```json
@@ -304,27 +259,12 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 
 ---
 
-## OTA Management
+## Upcoming Endpoints (Phase 6+)
 
-| Method | Path | Access | Description |
-|--------|------|--------|-------------|
-| POST | `/ota/bookings` | ADMIN, STAFF | Manually record an OTA booking (Booking.com / Airbnb / Expedia / Agoda / Other). Computes commission (explicit or default rate per source); marks room RESERVED |
-| GET | `/ota/bookings` | ADMIN, STAFF | List OTA bookings — `?source=&from=&to=` |
-| GET | `/ota/revenue` | ADMIN, STAFF | Revenue report — gross / commission / net, totals + breakdown by source — `?from=&to=` |
-
-**Default commission rates** (when not supplied): Booking.com 15%, Airbnb 14%, Expedia 18%, Agoda 17%, Other 15%.
-
----
-
-## Analytics
-
-| Method | Path | Access | Description |
-|--------|------|--------|-------------|
-| GET | `/analytics/overview` | ADMIN | Headline stats (occupancy, revenue, counts) |
-| GET | `/analytics/revenue-by-day` | ADMIN | Daily revenue series |
-| GET | `/analytics/occupancy-by-day` | ADMIN | Daily occupancy series |
-| GET | `/analytics/bookings-by-source` | ADMIN | Booking counts grouped by source |
-| GET | `/analytics/top-rooms` | ADMIN | Most-booked rooms |
+| Phase | Endpoint | Description |
+|-------|----------|-------------|
+| 6 | `GET/POST /ota/bookings` | OTA manual entry |
+| 6 | `GET /analytics/*` | Occupancy, revenue, OTA reports |
 
 ---
 

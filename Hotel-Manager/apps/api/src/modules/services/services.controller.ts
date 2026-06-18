@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, ForbiddenException } from '@nestjs/common';
+import { RateServiceRequestDto } from './dto/rate-service-request.dto';
 import { ServicesService } from './services.service';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { UpdateServiceRequestDto } from './dto/update-service-request.dto';
@@ -54,5 +55,17 @@ export class ServicesController {
   @Roles(UserRole.ADMIN, UserRole.STAFF)
   update(@Param('id') id: string, @Body() dto: UpdateServiceRequestDto) {
     return this.service.update(id, dto);
+  }
+
+  /** Guest rates a completed service request */
+  @Post(':id/rate')
+  @Roles(UserRole.GUEST)
+  rateService(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthedUser,
+    @Body() dto: RateServiceRequestDto,
+  ) {
+    if (!user.guest?.id) throw new ForbiddenException();
+    return this.service.rateService(id, user.guest.id, dto.rating, dto.comment);
   }
 }
