@@ -11,19 +11,20 @@ interface SocketContextValue {
 const SocketContext = createContext<SocketContextValue>({ socket: null, connected: false });
 
 export function SocketProvider({ children }: { children: React.ReactNode }) {
-  const { accessToken, user } = useAuth();
+  const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!accessToken || !user) {
+    if (!user) {
       disconnectSocket();
       setSocket(null);
       setConnected(false);
       return;
     }
 
-    const s = getSocket(accessToken);
+    // Token is in an HttpOnly cookie -- getSocket() sends it via withCredentials
+    const s = getSocket();
 
     s.on('connect', () => setConnected(true));
     s.on('disconnect', () => setConnected(false));
@@ -34,7 +35,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       s.off('connect');
       s.off('disconnect');
     };
-  }, [accessToken, user]);
+  }, [user]);
 
   return (
     <SocketContext.Provider value={{ socket, connected }}>
