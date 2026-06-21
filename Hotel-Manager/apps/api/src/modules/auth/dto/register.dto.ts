@@ -1,9 +1,6 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { UserRole } from '@hms/shared';
 
-/**
- * Public self-registration DTO.
- * Role is intentionally absent -- all self-registered accounts are created as STAFF.
- */
 export class RegisterDto {
   @IsEmail()
   email: string;
@@ -23,4 +20,7 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
+
+  @IsEnum(UserRole)
+  role: UserRole;
 }
