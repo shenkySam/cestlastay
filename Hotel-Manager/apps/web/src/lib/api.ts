@@ -1,26 +1,24 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-/**
- * Axios instance with cookie-based auth (CR-3 fix).
- *
- * Access and refresh tokens are stored in HttpOnly cookies set by the server.
- * The browser sends them automatically on every same-origin request.
- * We no longer read tokens from localStorage or attach Authorization headers.
- */
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api/v1',
   headers: { 'Content-Type': 'application/json' },
-  withCredentials: true, // send cookies on every request
 });
 
-// Silent token refresh: when a request gets a 401, try POST /auth/refresh
-// (the refresh cookie is sent automatically), then replay the original request.
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: () => void; reject: (e: unknown) => void }> = [];
+// Attach access token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('accessToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
-const processQueue = (error: unknown) => {
-  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve()));
+// Handle token expiry: refresh silently, then retry
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (v: string) => void; reject: (e: unknown) => void }> = [];
+
+const processQueue = (error: unknown, token: string | null) => {
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));
   failedQueue = [];
 };
 
@@ -30,10 +28,19 @@ api.interceptors.response.use(
     const original = error.config;
 
     if (error.response?.status === 401 && !original._retry) {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        window.dispatchEvent(new Event('auth:logout'));
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({
-            resolve: () => resolve(api(original)),
+            resolve: (token) => {
+              original.headers.Authorization = `Bearer ${token}`;
+              resolve(api(original));
+            },
             reject,
           });
         });
@@ -43,12 +50,13 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Refresh token lives in an HttpOnly cookie -- no body payload needed.
-        await axios.post('/api/v1/auth/refresh', {}, { withCredentials: true });
-        processQueue(null);
+        const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
+        localStorage.setItem('accessToken', data.accessToken);
+        api.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
+        processQueue(null, data.accessToken);
         return api(original);
       } catch (refreshError) {
-        processQueue(refreshError);
+        processQueue(refreshError, null);
         window.dispatchEvent(new Event('auth:logout'));
         return Promise.reject(refreshError);
       } finally {
@@ -56,7 +64,7 @@ api.interceptors.response.use(
       }
     }
 
-    // Show error toast -- skip 401 (handled above) and 404 (expected for optional resources)
+    // Show error toast — skip 401 (handled above) and 404 (expected for unbuilt endpoints)
     const status = error.response?.status;
     if (status && status !== 401 && status !== 404) {
       const message = error.response?.data?.message || 'An error occurred';

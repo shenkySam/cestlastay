@@ -33,7 +33,7 @@ export class AuthService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,
-        role: 'STAFF' as any,
+        role: dto.role,
       },
       select: {
         id: true,
