@@ -36,3 +36,9 @@ coverage
 
 # Turbo cache
 .turbo
+
+# Local scratch backups (pre-redesign copies)
+_old*
+
+# Scratch / working notes
+fault-audit-*.md

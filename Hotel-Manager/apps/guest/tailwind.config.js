@@ -4,57 +4,58 @@ export default {
   theme: {
     extend: {
       // ─────────────────────────────────────────────────────────────
-      //  C'EST LA STAY — TROPICAL PALETTE  ·  ⇩ CHANGE BRAND HEX HERE ⇩
-      //  Pulled straight from the logo: ocean waves, sunset sky,
-      //  palm fronds, and the warm sand of the beach house.
+      //  C'EST LA STAY — EARTHEN PALETTE  ·  ⇩ CHANGE BRAND HEX HERE ⇩
+      //  LIGHT / cream Earthen theme: warm cream page, dark clay text,
+      //  red-laterite clay + Matrimandir gold accents. Token NAMES are
+      //  kept so components keep working — only the hues changed.
       // ─────────────────────────────────────────────────────────────
       colors: {
-        // Ocean — the logo's blue waves. Trust / water / secondary CTAs.
+        // "ocean" slot → MATRIMANDIR GOLD. Secondary CTAs / links / accents.
         ocean: {
-          50: '#ecfeff', 100: '#d0f5fb', 200: '#a6e9f5', 300: '#6fd6ec',
-          400: '#2fbcdc', 500: '#0ea5c4', 600: '#0a85a4', 700: '#0c6a85',
-          800: '#11566c', 900: '#134457', 950: '#0a2c3a',
+          50: '#fbf7ea', 100: '#f5ead0', 200: '#ead29a', 300: '#ddb866',
+          400: '#cfa23f', 500: '#bf9132', 600: '#a2792a', 700: '#826024',
+          800: '#6b4f22', 900: '#5a431f', 950: '#34260f',
         },
-        // Sunset — the logo's yellow→orange sky. Primary CTAs / energy / highlights.
+        // "sunset" slot → TERRACOTTA / CLAY. Primary CTAs / energy / highlights.
         sunset: {
-          50: '#fff8eb', 100: '#fdecc8', 200: '#fbd896', 300: '#f9bf5a',
-          400: '#f7a52b', 500: '#f59e0b', 600: '#e07b09', 700: '#ba5a0c',
-          800: '#934510', 900: '#783911',
+          50: '#fbf3ee', 100: '#f6e1d6', 200: '#ecc3ad', 300: '#e09e7d',
+          400: '#cf7551', 500: '#b1542e', 600: '#9a4527', 700: '#7e3720',
+          800: '#662e1d', 900: '#54281b',
         },
-        // Palm — the logo's green fronds. Nature / success / ticks.
+        // Palm — the Auroville forest. Nature / success / ticks.
         palm: {
           50: '#f2faea', 100: '#e0f2cd', 200: '#c6e6a0', 300: '#a7d96a',
           400: '#82c43f', 500: '#5fae28', 600: '#4a8c20', 700: '#3a6c1d',
           800: '#2f561c', 900: '#29481b',
         },
-        // Sand — the logo's beach-house warmth. Page + surfaces + neutrals.
+        // Sand — warm laterite earth. Surfaces + neutrals.
         sand: {
           50: '#faf7f1', 100: '#f3ebdd', 200: '#e6d6bd', 300: '#d4ba93',
           400: '#c19a6b', 500: '#a8794e', 600: '#8b5e34', 700: '#6f4a28',
           800: '#5c3e24', 900: '#4e3621',
         },
 
-        // Immersive dark theme: "ink" is the light FOREGROUND, not dark text.
-        base: '#06121a',    // deep ocean-black page base
-        surface: '#0e2029', // dark glass fallback (cards use translucent .card)
-        ink: '#eef2ef',     // primary foreground — soft white
-        muted: '#b7c4c4',   // secondary foreground — legible cool light
+        // LIGHT theme: cream page, dark clay foreground text.
+        base: '#f4efe5',    // cream page base
+        surface: '#fbf8f1', // warm off-white card surface
+        ink: '#3a2a1f',     // primary foreground — deep clay-brown
+        muted: '#6b5849',   // secondary foreground — warm mid-brown
       },
       // Hairline divider colour exposed as --hairline in globals.css.
 
       fontFamily: {
         // ⇩ SWAP FONTS HERE (also update the <link> in index.html) ⇩
-        serif: ['Fraunces', 'Georgia', 'Cambria', 'serif'], // display / headings — editorial
-        sans: ['"Hanken Grotesk"', 'ui-sans-serif', 'system-ui', 'sans-serif'], // body / UI — warm humanist
+        serif: ['"Cormorant Garamond"', 'Georgia', 'Cambria', 'serif'], // display / headings — editorial
+        sans: ['"Jost"', 'ui-sans-serif', 'system-ui', 'sans-serif'], // body / UI — warm geometric
         script: ['Caveat', 'ui-sans-serif', 'cursive'], // logo wordmark — handwriting
       },
 
       borderRadius: { token: '6px', card: '24px' },
 
       boxShadow: {
-        // Layered, diffuse shadows — soft tropical daylight
-        soft: '0 1px 2px rgba(42,35,29,0.05), 0 18px 40px -22px rgba(42,35,29,0.20)',
-        lift: '0 2px 8px rgba(42,35,29,0.08), 0 40px 64px -30px rgba(12,106,133,0.28)',
+        // Layered, diffuse shadows — soft warm daylight
+        soft: '0 1px 2px rgba(58,42,31,0.05), 0 18px 40px -22px rgba(58,42,31,0.22)',
+        lift: '0 2px 8px rgba(58,42,31,0.10), 0 40px 64px -30px rgba(150,90,40,0.30)',
       },
 
       letterSpacing: { eyebrow: '0.26em' },

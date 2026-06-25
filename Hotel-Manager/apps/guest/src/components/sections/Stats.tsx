@@ -30,12 +30,12 @@ function StatItem({ stat, run }: { stat: Stat; run: boolean }) {
 
   return (
     <div className="text-center">
-      <p className="font-serif text-[clamp(2.4rem,5vw,3.6rem)] font-medium leading-none text-white">
+      <p className="font-serif text-[clamp(2.4rem,5vw,3.6rem)] font-medium leading-none text-ink">
         {stat.prefix}
         {display}
         {stat.suffix}
       </p>
-      <p className="mt-3 font-sans text-xs uppercase tracking-[0.18em] text-white">{stat.label}</p>
+      <p className="mt-3 font-sans text-xs uppercase tracking-[0.18em] text-muted">{stat.label}</p>
     </div>
   );
 }

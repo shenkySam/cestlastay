@@ -1,16 +1,14 @@
 /**
  * ──────────────────────────────────────────────────────────────────────────
  *  SITE CONTENT  —  the single no-code editing surface.
- *  Edit copy, prices, villa data, packages, contact details and image paths
+ *  C'EST LA STAY · EARTHEN — an Auroville hostel & guest house.
+ *  Edit copy, prices, room data, journeys, contact details and image paths
  *  here. (Brand colours live in tailwind.config.js; fonts in index.html.)
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-// ⇩ SWAP IMAGE SOURCES HERE ⇩
-// Dev placeholders use Unsplash. Replace with your own photography by dropping
-// files into /public/assets and using e.g. "/assets/hero.jpg" instead of u(...).
-const u = (id: string, w = 1600) =>
-  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+// Real photography lives in /public — drop more files there and reference them
+// as e.g. "/balcony.png". Reuse is fine for now; swap in per-room shots later.
 
 /** Price formatter — Indian Rupee, Indian digit grouping. */
 export const formatPrice = (n: number): string => `₹${n.toLocaleString('en-IN')}`;
@@ -21,7 +19,7 @@ export interface NavLink {
 }
 
 export interface Amenity {
-  /** lucide-react icon name — see Amenities.tsx icon map */
+  /** lucide-react icon name — see ClothAmenities.tsx icon map (fixed set) */
   icon: 'Waves' | 'Flower2' | 'UtensilsCrossed' | 'Sunrise';
   title: string;
   description: string;
@@ -65,214 +63,215 @@ export interface Stat {
 
 export const brand = {
   name: "C'est La Stay",
-  tagline: 'beachfront living, the way it should be',
-  location: 'Auroville Coast, Tamil Nadu',
+  tagline: 'an earthen retreat in the city of dawn',
+  location: 'Auroville, Tamil Nadu',
 };
 
 export const nav: NavLink[] = [
-  { label: 'The Coast', href: '#amenities' },
-  { label: 'Villas', href: '#rooms' },
-  { label: 'Offers', href: '#packages' },
+  { label: 'Experiences', href: '#amenities' },
+  { label: 'Stays', href: '#rooms' },
+  { label: 'Journeys', href: '#packages' },
   { label: 'Reserve', href: '#reserve' },
 ];
 
 export const hero = {
-  eyebrow: 'Beachfront on the Coromandel Coast',
+  eyebrow: 'Auroville · The City of Dawn',
   // Use \n to control line breaks in the display heading.
-  title: 'Where the day\nslows to the tide.',
+  title: 'Where the earth\nremembers the sun.',
   subtitle:
-    'A sun-warmed retreat of palm shade, open water, and unhurried mornings — moments from the Bay of Bengal at Auroville.',
+    'A boutique earthen hostel of clay, banyan shade and slow mornings — minutes from the Matrimandir, on the edge of the Auroville forest.',
   primaryCta: { label: 'Reserve Your Stay', href: '#reserve' },
-  secondaryCta: { label: 'Browse Villas', href: '#rooms' },
-  image: u('1507525428034-b723cf961d3e', 2000),
-  imageAlt: 'Turquoise sea meeting a soft sand beach at golden hour',
+  secondaryCta: { label: 'Explore the Rooms', href: '#rooms' },
+  image: '/heroMain.png',
+  imageAlt:
+    'Aerial of C\u2019est la Stay at sunrise, the Matrimandir rising from the palm canopy beyond',
 };
 
 export const stats: Stat[] = [
-  { value: 14, label: 'Private villas' },
-  { value: 300, suffix: 'm', label: 'Of beachfront' },
+  { value: 5, label: 'Rooms in one house' },
+  { value: 3, suffix: ' katha', label: 'Garden grounds' },
   { value: 4.9, label: 'Guest rating' },
-  { value: 25, suffix: 'k+', label: 'Happy guests' },
+  { value: 10, suffix: ' min', label: 'To the Matrimandir' },
 ];
 
 export const amenities = {
-  eyebrow: 'Comfort & Indulgence',
-  title: 'Salt air, slow days',
+  eyebrow: 'Days & Evenings',
+  title: 'Made of small ceremonies',
   intro:
-    'Nothing superfluous — just sea breeze, warm light, and space to exhale. Every corner is composed for ease.',
+    'Nothing superfluous — just forest air, warm light, and space to exhale. Every hour is composed for ease.',
   items: [
     {
-      icon: 'Waves',
-      title: 'Beachfront & Infinity Pool',
+      icon: 'Sunrise',
+      title: 'Matrimandir at Dawn',
       description:
-        'A heated infinity pool that spills toward the horizon, steps of warm sand, and loungers under the palms.',
-      image: u('1582719478250-c89cae4dc85b', 1200),
+        'A guided sunrise walk to the golden sphere, before the heat arrives and the township stirs.',
+      image: '/heroImage.png',
     },
     {
-      icon: 'Flower2',
-      title: 'Coastal Spa & Wellness',
+      icon: 'Waves',
+      title: 'The Coast, Ten Minutes Away',
       description:
-        'Sea-salt scrubs, coconut-oil rituals, and open-air treatment cabanas cooled by the ocean breeze.',
-      image: u('1540555700478-4be289fbecef', 1200),
+        'The quiet beaches of the Bay of Bengal — for an early swim or a long, salt-aired afternoon.',
+      image: '/heroMain.png',
     },
     {
       icon: 'UtensilsCrossed',
-      title: 'Ocean-to-Table Dining',
+      title: 'Farm-Table Dining',
       description:
-        'The morning catch, sun-ripened produce, and South Indian coastal flavours, served barefoot by the water.',
-      image: u('1414235077428-338989a2e8c0', 1200),
+        'Long-table meals from the township\u2019s organic growers, cooked over a slow flame in the courtyard.',
+      image: '/rooms.png',
     },
     {
-      icon: 'Sunrise',
-      title: 'Palm Garden & Yoga Deck',
+      icon: 'Flower2',
+      title: 'Sound Healing & Yoga',
       description:
-        'A shaded grove and a sunrise yoga deck for slow stretches, sea-gazing, and long, quiet afternoons.',
-      image: u('1506126613408-eca07ce68773', 1200),
+        'Sunrise stretches on the deck and evening resonance sessions beneath the open sky.',
+      image: '/balcony.png',
     },
   ] as Amenity[],
   highlights: [
-    'Direct beach access',
-    'Sunrise yoga',
-    'Bicycles & kayaks',
-    'Outdoor showers',
-    'Reef-safe everything',
+    'Sunrise yoga deck',
+    'Bicycles to the dome',
+    'Organic kitchen garden',
+    'Forest walks',
+    'Lantern-lit paths',
     'Late checkout on request',
   ],
 };
 
 export const rooms = {
-  eyebrow: 'The Villas',
-  title: 'Room to breathe by the sea',
+  eyebrow: 'The Rooms',
+  title: 'Five rooms in one earthen house',
   intro:
-    'Open-plan, sea-facing, and cooled by cross-breezes — each one steps from the sand.',
+    'Three hostel rooms on the ground floor, two family rooms above — all hand-finished in local clay and reclaimed teak, each opening to the garden.',
   items: [
     {
-      id: 'palm-cabana',
-      name: 'Palm Cabana',
-      type: 'Cabana',
+      id: 'banyan-bunk',
+      name: 'Banyan Bunk',
+      type: 'Ground floor · Hostel',
       description:
-        'A breezy garden cabana under the coconut palms, a short barefoot walk from the sand.',
-      pricePerNight: 6500,
-      sizeSqm: 34,
-      occupancy: 2,
-      amenities: ['Garden terrace', 'Outdoor shower', 'King bed', 'Palm views'],
-      image: u('1505693416388-ac5ce068fe85', 1100),
-      rating: 4.6,
-      minNights: 2,
+        'A bright bunk room under the banyan, with a shared bath and a door onto the garden.',
+      pricePerNight: 1400,
+      sizeSqm: 16,
+      occupancy: 4,
+      amenities: ['4-bed dorm', 'Shared bath', 'Reading light & locker', 'Garden access'],
+      image: '/rooms.png',
+      tag: 'Hostel',
+      minNights: 1,
     },
     {
-      id: 'garden-bungalow',
-      name: 'Garden Bungalow',
-      type: 'Bungalow',
+      id: 'canopy-dorm',
+      name: 'Canopy Dorm Bed',
+      type: 'Ground floor · Hostel',
       description:
-        'A serene bungalow opening onto a private courtyard of frangipani and sea breeze.',
-      pricePerNight: 7500,
-      sizeSqm: 42,
+        'A single bed in a breezy mixed dorm — the easy, sociable way to stay in Auroville.',
+      pricePerNight: 1200,
+      sizeSqm: 20,
+      occupancy: 6,
+      amenities: ['Mixed dorm', 'Shared bath', 'Linens included', 'Ceiling fan'],
+      image: '/heroImage.png',
+      tag: 'Hostel',
+      minNights: 1,
+    },
+    {
+      id: 'courtyard-room',
+      name: 'Courtyard Hostel Room',
+      type: 'Ground floor · Hostel (private)',
+      description:
+        'A private clay-walled room off the courtyard — hostel ease, with a door you can close.',
+      pricePerNight: 2400,
+      sizeSqm: 24,
       occupancy: 2,
-      amenities: ['Private courtyard', 'Soaking tub', 'Lounge', 'Garden access'],
-      image: u('1618773928121-c32242e63f39', 1100),
+      amenities: ['Private room', 'Shared bath', 'Courtyard view', 'King bed'],
+      image: '/heroMain.png',
       rating: 4.7,
+      minNights: 1,
+    },
+    {
+      id: 'matrimandir-family',
+      name: 'Matrimandir Family Room',
+      type: 'First floor · Family',
+      description:
+        'An upstairs room with a private bath and a balcony framing the golden dome at dusk.',
+      pricePerNight: 5500,
+      sizeSqm: 34,
+      occupancy: 3,
+      amenities: ['Private bath', 'Dome-view balcony', 'King + single', 'Hammock'],
+      image: '/balcony.png',
+      tag: 'Family favourite',
       minNights: 2,
     },
     {
-      id: 'ocean-view-suite',
-      name: 'Ocean-View Suite',
-      type: 'Suite',
+      id: 'sunrise-suite',
+      name: 'Sunrise Family Suite',
+      type: 'First floor · Family',
       description:
-        'Floor-to-ceiling views of the Bay of Bengal, with a balcony made for sunrise coffee.',
-      pricePerNight: 11000,
-      sizeSqm: 52,
-      occupancy: 3,
-      amenities: ['Sea-view balcony', 'Rainfall shower', 'King bed', 'Daybed'],
-      image: u('1566073771259-6a8506099945', 1100),
-      tag: 'Guest Favorite',
-      minNights: 3,
-    },
-    {
-      id: 'sunset-pavilion',
-      name: 'Sunset Pavilion',
-      type: 'Pavilion',
-      description:
-        'A double-height pavilion framing the western sky — golden hour, every evening.',
-      pricePerNight: 14000,
-      sizeSqm: 64,
-      occupancy: 3,
-      amenities: ['Sunset terrace', 'Plunge pool', 'Reading nook', 'Workspace'],
-      image: u('1571896349842-33c89424de2d', 1100),
-      rating: 4.8,
-      minNights: 3,
-    },
-    {
-      id: 'beachfront-villa',
-      name: 'Beachfront Villa',
-      type: 'Villa',
-      description:
-        'Your own stretch of shoreline — a standalone villa with a private pool and the tide at your door.',
-      pricePerNight: 22000,
-      sizeSqm: 96,
-      occupancy: 5,
-      amenities: ['Private pool', 'Direct beach access', 'Two bedrooms', 'Butler service'],
-      image: u('1611892440504-42a792e24d32', 1100),
-      tag: 'Guest Favorite',
-      minNights: 4,
+        'The top suite — two bedrooms, a private bath, and a hammock balcony made for first light.',
+      pricePerNight: 6800,
+      sizeSqm: 46,
+      occupancy: 4,
+      amenities: ['Two bedrooms', 'Private bath', 'Hammock balcony', 'Sunrise view'],
+      image: '/balcony.png',
+      rating: 4.9,
+      minNights: 2,
     },
   ] as Villa[],
 };
 
 export const packages = {
-  eyebrow: 'Excitement & Value',
-  title: 'Curated coastal escapes',
+  eyebrow: 'Stay a Little Longer',
+  title: 'Unhurried Auroville journeys',
   intro:
-    'Multi-night experiences composed end-to-end — arrive, kick off your shoes, and let the rest unfold.',
+    'Multi-night stays composed end-to-end — arrive, kick off your shoes, and let the forest set the pace.',
   items: [
     {
-      id: 'weekend-beach',
-      name: 'Weekend Beach Escape',
+      id: 'weekend-forest',
+      name: 'Weekend in the Forest',
       badge: '2 nights',
       description:
-        'A quick reset by the water — sunrise yoga, long lunches, and nowhere to be.',
+        'A quick reset under the canopy — sunrise yoga, long lunches, and nowhere to be.',
       includes: [
-        'Daily breakfast by the sea',
-        'One coastal spa ritual',
-        'Sunset dinner for two',
+        'Daily breakfast in the courtyard',
+        'One guided forest walk',
+        'Sunset farm-table dinner',
         'Late checkout',
       ],
-      priceFrom: 16900,
+      priceFrom: 4900,
       nights: 2,
-      image: u('1507525428034-b723cf961d3e', 1100),
+      image: '/heroImage.png',
     },
     {
-      id: 'honeymoon-sea',
-      name: 'Honeymoon by the Sea',
+      id: 'dawn-retreat',
+      name: 'The Dawn Retreat',
       badge: 'Most loved',
       description:
-        'A quiet celebration for two — a private pool, a private table, and the tide for company.',
+        'Three days tuned to the light — the golden dome at dawn, resonance at dusk.',
       includes: [
-        'Beachfront Villa upgrade',
-        'Private candle-lit dinner',
-        'In-villa sparkling & sweets',
+        'Family room upgrade',
+        'Matrimandir sunrise visit',
+        'Evening sound healing',
         'Couples spa ritual',
       ],
-      priceFrom: 48000,
+      priceFrom: 12900,
       nights: 3,
-      image: u('1611892440504-42a792e24d32', 1100),
+      image: '/heroMain.png',
       featured: true,
     },
     {
-      id: 'coastal-wellness',
-      name: 'Coastal Wellness Retreat',
-      badge: '4 nights',
+      id: 'slow-living-week',
+      name: 'Slow Living Week',
+      badge: '5 nights',
       description:
-        'For the deep exhale — four unhurried days tuned to the rhythm of the sea.',
+        'For the deep exhale — five unhurried days in the rhythm of the township.',
       includes: [
         'Daily yoga & meditation',
-        'Ayurvedic spa journey',
-        'Ocean-to-table tasting menu',
-        'Sunrise beach walk',
+        'Organic kitchen-garden table',
+        'Bicycle & coast day',
+        'Sunrise dome walk',
       ],
-      priceFrom: 62000,
-      nights: 4,
-      image: u('1506126613408-eca07ce68773', 1100),
+      priceFrom: 21900,
+      nights: 5,
+      image: '/balcony.png',
     },
   ] as Package[],
 };
@@ -281,7 +280,7 @@ export const reserve = {
   eyebrow: 'Frictionless Action',
   title: 'Reserve your stay',
   intro:
-    'Tell us when, and we’ll prepare the rest. No accounts, no clutter — just a warm welcome by the water.',
+    'Tell us when, and we\u2019ll prepare the rest. No accounts, no clutter — just a warm welcome and cold hibiscus tea.',
   reassurance: [
     'Free cancellation up to 7 days before arrival',
     'No prepayment required to reserve',
@@ -290,9 +289,9 @@ export const reserve = {
 };
 
 export const footer = {
-  closingEyebrow: 'Your shoreline awaits',
-  closingTitle: 'Come live the tide.',
-  closingText: 'The sea keeps its own time. Reserve a few days beside it.',
+  closingEyebrow: 'Your room is waiting',
+  closingTitle: 'Come live the dawn.',
+  closingText: 'The forest keeps its own time. Reserve a few days beside it.',
   contact: {
     address: '10, Auroville Rd, Edayanchavadi, Auroville, Tamil Nadu 605101, India',
     phone: '+91 413 262 0000',

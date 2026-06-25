@@ -32,8 +32,8 @@ export default function Amenities() {
             <span
               key={h}
               className={clsx(
-                'px-5 py-1 font-sans text-sm text-white',
-                i < amenities.highlights.length - 1 && 'border-r border-white/20',
+                'px-5 py-1 font-sans text-sm text-ink',
+                i < amenities.highlights.length - 1 && 'border-r border-ink/20',
               )}
             >
               {h}

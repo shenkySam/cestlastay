@@ -5,6 +5,7 @@ import Hero from './components/sections/Hero';
 import Amenities from './components/sections/Amenities';
 import Stats from './components/sections/Stats';
 import Rooms from './components/sections/Rooms';
+import Matrimandir from './components/sections/Matrimandir';
 import Packages from './components/sections/Packages';
 import Reserve from './components/sections/Reserve';
 import FooterCta from './components/sections/FooterCta';
@@ -24,13 +25,14 @@ export default function App() {
         <SceneBackground />
       </Suspense>
 
-      {/* Dim veil that calms the scene so content stays legible */}
+      {/* Soft cream veil so the warm particles stay subtle behind the content
+          and text keeps its contrast on the light page. */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 z-[1]"
         style={{
           background:
-            'linear-gradient(180deg, rgba(3,9,14,0.52) 0%, rgba(3,9,14,0.4) 32%, rgba(3,9,14,0.4) 68%, rgba(3,9,14,0.58) 100%)',
+            'linear-gradient(180deg, rgba(244,239,229,0.62) 0%, rgba(244,239,229,0.46) 32%, rgba(244,239,229,0.46) 68%, rgba(244,239,229,0.66) 100%)',
         }}
       />
 
@@ -38,11 +40,12 @@ export default function App() {
       <div className="relative z-10">
         <Navbar />
         <main>
-          {/* Awe & Escape → Comfort & Indulgence → Excitement & Value → Action */}
+          {/* Awe & Escape → Comfort → the golden sphere → Value → Action */}
           <Hero />
           <Amenities />
           <Stats />
           <Rooms />
+          <Matrimandir />
           <Packages />
           <Reserve />
           <FooterCta />
@@ -52,7 +55,7 @@ export default function App() {
 
       {/* Film-grain texture over the whole page */}
       <div
-        className="grain pointer-events-none fixed inset-0 z-[60] opacity-[0.06] mix-blend-overlay"
+        className="grain pointer-events-none fixed inset-0 z-[60] opacity-[0.04] mix-blend-multiply"
         aria-hidden
       />
     </>
