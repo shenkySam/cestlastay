@@ -119,7 +119,7 @@ export default function MatrimandirSphere() {
   return (
     <canvas
       ref={canvasRef}
-      style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab', touchAction: 'pan-y' }}
+      style={{ width: '100%', height: '100%', display: 'block', cursor: 'grab', touchAction: 'none' }}
     />
   );
 }
