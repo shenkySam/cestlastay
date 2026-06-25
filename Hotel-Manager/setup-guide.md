@@ -36,9 +36,9 @@ Before starting, ensure you have the following installed:
 
 ### Required Accounts
 
-1. **Supabase** (Database & Auth)
-   - Create account at: https://supabase.com
-   - Free tier sufficient for development
+1. **Neon** (PostgreSQL database)
+   - Create account at: https://neon.tech
+   - Free tier sufficient for development; grab the **pooled** and **direct** connection strings
 
 2. **Stripe** (Payment Processing)
    - Create account at: https://stripe.com
@@ -81,7 +81,8 @@ pnpm install
 This will install dependencies for:
 - Root workspace
 - `apps/api` (NestJS backend)
-- `apps/web` (React frontend)
+- `apps/web` (React admin/staff/guest portal)
+- `apps/guest` (React "C'est La Stay" public landing)
 - `packages/shared` (Shared code)
 
 ---
@@ -99,27 +100,18 @@ Edit `apps/api/.env`:
 
 ```env
 # ===========================================
-# DATABASE (Supabase PostgreSQL)
+# DATABASE (Neon PostgreSQL)
 # ===========================================
-DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+# Pooled connection — used by the app at runtime
+DATABASE_URL="postgresql://[USER]:[PASSWORD]@[ENDPOINT]-pooler.[REGION].aws.neon.tech/neondb?sslmode=require"
+# Direct connection — used by `prisma migrate`
+DIRECT_URL="postgresql://[USER]:[PASSWORD]@[ENDPOINT].[REGION].aws.neon.tech/neondb?sslmode=require"
 
-# Get from: Supabase Dashboard > Project Settings > Database
-# Format: postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+# Get both from: Neon Dashboard > Connection Details
+# (toggle "Pooled connection" for DATABASE_URL, off for DIRECT_URL)
 
-
-# ===========================================
-# SUPABASE AUTH
-# ===========================================
-SUPABASE_URL="https://[PROJECT_REF].supabase.co"
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-SUPABASE_JWT_SECRET="your-super-secret-jwt-secret"
-
-# Get from: Supabase Dashboard > Project Settings > API
-# - URL: Your project URL
-# - anon key: Public anon key
-# - service_role key: Service role key (keep secret!)
-# - JWT Secret: JWT Settings > JWT Secret
+# NOTE: SUPABASE_* keys may still appear in .env.example from an earlier
+# iteration — they are NOT used. Prisma connects to Neon via the two URLs above.
 
 
 # ===========================================
@@ -213,37 +205,26 @@ VITE_APP_VERSION="1.0.0"
 
 ---
 
-## Supabase Configuration
+## Neon Configuration
 
-### 1. Create Supabase Project
+### 1. Create Neon Project
 
-1. Go to https://supabase.com/dashboard
+1. Go to https://console.neon.tech
 2. Click "New Project"
 3. Fill in:
    - Project name: `hotel-management-system`
-   - Database password: (save this!)
-   - Region: Choose closest to you
-4. Wait for project to initialize (~2 minutes)
+   - Postgres version + region: choose closest to you
+4. Wait for the project to initialize (~seconds)
 
-### 2. Get Connection Details
+### 2. Get Connection Strings
 
-Navigate to: **Project Settings > Database**
+Open **Dashboard > Connection Details** and copy **two** strings into `.env`:
+- **Pooled connection** → `DATABASE_URL` (host contains `-pooler`)
+- **Direct connection** (toggle "Pooled connection" off) → `DIRECT_URL`
 
-Copy the connection string:
-```
-postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
-```
+Both end with `?sslmode=require`. Prisma uses `DATABASE_URL` at runtime and `DIRECT_URL` for migrations (configured in `apps/api/prisma/schema.prisma`).
 
-### 3. Enable Email Authentication
-
-Navigate to: **Authentication > Providers**
-- Enable "Email" provider
-- Configure email templates (optional)
-
-### 4. Get API Keys
-
-Navigate to: **Project Settings > API**
-- Copy `URL`, `anon public`, and `service_role` keys to `.env`
+> Auth is handled by the API itself (JWT + bcrypt) — there is no separate managed-auth provider to configure.
 
 ---
 
@@ -276,28 +257,23 @@ This will:
 npx prisma db seed
 ```
 
-This will create:
-- 1 Admin user (email: `admin@hotel.com`, password: `Admin123!`)
-- 2 Staff users
-- 3 Guest users
-- 5 Room categories
-- 10 Rooms
-- 3 Sample bookings
+This will create (upsert-safe, so it's repeatable):
+- 1 Admin user (`admin@hotel.com` / `Admin123!`)
+- 2 Staff users (Front Desk `staff@hotel.com`, Housekeeping `housekeeping@hotel.com` — both `Staff123!`)
+- 1 System user (`system@hotel.com`) — used as `createdById` for public/online bookings
+- 1 sample Guest profile (`guest@hotel.com`)
+- 3 Room categories (Standard Single, Deluxe Double, Executive Suite)
+- 7 Rooms (101, 102, 201, 202, 203, 301, 302)
+- 1 Sample booking `BKG-20260501-0001` (+ its invoice)
 
 **Test Credentials:**
 ```
-Admin:
-  Email: admin@hotel.com
-  Password: Admin123!
-
-Staff:
-  Email: staff@hotel.com
-  Password: Staff123!
-
-Guest:
-  Email: guest@hotel.com
-  Password: Guest123!
+Admin:        admin@hotel.com        / Admin123!
+Staff:        staff@hotel.com        / Staff123!
+Housekeeping: housekeeping@hotel.com / Staff123!
 ```
+> Guests do not log in with email/password — the guest portal authenticates with
+> **booking number + last name** (try `BKG-20260501-0001` / `Smith`).
 
 ### 4. View Database (Optional)
 
@@ -322,7 +298,7 @@ Opens visual database browser at `http://localhost:5555`
 
 1. Go to: https://dashboard.stripe.com/test/webhooks
 2. Click "Add endpoint"
-3. Endpoint URL: `https://your-backend-url.com/api/v1/payments/stripe/webhook`
+3. Endpoint URL: `https://your-backend-url.com/api/v1/payments/webhook`
 4. Select events:
    - `payment_intent.succeeded`
    - `payment_intent.payment_failed`
@@ -339,7 +315,7 @@ brew install stripe/stripe-cli/stripe
 stripe login
 
 # Forward webhooks to local server
-stripe listen --forward-to localhost:3000/api/v1/payments/stripe/webhook
+stripe listen --forward-to localhost:3000/api/v1/payments/webhook
 ```
 
 ---
@@ -390,8 +366,9 @@ pnpm dev
 ```
 
 This starts:
-- Backend API at `http://localhost:3000`
-- Frontend at `http://localhost:5173`
+- Backend API at `http://localhost:3000` (base path `/api/v1`)
+- Portal (web) at `http://localhost:5173`
+- Landing (guest) at `http://localhost:5174`
 
 ### Option 2: Start Services Individually
 
@@ -413,11 +390,12 @@ pnpm dev
 
 ### 1. Check Backend
 
-```bash
-# Health check
-curl http://localhost:3000/health
+On startup the API logs `HMS API running on http://localhost:3000/api/v1`.
+There is no `/health` route; hit a public endpoint instead:
 
-# Should return: { "status": "ok" }
+```bash
+# Public endpoint — returns a JSON array of room categories
+curl http://localhost:3000/api/v1/rooms/categories
 ```
 
 ### 2. Check Database Connection
@@ -452,10 +430,10 @@ Should redirect to admin dashboard.
 ### Issue: "Cannot connect to database"
 
 **Solution:**
-- Check `DATABASE_URL` in `.env`
-- Ensure Supabase project is active
-- Verify password in connection string
-- Check if database is paused (free tier auto-pauses after inactivity)
+- Check `DATABASE_URL` and `DIRECT_URL` in `.env`
+- Verify the password / connection strings are current (Neon can rotate them)
+- Ensure the URL ends with `?sslmode=require`
+- After idle, Neon cold-starts on the first query — retry once
 
 ```bash
 # Test connection

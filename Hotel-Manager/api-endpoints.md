@@ -56,11 +56,11 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/rooms/categories` | Any | List all room categories |
+| GET | `/rooms/categories` | [PUBLIC] | List all room categories (used by the guest landing) |
 | POST | `/rooms/categories` | ADMIN | Create room category |
 | PATCH | `/rooms/categories/:id` | ADMIN | Update room category |
 | DELETE | `/rooms/categories/:id` | ADMIN | Delete category (fails if rooms exist) |
-| GET | `/rooms/availability` | Any | Available rooms for date range — `?checkIn=&checkOut=&categoryId=` |
+| GET | `/rooms/availability` | [PUBLIC] | Available rooms for date range — `?checkIn=&checkOut=&categoryId=` |
 | GET | `/rooms` | Any | List rooms — `?status=&floor=&categoryId=` |
 | GET | `/rooms/:id` | Any | Get single room with category |
 | POST | `/rooms` | ADMIN | Create room |
@@ -77,6 +77,7 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
+| POST | `/bookings/public` | [PUBLIC] | Self-service booking from the guest landing — finds/creates guest, picks an available room in the category, creates booking |
 | GET | `/bookings` | ADMIN, STAFF | List bookings — `?status=&guestId=&roomId=&search=` |
 | GET | `/bookings/:id` | ADMIN, STAFF | Get booking with guest, room, createdBy |
 | POST | `/bookings` | ADMIN, STAFF | Create booking — validates no overlap, marks room RESERVED |
@@ -86,6 +87,21 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 | POST | `/bookings/:id/cancel` | ADMIN, STAFF | Cancel booking, frees room if RESERVED |
 
 **Booking number format:** `BKG-YYYYMMDD-XXXX` (sequential per day)
+
+**`POST /bookings/public` body** (no auth — used by the C'est La Stay landing, attributed to the `system@hotel.com` user):
+```json
+{
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "email": "ada@example.com",
+  "phone": "+1...",                 // optional
+  "checkInDate": "2026-07-01",
+  "checkOutDate": "2026-07-04",
+  "numberOfGuests": 2,
+  "categoryId": "category-uuid",    // optional — picks any available room if omitted
+  "specialRequests": "Sea view"     // optional
+}
+```
 
 ---
 
@@ -105,10 +121,11 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| GET | `/services` | ADMIN, STAFF | List requests — `?status=&type=&guestId=` |
+| GET | `/services` | ADMIN, STAFF, GUEST | List requests — `?status=&type=&guestId=` (guests pass their own `guestId`) |
 | GET | `/services/:id` | ADMIN, STAFF | Get single request |
 | POST | `/services` | Any authenticated | Create request — notifies all staff in real-time |
 | PATCH | `/services/:id` | ADMIN, STAFF | Update status, notes, assignedToId, priority |
+| POST | `/services/:id/rate` | GUEST | Guest rates a completed service request (`serviceRating` 1-5 + optional comment) |
 
 **`POST /services` body:**
 ```json
@@ -259,12 +276,50 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 ---
 
-## Upcoming Endpoints (Phase 6+)
+## OTA Management
 
-| Phase | Endpoint | Description |
-|-------|----------|-------------|
-| 6 | `GET/POST /ota/bookings` | OTA manual entry |
-| 6 | `GET /analytics/*` | Occupancy, revenue, OTA reports |
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| POST | `/ota/bookings` | ADMIN, STAFF | Record a booking from an OTA channel (Booking.com, Airbnb, Expedia, Agoda, …) with commission |
+| GET | `/ota/bookings` | ADMIN, STAFF | List OTA bookings — `?source=&status=` |
+| GET | `/ota/revenue` | ADMIN, STAFF | Revenue + commission rollup grouped by OTA source |
+
+**`POST /ota/bookings` body:** `roomId`, `checkInDate`, `checkOutDate`, `numberOfGuests`, `source` (must be an OTA source), `otaBookingId`, optional `otaCommission`, `totalAmount`, and either an existing `guestId` or inline `guestFirstName/guestLastName/guestEmail/guestPhone`.
+
+---
+
+## Analytics
+
+All routes are **ADMIN-only** and accept an optional `?from=&to=` date range.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/analytics/overview` | Headline KPIs (revenue, occupancy, bookings, ADR, etc.) |
+| GET | `/analytics/revenue-by-day` | Daily revenue series |
+| GET | `/analytics/occupancy-by-day` | Daily occupancy series |
+| GET | `/analytics/bookings-by-source` | Booking counts grouped by source |
+| GET | `/analytics/top-rooms` | Highest-earning / most-booked rooms |
+
+---
+
+## Ratings
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| POST | `/ratings` | GUEST | Submit a post-stay review for a booking (one per booking) |
+| GET | `/ratings` | ADMIN | List all ratings with guest + booking |
+| GET | `/ratings/summary` | ADMIN | Average overall/room rating + distribution |
+| GET | `/ratings/booking/:bookingId` | Any authenticated | Get the rating for a booking (null if not yet rated) |
+
+**`POST /ratings` body:**
+```json
+{
+  "bookingId": "booking-uuid",
+  "overallRating": 5,
+  "roomRating": 4,
+  "comment": "Lovely stay"   // optional
+}
+```
 
 ---
 

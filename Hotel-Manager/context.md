@@ -20,19 +20,22 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 ## Monorepo Structure
 
 ```
-Hotel Manager/
+Hotel-Manager/
 ├── apps/
-│   ├── api/          # NestJS backend — port 3000
-│   └── web/          # React + Vite frontend — port 5173
+│   ├── api/          # NestJS backend — port 3000 (REST + Socket.IO)
+│   ├── web/          # React + Vite admin/staff/guest portal — port 5173
+│   └── guest/        # React + Vite "C'est La Stay" public landing — port 5174
 ├── packages/
 │   └── shared/       # Shared TypeScript types and enums
+├── docs/             # ADRs + SEO plan
 ├── turbo.json
 └── pnpm-workspace.yaml
 ```
 
-**Run everything:** `pnpm dev` from root (starts both api and web)
+**Run everything:** `pnpm dev` from root (starts api, web, and guest)
 **Run API alone:** `cd apps/api && npx ts-node -r tsconfig-paths/register src/main.ts`
 **Run Web alone:** `cd apps/web && pnpm dev`
+**Run Landing alone:** `cd apps/guest && pnpm dev`
 
 ---
 
@@ -79,11 +82,12 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 
 ## Database
 
-**Provider:** Supabase (PostgreSQL)
-**Connection:** Session Pooler URL (IPv4 compatible) — see `apps/api/.env`
+**Provider:** Neon (serverless PostgreSQL)
+**Connection:** `DATABASE_URL` (pooled, app runtime) + `DIRECT_URL` (direct, for `prisma migrate`) — see `apps/api/.env`
 **ORM:** Prisma — schema at `apps/api/prisma/schema.prisma`
 
-> ⚠️ Supabase free-tier projects auto-pause after ~1 week of inactivity. If the API crashes with `P1001 Can't reach database`, the project needs to be restored from the Supabase dashboard. Do NOT restart the project while the May 2026 systemd outage warning is active.
+> Leftover `SUPABASE_*` keys remain in `apps/api/.env` from an earlier iteration but are **not** used — Prisma connects to Neon via `DATABASE_URL`/`DIRECT_URL`.
+> Neon scales to zero when idle; the first query after idle may incur a brief cold-start. A `P1001 Can't reach database` usually means a bad/expired connection string.
 
 ### Key tables
 
@@ -103,6 +107,8 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 | `notifications` | userId, type, status (UNREAD/READ), title, message, link | userId → users.id (not guests.id) |
 | `email_logs` | recipientEmail, type, status, sendgridId | CRM email tracking |
 | `loyalty_discounts` | code, discountType, discountValue, validFrom, validUntil | Post-stay discount codes |
+| `ratings` | bookingId (unique), guestId, overallRating, roomRating, comment | Post-stay reviews — one per booking |
+| `audit_logs` | userId (no FK), action, entity, entityId, changes | Immutable action log (no `updated_at`) |
 
 ### Migrations
 
@@ -121,6 +127,8 @@ npx ts-node prisma/seed.ts                    # re-run seed (uses upsert, safe t
 | Admin | admin@hotel.com | Admin123! | Full access |
 | Staff (Front Desk) | staff@hotel.com | Staff123! | employeeId: EMP001 |
 | Staff (Housekeeping) | housekeeping@hotel.com | Staff123! | employeeId: EMP002 |
+| System | system@hotel.com | — | `createdById` for public/online bookings (`POST /bookings/public`) |
+| Guest | guest@hotel.com | Guest123! | Sample guest profile (portal login uses booking #, not this) |
 
 | Room # | Category | Floor | Status |
 |--------|----------|-------|--------|
@@ -156,6 +164,7 @@ React Router v6 nested routes with `Outlet`.
   /admin/analytics  → AdminAnalyticsPage ✅
   /admin/crm        → AdminCrmPage ✅
   /admin/payments   → AdminPaymentsPage ✅
+  /admin/ratings    → AdminRatingsPage ✅
 
 /staff              → ProtectedRoute(STAFF|ADMIN) → StaffLayout
   /staff/           → StaffDashboardPage ✅
@@ -257,25 +266,40 @@ Guests do NOT subscribe (skipped in `NotificationContext` because their token su
 
 ```env
 # apps/api/.env
-DATABASE_URL=           # Supabase session pooler URI (IPv4 compatible)
+DATABASE_URL=           # Neon pooled connection (app runtime)
+DIRECT_URL=             # Neon direct connection (prisma migrate)
 JWT_SECRET=             # Random 32+ char string
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=     # Different random 32+ char string
 JWT_REFRESH_EXPIRES_IN=7d
-FRONTEND_URL=http://localhost:5173
+NODE_ENV=development
 PORT=3000
+FRONTEND_URL=http://localhost:5173
+CORS_ORIGINS=           # comma-separated allow-list (HTTP + WS); falls back to FRONTEND_URL
+TAX_RATE=10             # invoice tax percentage
 
-# Phase 4 additions
+# Phase 4 — Stripe
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
 
-# Phase 5 additions
+# Phase 5 — SendGrid (STUB mode if key missing/invalid)
 SENDGRID_API_KEY=
 SENDGRID_FROM_EMAIL=
+SENDGRID_FROM_NAME=
+
+# Optional — Twilio SMS
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
 
 # apps/web/.env
 VITE_API_URL=http://localhost:3000/api/v1
 VITE_SOCKET_URL=http://localhost:3000
 VITE_STRIPE_PUBLISHABLE_KEY=   # Phase 4
+
+# apps/guest/.env  (public landing)
+VITE_API_URL=http://localhost:3000/api/v1
+VITE_PORTAL_URL=http://localhost:5173      # "Login" → ${VITE_PORTAL_URL}/guest-portal
+VITE_ENABLE_BOOKING_API=false              # flip to true to enable the public booking form
 ```

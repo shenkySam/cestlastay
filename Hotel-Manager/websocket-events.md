@@ -144,8 +144,11 @@ Fired by `BookingsService.checkOut()`.
 | `HOUSEKEEPING_ALERT` | Housekeeping task created | All ADMIN + STAFF |
 | `CHECK_IN` | Guest checks in | All ADMIN + STAFF |
 | `CHECK_OUT` | Guest checks out | All ADMIN + STAFF |
-| `BOOKING_CONFIRMATION` | Reserved for Phase 5 CRM | Guest |
+| `BOOKING_CONFIRMATION` | Booking created (CRM email; persisted notification) | Guest |
+| `BOOKING_CANCELLATION` | Booking cancelled | Guest |
 | `PAYMENT_RECEIVED` | Defined in DB enum but not yet emitted — Phase 4 payments persist via Stripe webhook only, no WS broadcast | Guest + Staff |
+
+> The full `NotificationType` enum lives in `apps/api/prisma/schema.prisma`. Only the rows above are currently produced; the rest are reserved.
 
 ---
 

@@ -27,14 +27,13 @@ This document outlines the technology choices for the Hotel Management System an
 **Structure:**
 ```
 apps/
-  ├── api/          # NestJS backend
-  ├── web/          # React frontend
-  └── mobile/       # React Native (future)
+  ├── api/          # NestJS backend (REST + Socket.IO)
+  ├── web/          # React admin/staff/guest portal
+  └── guest/        # React "C'est La Stay" public landing (three.js/GSAP)
 packages/
-  ├── shared/       # Shared types and utilities
-  ├── ui/           # Shared React components
-  └── eslint-config/
+  └── shared/       # Shared TypeScript types, enums, constants
 ```
+> A `mobile/` (React Native) app and additional shared packages (`ui`, `eslint-config`) are possible future additions — not present today.
 
 ---
 
@@ -67,28 +66,26 @@ packages/
 
 ## Database
 
-### Supabase (PostgreSQL)
+### Neon (Serverless PostgreSQL)
 
-**Decision:** Use Supabase over self-hosted PostgreSQL or other databases
+**Decision:** Use Neon managed Postgres, accessed through Prisma
 
 **Why?**
-- **Built-in authentication:** JWT token management, email auth, social logins out of the box
-- **Row-level security:** Database-level access control policies (bonus feature)
-- **Real-time subscriptions:** Listen to database changes (optional enhancement)
-- **PostgreSQL underneath:** Can migrate to self-hosted Postgres if needed
-- **Free tier:** 500MB database, 2GB bandwidth, 50MB file storage
+- **Standard PostgreSQL:** No proprietary lock-in — relational model fits bookings/invoices well
+- **Serverless + autoscaling:** Scales to zero when idle, cheap for an MVP
+- **Pooled + direct URLs:** `DATABASE_URL` (pooled, for the app) and `DIRECT_URL` (direct, for `prisma migrate`) map cleanly to Prisma's `url`/`directUrl`
+- **Branching:** Database branches for preview/dev environments
 - **Managed infrastructure:** Zero server maintenance
-- **REST API auto-generated:** Direct database queries from frontend if needed
 
-**Trade-offs:**
-- Vendor dependency (mitigated by PostgreSQL compatibility)
-- Open-source and self-hostable if needed
+**Connection:** the Prisma datasource reads `DATABASE_URL` (pooled) and `DIRECT_URL` (direct). See `apps/api/prisma/schema.prisma`.
+
+> Note: some Supabase keys (`SUPABASE_URL`, `SUPABASE_*`) still exist in `apps/api/.env` from an earlier iteration, but Prisma connects to **Neon** — those keys are not used by the data layer.
 
 **Alternatives Considered:**
+- **Supabase:** earlier choice; migrated to Neon for serverless Postgres + branching
 - **MongoDB:** NoSQL doesn't fit relational booking data well
-- **MySQL:** Supabase offers more features for same cost
-- **Firebase:** More expensive, less flexible for complex queries
-- **Self-hosted PostgreSQL:** Requires infrastructure management
+- **MySQL:** fewer Postgres-native features (arrays, enums) used by the schema
+- **Self-hosted PostgreSQL:** requires infrastructure management
 
 ---
 
@@ -138,7 +135,15 @@ packages/
 - **Angular:** Too heavy, steeper learning curve
 - **Svelte:** Less mature ecosystem
 
-**UI Library:** TBD (Tailwind CSS + Headless UI or Material-UI)
+**Styling:** Tailwind CSS (+ PostCSS/Autoprefixer) in both `web` and `guest`. Icons via `lucide-react`, toasts via `react-hot-toast` (web).
+
+### Guest landing (`apps/guest`)
+
+The public `C'est La Stay` site is also React + Vite + Tailwind, plus a motion/3D layer:
+- **three.js** — lazy-loaded WebGL scenes (faceted "Matrimandir" sphere, particle backgrounds, cloth sim), kept out of the initial chunk
+- **GSAP** + **Lenis** — scroll-driven animation and smooth scrolling
+- **Embla Carousel** — room/gallery carousels
+- **date-fns** — date handling for the booking widget
 
 ---
 
@@ -241,11 +246,12 @@ packages/
 - **Zero config:** Detects React/Vite automatically
 
 **Why Railway?**
-- **Free tier:** $5/month credit (sufficient for MVP)
-- **PostgreSQL included:** No separate database hosting needed
-- **Auto-deployment:** Git integration
+- **Always-on process:** Long-running NestJS server for Socket.IO + `@Cron` jobs
+- **Auto-deployment:** Git integration, builds from `apps/api/Dockerfile`
 - **Environment variables:** Easy config management
 - **WebSocket support:** Unlike some PaaS providers
+
+> The database is hosted separately on **Neon** (not Railway's Postgres add-on); the API connects via `DATABASE_URL`/`DIRECT_URL`.
 
 **Alternatives Considered:**
 - **Netlify:** Similar to Vercel, slightly less popular
@@ -295,9 +301,10 @@ packages/
 |--------------------|------------------|----------------------------------------|
 | Monorepo           | Turborepo        | Code sharing, atomic commits           |
 | Backend Framework  | NestJS           | Enterprise architecture, TypeScript    |
-| Database           | Supabase (PostgreSQL) | Managed, free tier, built-in auth |
+| Database           | Neon (PostgreSQL) | Serverless Postgres, pooled + direct URLs, branching |
 | ORM                | Prisma           | Type-safe queries, migrations          |
-| Frontend           | React + Vite     | Industry standard, fast dev server     |
+| Frontend (portal)  | React + Vite     | Industry standard, fast dev server     |
+| Landing (3D)       | three.js + GSAP  | WebGL scenes + scroll animation on the guest site |
 | Real-time          | Socket.IO        | Reliable, fallback support             |
 | Payments           | Stripe           | PCI-compliant, strong SDKs             |
 | Email              | SendGrid         | Free tier, good deliverability         |
