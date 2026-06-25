@@ -12,3 +12,6 @@ build/
 # Env
 .env
 .env.local
+
+# Scratch / working notes
+marketing-*.md

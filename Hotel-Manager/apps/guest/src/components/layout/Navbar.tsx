@@ -27,7 +27,7 @@ export default function Navbar() {
     <header
       className={clsx(
         'fixed inset-x-0 top-0 z-50 transition-all duration-500 ease-breath',
-        scrolled ? 'bg-[#06121a]/75 shadow-soft backdrop-blur-xl' : 'bg-transparent',
+        scrolled ? 'bg-base/80 shadow-soft backdrop-blur-xl' : 'bg-transparent',
       )}
     >
       <span
@@ -47,7 +47,7 @@ export default function Navbar() {
           }}
           aria-label="C'est La Stay — home"
         >
-          <Logo className="h-9 md:h-10" />
+          <Logo className="h-9 md:h-10" light={!scrolled} />
         </a>
 
         <div className="hidden items-center gap-9 md:flex">
@@ -94,7 +94,7 @@ export default function Navbar() {
 
       <div
         className={clsx(
-          'overflow-hidden bg-[#06121a]/95 backdrop-blur-xl transition-[max-height] duration-500 ease-breath md:hidden',
+          'overflow-hidden bg-base/95 backdrop-blur-xl transition-[max-height] duration-500 ease-breath md:hidden',
           open ? 'max-h-96' : 'max-h-0',
         )}
       >

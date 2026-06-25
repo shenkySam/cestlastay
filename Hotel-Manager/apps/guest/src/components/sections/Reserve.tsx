@@ -162,23 +162,23 @@ export default function Reserve() {
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-20">
           {/* Left — copy + reassurance */}
           <Reveal>
-            <p className="eyebrow mb-4 text-sunset-300">{reserveContent.eyebrow}</p>
-            <h2 className="font-serif text-[clamp(2rem,4.6vw,3.6rem)] font-medium leading-[1.06] text-white">
+            <p className="eyebrow mb-4">{reserveContent.eyebrow}</p>
+            <h2 className="font-serif text-[clamp(2rem,4.6vw,3.6rem)] font-medium leading-[1.06] text-ink">
               {reserveContent.title}
             </h2>
-            <p className="mt-6 max-w-md font-sans leading-relaxed text-white/75">
+            <p className="mt-6 max-w-md font-sans leading-relaxed text-muted">
               {reserveContent.intro}
             </p>
             <ul className="mt-9 space-y-3.5">
               {reserveContent.reassurance.map((r) => (
-                <li key={r} className="flex items-start gap-3 font-sans text-sm text-white/85">
-                  <Check size={18} strokeWidth={1.6} className="mt-0.5 shrink-0 text-palm-300" />
+                <li key={r} className="flex items-start gap-3 font-sans text-sm text-ink/80">
+                  <Check size={18} strokeWidth={1.6} className="mt-0.5 shrink-0 text-palm-600" />
                   {r}
                 </li>
               ))}
             </ul>
             {!isBookingApiEnabled && (
-              <p className="mt-9 max-w-md font-sans text-xs leading-relaxed text-white/45">
+              <p className="mt-9 max-w-md font-sans text-xs leading-relaxed text-muted/80">
                 Demo mode — requests are acknowledged locally (no booking is created).
                 Set VITE_ENABLE_BOOKING_API=true once the public API endpoints are live.
               </p>
@@ -200,7 +200,7 @@ export default function Reserve() {
                   <button
                     type="button"
                     onClick={reset}
-                    className="mt-7 font-sans text-sm text-ocean-300 underline-offset-4 hover:underline"
+                    className="mt-7 font-sans text-sm text-sunset-600 underline-offset-4 hover:underline"
                   >
                     Make another request
                   </button>

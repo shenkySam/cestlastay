@@ -130,7 +130,7 @@ export default function ClothAmenities({ items }: Props) {
               >
                 <Icon size={28} strokeWidth={1.4} className="mx-auto mb-3 text-white" />
                 <h3 className="font-serif text-3xl text-white md:text-4xl">{a.title}</h3>
-                <p className="mx-auto mt-3 max-w-md font-sans leading-relaxed text-muted">
+                <p className="mx-auto mt-3 max-w-md font-sans leading-relaxed text-white/85">
                   {a.description}
                 </p>
               </div>
@@ -138,7 +138,7 @@ export default function ClothAmenities({ items }: Props) {
           })}
         </div>
 
-        <span className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 font-sans text-xs uppercase tracking-[0.18em] text-muted/70">
+        <span className="pointer-events-none absolute bottom-7 left-1/2 -translate-x-1/2 font-sans text-xs uppercase tracking-[0.18em] text-white/70">
           Scroll to draw back the sea linen
         </span>
       </div>

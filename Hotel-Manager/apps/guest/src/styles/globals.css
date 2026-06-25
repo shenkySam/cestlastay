@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 /* ════════════════════════════════════════════════════════════════════
-   BASE  —  immersive dark theme (content floats over the WebGL scene)
+   BASE  —  LIGHT / cream Earthen theme (content floats over the WebGL scene)
    ════════════════════════════════════════════════════════════════════ */
 @layer base {
   :root {
     --radius: 6px;
-    --hairline: rgba(238, 242, 239, 0.14); /* light divider on dark */
+    --hairline: rgba(58, 42, 31, 0.14); /* dark divider on cream */
   }
 
   * { box-sizing: border-box; }
@@ -20,9 +20,9 @@
 
   body {
     @apply font-sans text-ink antialiased;
-    /* deep base; the fixed particle canvas (transparent) glows over this */
-    background-color: #06121a;
-    background-image: radial-gradient(135% 100% at 50% 0%, #0b2536 0%, #06121a 52%, #03090e 100%);
+    /* warm cream base; the fixed particle canvas (transparent) drifts over this */
+    background-color: #f4efe5;
+    background-image: radial-gradient(135% 100% at 50% 0%, #faf6ec 0%, #f4efe5 52%, #ece3d2 100%);
     background-attachment: fixed;
     text-rendering: optimizeLegibility;
   }
@@ -31,31 +31,24 @@
     @apply font-serif;
     font-optical-sizing: auto;
     text-wrap: balance;
-    /* lift headings off the moving scene */
-    text-shadow: 0 2px 20px rgba(3, 9, 14, 0.5);
-  }
-
-  /* body copy that sits directly on the scene stays crisp */
-  p, li, a, span, label {
-    text-shadow: 0 1px 12px rgba(3, 9, 14, 0.35);
   }
 
   ::selection {
-    background: theme('colors.ocean.400');
-    color: #03090e;
+    background: theme('colors.sunset.500');
+    color: #f4efe5;
   }
 
   :focus-visible {
-    outline: 2px solid theme('colors.ocean.400');
+    outline: 2px solid theme('colors.sunset.500');
     outline-offset: 3px;
     border-radius: 2px;
   }
 
   ::-webkit-scrollbar { width: 11px; }
-  ::-webkit-scrollbar-track { background: #06121a; }
+  ::-webkit-scrollbar-track { background: #ece3d2; }
   ::-webkit-scrollbar-thumb {
-    background: rgba(238, 242, 239, 0.18);
-    border: 3px solid #06121a;
+    background: rgba(58, 42, 31, 0.22);
+    border: 3px solid #ece3d2;
     border-radius: 99px;
   }
 }
@@ -67,9 +60,9 @@
   .container-x { @apply mx-auto w-full max-w-[1240px] px-6 md:px-10; }
   .section { @apply py-24 md:py-32; }
 
-  /* Eyebrow — brighter ocean for dark backgrounds */
+  /* Eyebrow — clay on the cream page */
   .eyebrow {
-    @apply font-sans text-[0.7rem] font-semibold uppercase tracking-eyebrow text-ocean-300;
+    @apply font-sans text-[0.7rem] font-semibold uppercase tracking-eyebrow text-sunset-600;
   }
 
   .divider { height: 1px; background: var(--hairline); border: 0; }
@@ -84,95 +77,90 @@
   }
   .btn-lg { @apply px-8 py-4 text-[0.95rem]; }
 
-  /* PRIMARY — sunset orange */
+  /* PRIMARY — clay / terracotta */
   .btn-primary {
     @apply btn bg-sunset-600 text-white shadow-soft
-           hover:-translate-y-0.5 hover:bg-sunset-500 hover:shadow-lift active:translate-y-0;
+           hover:-translate-y-0.5 hover:bg-sunset-700 hover:shadow-lift active:translate-y-0;
   }
 
-  /* SECONDARY — ocean blue */
+  /* SECONDARY — Matrimandir gold */
   .btn-accent {
     @apply btn bg-ocean-600 text-white shadow-soft
-           hover:-translate-y-0.5 hover:bg-ocean-500 hover:shadow-lift active:translate-y-0;
+           hover:-translate-y-0.5 hover:bg-ocean-700 hover:shadow-lift active:translate-y-0;
   }
 
-  /* TERTIARY — light hairline outline (ink is light now) */
+  /* TERTIARY — clay hairline outline on cream */
   .btn-outline {
-    @apply btn border border-ink/25 bg-white/0 text-ink
-           hover:border-ink/50 hover:bg-white/[0.06];
+    @apply btn border border-ink/25 bg-transparent text-ink
+           hover:border-ink/50 hover:bg-ink/[0.04];
   }
-  /* alias kept for hero usage */
+  /* alias for buttons sitting on a dark PHOTO (hero overlay) */
   .btn-outline-light {
-    @apply btn border border-white/50 bg-white/5 text-white backdrop-blur-sm
-           hover:border-white hover:bg-white/15;
+    @apply btn border border-white/60 bg-white/10 text-white backdrop-blur-sm
+           hover:border-white hover:bg-white/20;
   }
 
   /* SOLID WHITE, capsule — dark text on white, for overlay photo cards */
   .btn-light {
-    @apply btn bg-white text-[#06121a] shadow-soft
+    @apply btn bg-white text-ink shadow-soft
            hover:-translate-y-0.5 hover:bg-sand-50 hover:shadow-lift active:translate-y-0;
   }
 
-  /* Surfaces — frosted glass floating over the scene --------------------- */
+  /* Surfaces — warm cards floating over the scene --------------------- */
   .card {
-    @apply rounded-card border border-white/10 bg-white/[0.055] shadow-soft backdrop-blur-md;
+    @apply rounded-card border border-ink/10 bg-surface/85 shadow-soft backdrop-blur-md;
   }
-  /* a flatter glass panel (nav, footer, form) */
+  /* a flatter cream glass panel (nav, footer, form) */
   .glass {
-    @apply border border-white/10 bg-[#06121a]/55 backdrop-blur-xl;
+    @apply border border-ink/10 bg-base/70 backdrop-blur-xl;
   }
 
-  /* Form fields — dark glass ------------------------------------------- */
+  /* Form fields — cream/light ----------------------------------------- */
   .field-label {
     @apply mb-1.5 block font-sans text-xs font-semibold uppercase tracking-[0.12em] text-muted;
   }
   .field {
-    @apply block w-full rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-3
+    @apply block w-full rounded-2xl border border-ink/15 bg-white/70 px-4 py-3
            font-sans text-sm text-ink placeholder-muted/60
            transition-colors duration-300 ease-breath
-           focus:border-ocean-400 focus:bg-white/10 focus:outline-none focus:ring-1 focus:ring-ocean-400;
+           focus:border-sunset-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-sunset-500;
   }
-  /* native date/select pickers readable on dark */
-  .field option { color: #0e2029; }
-  .field::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.7); }
+  .field option { color: #3a2a1f; }
 }
 
 /* ════════════════════════════════════════════════════════════════════
    UTILITIES
    ════════════════════════════════════════════════════════════════════ */
 @layer utilities {
-  /* Soft dark scrim to lift text off the busy parts of the scene */
+  /* Soft cream scrim to settle text over busy parts of the scene */
   .scrim-text {
     background-image: radial-gradient(
       65% 60% at 50% 50%,
-      rgba(3, 9, 14, 0.72) 0%,
-      rgba(3, 9, 14, 0.42) 48%,
-      rgba(3, 9, 14, 0) 78%
+      rgba(244, 239, 229, 0.78) 0%,
+      rgba(244, 239, 229, 0.45) 48%,
+      rgba(244, 239, 229, 0) 78%
     );
   }
 
-  /* Bottom-up dark gradient — lifts text/controls overlaid on a photo card */
+  /* Bottom-up DARK gradient — lifts white text/controls overlaid on a photo */
   .scrim-bottom {
     background-image: linear-gradient(
       to top,
-      rgba(3, 9, 14, 0.92) 0%,
-      rgba(3, 9, 14, 0.65) 30%,
-      rgba(3, 9, 14, 0.15) 62%,
-      rgba(3, 9, 14, 0) 100%
+      rgba(40, 28, 18, 0.92) 0%,
+      rgba(40, 28, 18, 0.65) 30%,
+      rgba(40, 28, 18, 0.15) 62%,
+      rgba(40, 28, 18, 0) 100%
     );
   }
 
-  /* Lead copy that floats directly on the busy scene (no card backing).
-     Brightens to the primary foreground + a stronger dark halo so it reads
-     over bright particle clusters — same idea as the heading text-shadow. */
+  /* Lead copy that floats directly on the cream scene (no card backing). */
   .copy-on-scene {
-    @apply text-ink;
-    text-shadow: 0 2px 18px rgba(3, 9, 14, 0.6);
+    @apply text-muted;
   }
 
   /* Warm sandy gradient shown behind images while loading / on error */
   .img-fallback {
-    background-image: linear-gradient(135deg, #1a2c33 0%, #14333f 55%, #0c2530 100%);
+    background-image: linear-gradient(135deg, #e6dac6 0%, #d4ba93 55%, #c19a6b 100%);
   }
 
   /* Film grain — subtle tactile texture layered over the whole page */

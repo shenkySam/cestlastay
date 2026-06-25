@@ -5,13 +5,15 @@ const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Warm, on-brand light motes (sun glints / sea spray) + a few ocean glints.
+// Warm earthen motes — clay, Matrimandir gold, amber, bronze, olive. Tuned to
+// read on a LIGHT/cream page (normal blending, soft round sprites — not the
+// additive glow used on a dark canvas).
 const PALETTE: Array<[string, number]> = [
-  ['#fff3d6', 0.30], // warm cream
-  ['#ffd27a', 0.26], // soft gold
-  ['#f7a52b', 0.18], // sunset
-  ['#ffe9a8', 0.16], // pale sun
-  ['#6fd6ec', 0.10], // ocean glint
+  ['#b1542e', 0.28], // clay / terracotta
+  ['#c9a23a', 0.30], // matrimandir gold
+  ['#c0792f', 0.20], // amber
+  ['#8a4a26', 0.12], // deep bronze
+  ['#7a7a3c', 0.10], // olive
 ];
 
 function pickColor(): string {
@@ -25,12 +27,17 @@ function pickColor(): string {
 }
 
 /**
- * Persistent, full-page WebGL background. A warm galaxy swirl that unwinds —
- * as you scroll the whole page — into a wide, gently undulating particle GRID
- * (a "wave terrain": a receding mesh in the centre with larger floating-wave
- * particles in the foreground). Fixed behind all content; transparent so the
- * dark body gradient shows through. Driven by window scroll (Lenis updates it),
- * with the rotation kept very slow so motion reads as smooth and scroll-led.
+ * Persistent, full-page WebGL background for the Earthen landing.
+ *
+ * A warm particle field that travels through three shapes as you scroll,
+ * smoothly (eased), keyed to the real #matrimandir section:
+ *   1. CLOUD   — gently floating embers (hero / top)
+ *   2. RIPPLE  — a tilted concentric ripple disc that gathers BEHIND the
+ *                Matrimandir sphere, reading like rings spreading from a drop
+ *   3. TERRAIN — a wide undulating wave terrain, fully formed at the bottom
+ *
+ * Fixed behind all content; transparent so the cream page shows through.
+ * Driven by window scroll (Lenis updates it). Honours reduced-motion.
  */
 export default function SceneBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,6 +46,8 @@ export default function SceneBackground() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const reduce = prefersReducedMotion();
+    const lerp = THREE.MathUtils.lerp;
+    const ease = (t: number) => t * t * (3 - 2 * t);
 
     let w = window.innerWidth;
     let h = window.innerHeight;
@@ -52,68 +61,48 @@ export default function SceneBackground() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(w, h, false);
 
-    /* ---- grid dimensions (cols * rows = particle count) ---- */
     const isMobile = w < 768;
-    const COLS = isMobile ? 84 : 120;
-    const ROWS = isMobile ? 56 : 76;
+    const COLS = isMobile ? 70 : 110;
+    const ROWS = isMobile ? 46 : 68;
     const COUNT = COLS * ROWS;
+    const GRID_W = 30;
+    const GRID_D = 20;
 
-    const GRID_W = 30; // terrain width
-    const GRID_D = 20; // terrain depth
+    // Ripple disc placement — right of centre, behind where the sphere sits.
+    const DCX = isMobile ? 0 : 3.4;
+    const DCY = -0.2;
+    const DZ = -0.6;
+    const DISC_R = isMobile ? 3.6 : 4.6;
+    const TILT = 1.02; // ~58° so the concentric rings read in perspective
 
-    const initial = new Float32Array(COUNT * 3); // galaxy swirl
-    const gridX = new Float32Array(COUNT); // terrain target x
-    const gridZ = new Float32Array(COUNT); // terrain target z (depth)
+    const initial = new Float32Array(COUNT * 3); // cloud
+    const ripple = new Float32Array(COUNT * 3); // (localX, localZ, radius)
+    const phase = new Float32Array(COUNT);
+    const gridX = new Float32Array(COUNT);
+    const gridZ = new Float32Array(COUNT);
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
-
     const c = new THREE.Color();
 
-    // ---- "home" silhouette sampler: walls + roof + chimney, door & windows cut out ----
-    const HCX = 1.3; // home sits right of the hero copy (applied as a position offset)
-    const inDoor = (x: number, y: number) => x > -0.7 && x < 0.7 && y < -1.3;
-    const inWindow = (x: number, y: number) =>
-      y > -0.6 && y < 0.4 && ((x > -2.3 && x < -1.1) || (x > 1.1 && x < 2.3));
-    const housePoint = (): [number, number] => {
-      const pick = Math.random();
-      let x: number;
-      let y: number;
-      if (pick < 0.64) {
-        // walls — reject the door + window openings
-        let tries = 0;
-        do {
-          x = -3 + Math.random() * 6;
-          y = -4 + Math.random() * 4.6;
-          tries += 1;
-        } while ((inDoor(x, y) || inWindow(x, y)) && tries < 10);
-      } else if (pick < 0.96) {
-        // roof triangle: (-3.8,0.6) (3.8,0.6) (0,4)
-        let a = Math.random();
-        let b = Math.random();
-        if (a + b > 1) {
-          a = 1 - a;
-          b = 1 - b;
-        }
-        x = -3.8 + a * 7.6 + b * 3.8;
-        y = 0.6 + b * 3.4;
-      } else {
-        // chimney
-        x = 1.5 + Math.random() * 0.7;
-        y = 1.9 + Math.random() * 1.4;
-      }
-      return [x, y]; // centred at the local origin so it spins about itself
-    };
+    const RINGS = isMobile ? 24 : 36;
+    const SEG = Math.ceil(COUNT / RINGS);
 
     for (let i = 0; i < COUNT; i++) {
       const i3 = i * 3;
+      initial[i3] = (Math.random() - 0.5) * 16;
+      initial[i3 + 1] = (Math.random() - 0.5) * 10;
+      initial[i3 + 2] = (Math.random() - 0.5) * 6;
+      phase[i] = Math.random() * Math.PI * 2;
 
-      // "home" shape (face-on, XY plane)
-      const [hx, hy] = housePoint();
-      initial[i3] = hx + (Math.random() - 0.5) * 0.12;
-      initial[i3 + 1] = hy + (Math.random() - 0.5) * 0.12;
-      initial[i3 + 2] = (Math.random() - 0.5) * 3.0; // depth, so the spin reads as 3D
+      // organised concentric ripple disc: rings of points (lx, lz, radius)
+      const ring = Math.floor(i / SEG);
+      const seg = i % SEG;
+      const rad = (ring / (RINGS - 1)) * DISC_R;
+      const ang = (seg / SEG) * Math.PI * 2 + ring * 0.18;
+      ripple[i3] = rad * Math.cos(ang);
+      ripple[i3 + 1] = rad * Math.sin(ang);
+      ripple[i3 + 2] = rad;
 
-      // terrain grid target (XZ plane, Y becomes the wave)
       const col = i % COLS;
       const row = Math.floor(i / COLS);
       gridX[i] = (col / (COLS - 1) - 0.5) * GRID_W;
@@ -133,13 +122,29 @@ export default function SceneBackground() {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
+    // round dot sprite — soft circles, not squares
+    const dotCanvas = document.createElement('canvas');
+    dotCanvas.width = dotCanvas.height = 64;
+    const dg = dotCanvas.getContext('2d')!;
+    const dgrd = dg.createRadialGradient(32, 32, 0, 32, 32, 32);
+    dgrd.addColorStop(0, 'rgba(255,255,255,1)');
+    dgrd.addColorStop(0.5, 'rgba(255,255,255,0.9)');
+    dgrd.addColorStop(1, 'rgba(255,255,255,0)');
+    dg.fillStyle = dgrd;
+    dg.beginPath();
+    dg.arc(32, 32, 32, 0, Math.PI * 2);
+    dg.fill();
+    const dotTex = new THREE.CanvasTexture(dotCanvas);
+
     const material = new THREE.PointsMaterial({
-      size: isMobile ? 0.055 : 0.045,
-      sizeAttenuation: true, // big foreground particles, small in the distance
+      size: isMobile ? 0.08 : 0.06,
+      map: dotTex,
+      alphaTest: 0.02,
+      sizeAttenuation: true,
       transparent: true,
       opacity: 0.92,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       vertexColors: true,
     });
     const points = new THREE.Points(geometry, material);
@@ -147,60 +152,71 @@ export default function SceneBackground() {
 
     const posAttr = geometry.attributes.position as THREE.BufferAttribute;
     const pos = posAttr.array as Float32Array;
-
-    const morph = { value: 0, target: 0 };
-    // smoothed cursor position (-1..1) used to lean the home toward the pointer
-    const pointer = { tx: 0, ty: 0, x: 0, y: 0 };
+    let prog = 0; // smoothed scroll progress
 
     const scrollProgress = () => {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       return max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
     };
+    // Scroll fraction where the Matrimandir section sits centred in the viewport.
+    const domeFrac = () => {
+      const sec = document.getElementById('matrimandir');
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      if (!sec || max <= 0) return 0.4;
+      const center = sec.offsetTop + sec.offsetHeight / 2 - window.innerHeight / 2;
+      return Math.min(0.85, Math.max(0.12, center / max));
+    };
 
     const renderFrame = (t: number) => {
-      // galaxy unwinds into the grid over the first ~45% of scroll, then the
-      // wave terrain persists behind the rest of the page
-      morph.target = Math.min(1, scrollProgress() / 0.45);
-      morph.value += (morph.target - morph.value) * 0.05; // liquid, scroll-led ease
-      const m = morph.value;
+      prog += (scrollProgress() - prog) * 0.08; // eased, smooth — no snapping
+      const A = domeFrac();
+      const g = ease(prog <= A ? (A > 0 ? prog / A : 1) : 1); // cloud → ripple
+      const s = ease(prog > A ? (prog - A) / (1 - A) : 0); // ripple → terrain
 
       for (let i = 0; i < COUNT; i++) {
         const i3 = i * 3;
+        // cloud (with gentle drift) → ripple disc
+        const bob = (1 - g) * 0.5;
+        const cx = initial[i3] + Math.sin(t * 0.3 + phase[i]) * bob;
+        const cy = initial[i3 + 1] + Math.cos(t * 0.25 + phase[i]) * bob;
+        const lx = ripple[i3];
+        const lz = ripple[i3 + 1];
+        const rad = ripple[i3 + 2];
+        const wv = Math.sin(rad * 1.7 - t * 2.2) * 0.55; // travelling radial ripple
+        const rx = DCX + lx;
+        const ry = DCY + lz * Math.sin(TILT) + wv;
+        const rz = DZ + lz * Math.cos(TILT);
+        let bx = lerp(cx, rx, g);
+        let by = lerp(cy, ry, g);
+        let bz = lerp(initial[i3 + 2], rz, g);
+        // ripple → wave terrain
         const gx = gridX[i];
         const gz = gridZ[i];
-        // gentle travelling wave across the terrain
         const wave =
           Math.sin(gx * 0.35 + t * 0.6) * Math.cos(gz * 0.3 + t * 0.45) * 1.7;
-        pos[i3] = THREE.MathUtils.lerp(initial[i3], gx, m);
-        pos[i3 + 1] = THREE.MathUtils.lerp(initial[i3 + 1], wave, m);
-        pos[i3 + 2] = THREE.MathUtils.lerp(initial[i3 + 2], gz, m);
+        pos[i3] = lerp(bx, gx, s);
+        pos[i3 + 1] = lerp(by, wave, s);
+        pos[i3 + 2] = lerp(bz, gz, s);
       }
       posAttr.needsUpdate = true;
 
-      // the home turns slowly on its own axis AND leans toward the cursor
-      // (smoothly eased, slow lag); all of it settles into the centred terrain
-      pointer.x += (pointer.tx - pointer.x) * 0.04;
-      pointer.y += (pointer.ty - pointer.y) * 0.04;
-      const home = 1 - m;
-      // no auto-spin — the home only leans toward the cursor (smoothly eased);
-      // the lean is scoped to the home and fades out as it becomes the terrain
-      points.rotation.y = pointer.x * 0.5 * home;
-      points.rotation.x = pointer.y * 0.28 * home;
-      points.position.x = HCX * home;
-
-      // camera eases (with scroll) from a face-on galaxy view to a low,
-      // receding view across the wave terrain
-      camera.position.set(0, m * 2.6, 7 + m * 5.5);
-      camera.lookAt(0, -m * 0.9, -m * 5.5);
-
+      // camera eases from a face-on cloud to a low, receding view of the terrain
+      camera.position.set(0, s * 2.6, 7 + s * 5.5);
+      camera.lookAt(0, -s * 0.9, -s * 5.5);
       renderer.render(scene, camera);
     };
 
+    let clock: THREE.Clock | null = null;
     if (reduce) {
+      prog = scrollProgress();
       renderFrame(0);
+      const onScroll = () => renderFrame(0);
+      window.addEventListener('scroll', onScroll, { passive: true });
+      // store for cleanup
+      (canvas as unknown as { __onScroll?: () => void }).__onScroll = onScroll;
     } else {
-      const clock = new THREE.Clock();
-      renderer.setAnimationLoop(() => renderFrame(clock.getElapsedTime()));
+      clock = new THREE.Clock();
+      renderer.setAnimationLoop(() => renderFrame(clock!.getElapsedTime()));
     }
 
     const handleResize = () => {
@@ -214,16 +230,12 @@ export default function SceneBackground() {
     };
     window.addEventListener('resize', handleResize);
 
-    const onPointer = (e: PointerEvent) => {
-      pointer.tx = (e.clientX / window.innerWidth) * 2 - 1;
-      pointer.ty = (e.clientY / window.innerHeight) * 2 - 1;
-    };
-    window.addEventListener('pointermove', onPointer);
-
     return () => {
       renderer.setAnimationLoop(null);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('pointermove', onPointer);
+      const onScroll = (canvas as unknown as { __onScroll?: () => void }).__onScroll;
+      if (onScroll) window.removeEventListener('scroll', onScroll);
+      dotTex.dispose();
       geometry.dispose();
       material.dispose();
       renderer.dispose();
