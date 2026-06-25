@@ -19,6 +19,8 @@ staff (1) ─── (0..*) service_requests (assigned)
 
 invoice (1) ─── (0..*) invoice_items
 service_request (0..1) ─── (0..*) invoice_items
+
+bookings (1) ─── (0..1) rating (0..*) ─── (1) guests
 ```
 
 ---
@@ -202,6 +204,9 @@ Guest service ticketing system.
 | `requested_at` | TIMESTAMP | DEFAULT now() | Request timestamp |
 | `started_at` | TIMESTAMP | NULL | Started timestamp |
 | `completed_at` | TIMESTAMP | NULL | Completed timestamp |
+| `service_rating` | INTEGER | NULL | Guest rating of the service (1-5) |
+| `rating_comment` | TEXT | NULL | Guest comment on the service |
+| `rated_at` | TIMESTAMP | NULL | When the service was rated |
 | `created_at` | TIMESTAMP | DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP | AUTO | Auto-updated timestamp |
 
@@ -326,7 +331,7 @@ In-app notification center.
 |--------|------|-------------|-------------|
 | `id` | UUID | PK | Notification ID |
 | `user_id` | UUID | FK (users), NOT NULL | Recipient user |
-| `type` | ENUM | NOT NULL | CHECK_IN, CHECK_OUT, BOOKING_CONFIRMATION, SERVICE_REQUEST, COMPLAINT, PAYMENT_RECEIVED, HOUSEKEEPING_ALERT, SYSTEM |
+| `type` | ENUM | NOT NULL | CHECK_IN, CHECK_OUT, BOOKING_CONFIRMATION, BOOKING_CANCELLATION, SERVICE_REQUEST, COMPLAINT, PAYMENT_RECEIVED, HOUSEKEEPING_ALERT, SYSTEM |
 | `status` | ENUM | DEFAULT 'UNREAD' | UNREAD, READ, ARCHIVED |
 | `title` | VARCHAR | NOT NULL | Notification title |
 | `message` | TEXT | NOT NULL | Notification message |
@@ -397,6 +402,11 @@ Loyalty discount code management.
 #### `audit_logs`
 System action tracking for compliance.
 
+> ℹ️ The `AuditLog` model lives in `apps/api/prisma/schema.prisma` and maps to this
+> table (created by the `20260427091801_init` migration). It has no foreign key on
+> `user_id` by design — audit rows survive user deletion. There is intentionally no
+> `updated_at` column (rows are immutable).
+
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | PK | Log ID |
@@ -413,6 +423,32 @@ System action tracking for compliance.
 - `idx_audit_user` on `user_id`
 - `idx_audit_entity` on `(entity, entity_id)`
 - `idx_audit_created` on `created_at`
+
+---
+
+### 8. Ratings & Feedback
+
+#### `ratings`
+Post-stay guest reviews, one per booking. Added by the `20260617000000_add_ratings_feature` migration.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK | Rating ID |
+| `booking_id` | UUID | FK (bookings), UNIQUE | Rated booking (one rating per booking) |
+| `guest_id` | UUID | FK (guests), NOT NULL | Guest who left the rating |
+| `overall_rating` | INTEGER | NOT NULL | Overall rating (1-5) |
+| `room_rating` | INTEGER | NOT NULL | Room rating (1-5) |
+| `comment` | TEXT | NULL | Free-text review |
+| `created_at` | TIMESTAMP | DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP | AUTO | Auto-updated timestamp |
+
+**Indexes:**
+- `idx_ratings_booking` on `booking_id` (UNIQUE)
+- `idx_ratings_guest` on `guest_id`
+- `idx_ratings_overall` on `overall_rating`
+
+> Note: service-level ratings live on `service_requests` (`service_rating`,
+> `rating_comment`, `rated_at`); this table holds the booking/stay-level rating.
 
 ---
 

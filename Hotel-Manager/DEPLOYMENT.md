@@ -21,12 +21,12 @@ Push to GitHub first (Railway & Vercel deploy from the repo).
 1. Open the failing service → **Settings → Source** → set **Root Directory = `Hotel-Manager`**, Save.
    - Railway then finds `Hotel-Manager/railway.json`, which builds `apps/api/Dockerfile` (whole workspace as context).
 2. **Settings → Networking → Generate Domain** (gives e.g. `https://hms-api-production.up.railway.app`).
-3. **Variables** — add (values from your Supabase/Stripe/etc. dashboards; see `apps/api/.env.example`):
+3. **Variables** — add (values from your Neon/Stripe/etc. dashboards; see `apps/api/.env.example`):
 
    | Variable | Notes |
    |----------|-------|
-   | `DATABASE_URL` | Supabase connection string (app runtime) |
-   | `DIRECT_URL` | **Direct** (port 5432) connection — used by `prisma migrate deploy` |
+   | `DATABASE_URL` | Neon **pooled** connection string (app runtime) |
+   | `DIRECT_URL` | Neon **direct** connection — used by `prisma migrate deploy` |
    | `JWT_SECRET`, `JWT_REFRESH_SECRET` | random ≥32-char strings |
    | `JWT_EXPIRES_IN` (`15m`), `JWT_REFRESH_EXPIRES_IN` (`7d`) | optional, have defaults |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | payments |

@@ -51,7 +51,7 @@ A comprehensive web-based Hotel Management System designed to streamline daily o
 
 **Deliverables:**
 - ✅ Turborepo monorepo with pnpm workspaces
-- ✅ NestJS backend with Prisma + Supabase
+- ✅ NestJS backend with Prisma + PostgreSQL (Neon)
 - ✅ Complete database schema and migrations
 - ✅ Authentication system (JWT + role-based guards)
 - ✅ React frontend with protected routes
@@ -206,7 +206,7 @@ pnpm install
 
 # Setup environment variables
 cp apps/api/.env.example apps/api/.env
-# Edit .env with your Supabase, Stripe, SendGrid credentials
+# Edit .env with your Neon (DATABASE_URL + DIRECT_URL), Stripe, SendGrid credentials
 
 # Initialize database
 cd apps/api
