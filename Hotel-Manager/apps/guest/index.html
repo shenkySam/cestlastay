@@ -154,7 +154,7 @@
   .room-foot a{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--clay);border-bottom:1px solid var(--clay);padding-bottom:2px}
   .philo img.philo-shot{aspect-ratio:3/2;width:100%;border-radius:2px;object-fit:cover;object-position:center;display:block}
   /* stays showcase */
-  .stays-showcase{display:grid;grid-template-columns:1.15fr .85fr;gap:52px;align-items:center}
+  .stays-showcase{display:grid;grid-template-columns:1.15fr .85fr;gap:52px;align-items:start}
   .stays-img{width:100%;border-radius:3px;object-fit:cover;display:block;box-shadow:0 24px 60px rgba(58,42,31,.18)}
   .stays-list{display:flex;flex-direction:column}
   .stay-row{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding:26px 0;border-top:1px solid var(--line)}
@@ -247,8 +247,12 @@
     .switcher a{padding:9px 12px;font-size:11px}
   }
 
-  /* picture wrappers must not disturb the existing img layout */
-  picture{display:contents}
+  /* picture wrappers must not disturb the existing img layout.
+     NB: display:contents would promote the <source> tags to grid items
+     (phantom row + gap) inside grid sections — use block so the picture is
+     the single grid/flex item and the <img> inside keeps its own sizing. */
+  picture{display:block}
+  picture > img{display:block;width:100%}
 
   /* header map icon (top-right, beside Reserve) */
   .map-link{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);color:var(--ink-soft);transition:all .2s;margin-right:14px}
