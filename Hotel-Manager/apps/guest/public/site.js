@@ -16,6 +16,10 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
   const fmtPrice = (n) => '₹' + Number(n).toLocaleString('en-IN');
+  const fmtDate = (iso) => {
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
 
   // ---- Stay catalog (drives prices + the modal dropdown from the admin) ------
   let categories = [];
@@ -211,18 +215,22 @@
       const res = await fetch(API + '/rooms/availability?checkIn=' + ci + '&checkOut=' + co);
       if (res.ok) rooms = await res.json();
     } catch (_) { /* offline -> treat all as on request */ }
-    const availCats = new Set((rooms || []).map((r) => r.categoryId));
+    // Match available rooms to the page's stays by the category name carried in
+    // the availability response itself — independent of the categories fetch.
+    const availNames = new Set(
+      (rooms || []).map((r) => ((r.category && r.category.name) || '').trim().toLowerCase()),
+    );
 
     let n = 0;
     $$('#staysList .stay-row').forEach((row) => {
-      const cat = findCategory(row.getAttribute('data-stay'));
-      const ok = !!(cat && availCats.has(cat.id));
+      const ok = availNames.has((row.getAttribute('data-stay') || '').trim().toLowerCase());
       if (ok) n++;
       setRowAvail(row, ok);
     });
+    const range = fmtDate(ci) + ' – ' + fmtDate(co);
     msg.textContent = n > 0
-      ? n + ' stay' + (n > 1 ? 's' : '') + ' available for ' + ci + ' → ' + co + '. Choose one and hit Reserve.'
-      : 'No rooms open for ' + ci + ' → ' + co + ' — hit Reserve to request and we’ll confirm by email.';
+      ? n + ' stay' + (n > 1 ? 's' : '') + ' open for ' + range + ' — select one below and reserve.'
+      : 'Our rooms are spoken for ' + range + ' — reserve to request these dates and a host will personally confirm by email within 24 hours.';
   }
 
   const bookingBar = $('#bookingBar');
