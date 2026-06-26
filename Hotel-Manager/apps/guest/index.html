@@ -124,6 +124,9 @@
   .field input,.field select{width:100%;background:none;border:none;color:var(--cream);font-family:'Jost',sans-serif;font-size:15px;outline:none}
   .field input::placeholder{color:rgba(244,239,229,.5)}
   .field input[type=date]{color-scheme:dark}
+  /* native dropdown list is OS-rendered white — keep its text legible (the
+     closed select still shows cream text on the dark booking bar) */
+  .field select option{color:#3a2a1f;background:#fff}
   .book-search{background:var(--clay);display:flex;align-items:center;justify-content:center;padding:0 36px;cursor:pointer;font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--cream);transition:background .25s;border:none}
   .book-search:hover{background:var(--clay-deep)}
 
@@ -134,7 +137,7 @@
   .sec-head p{font-size:17px;color:var(--ink-soft);margin-top:22px}
 
   /* philosophy */
-  .philo{display:grid;grid-template-columns:1.35fr .65fr;gap:64px;align-items:center}
+  .philo{display:grid;grid-template-columns:1.35fr .65fr;gap:64px;align-items:start}
   .philo .ph{aspect-ratio:4/5;border-radius:2px}
   .philo blockquote{font-family:'Cormorant Garamond',serif;font-size:clamp(28px,3.4vw,44px);line-height:1.22;font-style:italic;color:var(--ink)}
   .philo .sig{margin-top:30px;font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--clay)}
@@ -176,7 +179,7 @@
 
   /* location */
   #auroville{background:var(--ink);color:var(--cream)}
-  .loc{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
+  .loc{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:start}
   .loc .eyebrow{color:#e3a06a}
   .loc h2{font-size:clamp(36px,4.6vw,64px);margin:18px 0 26px}
   .loc p{font-size:17px;color:rgba(244,239,229,.72);max-width:46ch}

@@ -4,7 +4,6 @@
 // in index.html. `particles.js` (a classic script) runs first and exposes
 // window.Particles, which we use for the hero fireflies.
 import { initSphere } from './sphere.js';
-import { initScene } from './scene-earthen.js';
 
 const sphereEl = document.getElementById('sphere');
 if (sphereEl) {
@@ -21,10 +20,8 @@ if (sphereEl) {
   window.dispatchEvent(new Event('sphereready'));
 }
 
-const fxEl = document.getElementById('fx-bg');
-if (fxEl) {
-  window.__scene = initScene(fxEl);
-}
+// The full-page background dot-field (scene-earthen.js) was removed — it read as
+// busy/distracting over the light cream sections. The hero embers stay below.
 
 const heroCanvas = document.querySelector('.fx-hero');
 if (heroCanvas && window.Particles) {
