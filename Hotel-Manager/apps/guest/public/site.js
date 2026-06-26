@@ -167,6 +167,67 @@
     });
   }
 
+  // ---- Availability search (hero booking bar) --------------------------------
+  function scrollToStays() {
+    const el = document.getElementById('stays');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function ensureAvailMsg() {
+    let el = document.getElementById('availMsg');
+    if (!el) {
+      const head = document.querySelector('#stays .sec-head');
+      el = document.createElement('p');
+      el.id = 'availMsg';
+      el.className = 'avail-msg';
+      el.setAttribute('role', 'status');
+      if (head) head.appendChild(el);
+    }
+    return el;
+  }
+
+  function setRowAvail(row, ok) {
+    const meta = row.querySelector('.stay-meta');
+    if (!meta) return;
+    let b = meta.querySelector('[data-avail]');
+    if (!b) { b = document.createElement('div'); b.setAttribute('data-avail', ''); meta.appendChild(b); }
+    b.className = 'avail-badge ' + (ok ? 'ok' : 'req');
+    b.textContent = ok ? '✓ Available' : 'On request';
+  }
+
+  async function onSearch() {
+    const ci = ($('#bbCheckIn') || {}).value || '';
+    const co = ($('#bbCheckOut') || {}).value || '';
+    const msg = ensureAvailMsg();
+    msg.classList.remove('err');
+    const bad = (t) => { msg.textContent = t; msg.classList.add('err'); scrollToStays(); };
+    if (!ci || !co) return bad('Please choose your arrival and departure dates above.');
+    if (new Date(co) <= new Date(ci)) return bad('Departure must be after arrival.');
+
+    msg.textContent = 'Checking availability…';
+    scrollToStays();
+    let rooms = [];
+    try {
+      const res = await fetch(API + '/rooms/availability?checkIn=' + ci + '&checkOut=' + co);
+      if (res.ok) rooms = await res.json();
+    } catch (_) { /* offline -> treat all as on request */ }
+    const availCats = new Set((rooms || []).map((r) => r.categoryId));
+
+    let n = 0;
+    $$('#staysList .stay-row').forEach((row) => {
+      const cat = findCategory(row.getAttribute('data-stay'));
+      const ok = !!(cat && availCats.has(cat.id));
+      if (ok) n++;
+      setRowAvail(row, ok);
+    });
+    msg.textContent = n > 0
+      ? n + ' stay' + (n > 1 ? 's' : '') + ' available for ' + ci + ' → ' + co + '. Choose one and hit Reserve.'
+      : 'No rooms open for ' + ci + ' → ' + co + ' — hit Reserve to request and we’ll confirm by email.';
+  }
+
+  const bookingBar = $('#bookingBar');
+  if (bookingBar) bookingBar.addEventListener('submit', (e) => { e.preventDefault(); onSearch(); });
+
   // ---- Newsletter ------------------------------------------------------------
   const newsForm = $('#newsForm');
   if (newsForm) {

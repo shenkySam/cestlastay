@@ -274,6 +274,13 @@
   .modal-done .tick{width:58px;height:58px;border-radius:50%;background:#e7efe3;color:#3f6b3f;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px}
   .news-msg{font-size:13px;margin-top:8px;color:#3f6b3f}
   .news-msg.err{color:#b3261e}
+
+  /* availability search results */
+  .avail-msg{margin-top:18px;font-size:14px;color:var(--clay);min-height:18px}
+  .avail-msg.err{color:#b3261e}
+  .avail-badge{display:inline-block;margin-top:8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:3px 10px;border-radius:100px}
+  .avail-badge.ok{background:#e7efe3;color:#3f6b3f}
+  .avail-badge.req{background:rgba(177,84,46,.12);color:var(--clay)}
 </style>
 </head>
 <body>
@@ -343,7 +350,7 @@
               <option value="4">4 guests</option>
             </select>
           </div>
-          <button class="book-search" type="submit" data-book>Search</button>
+          <button class="book-search" type="submit">Search</button>
         </form>
       </div>
     </div>
