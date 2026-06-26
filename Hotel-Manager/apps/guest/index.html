@@ -246,6 +246,34 @@
     .switcher{bottom:14px;width:calc(100% - 28px);justify-content:center}
     .switcher a{padding:9px 12px;font-size:11px}
   }
+
+  /* picture wrappers must not disturb the existing img layout */
+  picture{display:contents}
+
+  /* header map icon (top-right, beside Reserve) */
+  .map-link{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);color:var(--ink-soft);transition:all .2s;margin-right:14px}
+  .map-link:hover{color:var(--clay);border-color:var(--clay)}
+  .nav-actions{display:flex;align-items:center}
+
+  /* booking modal */
+  .modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(58,42,31,.55);backdrop-filter:blur(4px)}
+  .modal.open{display:flex}
+  .modal-card{background:var(--cream);width:100%;max-width:500px;max-height:92vh;overflow-y:auto;border-radius:4px;padding:34px 34px 30px;box-shadow:0 30px 80px rgba(58,42,31,.4);position:relative}
+  .modal-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:26px;line-height:1;color:var(--ink-soft);cursor:pointer}
+  .modal-card h3{font-family:'Cormorant Garamond',serif;font-size:32px;margin-bottom:6px}
+  .modal-card .sub{font-size:14px;color:var(--ink-soft);margin-bottom:22px}
+  .mfield{margin-bottom:14px}
+  .mfield label{display:block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
+  .mfield input,.mfield select,.mfield textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:3px;padding:11px 13px;font-family:'Jost',sans-serif;font-size:15px;color:var(--ink);outline:none}
+  .mfield input:focus,.mfield select:focus,.mfield textarea:focus{border-color:var(--clay)}
+  .mrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal .btn-solid{width:100%;margin-top:8px;padding:15px}
+  .modal-msg{font-size:13px;margin-top:12px;min-height:18px}
+  .modal-msg.err{color:#b3261e}
+  .modal-done{text-align:center;padding:26px 0}
+  .modal-done .tick{width:58px;height:58px;border-radius:50%;background:#e7efe3;color:#3f6b3f;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px}
+  .news-msg{font-size:13px;margin-top:8px;color:#3f6b3f}
+  .news-msg.err{color:#b3261e}
 </style>
 </head>
 <body>
@@ -254,22 +282,31 @@
 
 <header>
   <div class="wrap nav">
-    <div class="brand">C'est La <em>Stay</em></div>
+    <a href="#top" class="brand">C'est La <em>Stay</em></a>
     <nav class="nav-links">
       <a href="#stays">Stays</a>
       <a href="#experiences">Experiences</a>
       <a href="#auroville">Auroville</a>
       <a href="#contact">Contact</a>
     </nav>
-    <button class="btn btn-solid">Reserve</button>
+    <div class="nav-actions">
+      <a class="map-link" href="https://www.google.com/maps?q=11.999652,79.800917" target="_blank" rel="noopener" aria-label="View location on Google Maps" title="Edayanchavadi, Auroville — view on map">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      </a>
+      <button class="btn btn-solid" data-book>Reserve</button>
+    </div>
     <button class="menu-toggle">☰</button>
   </div>
 </header>
 
 <main>
-  <section class="hero" data-screen-label="Hero">
+  <section class="hero" id="top" data-screen-label="Hero">
     <div class="hero-photo">
-      <img src="/heroMain.png" alt="Aerial of C'est la Stay at sunrise, the Matrimandir rising from the palm canopy beyond">
+      <picture>
+        <source type="image/avif" srcset="/heroMain-480.avif 480w, /heroMain-960.avif 960w, /heroMain-1440.avif 1440w" sizes="100vw">
+        <source type="image/webp" srcset="/heroMain-480.webp 480w, /heroMain-960.webp 960w, /heroMain-1440.webp 1440w" sizes="100vw">
+        <img src="/heroMain.png" alt="Aerial of C'est la Stay at sunrise, the Matrimandir rising from the palm canopy beyond">
+      </picture>
       <canvas class="fx-hero"></canvas>
       <div class="wrap hero-overlay">
         <p class="eyebrow">Auroville · The City of Dawn</p>
@@ -284,29 +321,29 @@
         <div><b>★ 4.9</b>From 280 guests</div>
       </div>
       <div class="booking">
-        <form class="booking-row" onsubmit="return false">
+        <form class="booking-row" id="bookingBar" onsubmit="return false">
           <div class="field">
             <label>Where</label>
             <input type="text" value="Auroville, Tamil Nadu" readonly>
           </div>
           <div class="field">
             <label>Check in</label>
-            <input type="date">
+            <input type="date" id="bbCheckIn">
           </div>
           <div class="field">
             <label>Check out</label>
-            <input type="date">
+            <input type="date" id="bbCheckOut">
           </div>
           <div class="field">
             <label>Guests</label>
-            <select>
-              <option>2 guests</option>
-              <option>1 guest</option>
-              <option>3 guests</option>
-              <option>4 guests</option>
+            <select id="bbGuests">
+              <option value="2">2 guests</option>
+              <option value="1">1 guest</option>
+              <option value="3">3 guests</option>
+              <option value="4">4 guests</option>
             </select>
           </div>
-          <button class="book-search" type="submit">Search</button>
+          <button class="book-search" type="submit" data-book>Search</button>
         </form>
       </div>
     </div>
@@ -314,7 +351,11 @@
 
   <section data-screen-label="Philosophy">
     <div class="wrap philo">
-      <img class="philo-shot" src="/balcony.png" alt="A private balcony with hammock looking out to the Matrimandir at sunset">
+      <picture>
+        <source type="image/avif" srcset="/balcony-480.avif 480w, /balcony-960.avif 960w, /balcony-1440.avif 1440w" sizes="(max-width:900px) 100vw, 60vw">
+        <source type="image/webp" srcset="/balcony-480.webp 480w, /balcony-960.webp 960w, /balcony-1440.webp 1440w" sizes="(max-width:900px) 100vw, 60vw">
+        <img class="philo-shot" src="/balcony.png" alt="A private balcony with hammock looking out to the Matrimandir at sunset">
+      </picture>
       <div>
         <p class="eyebrow">Our philosophy</p>
         <blockquote>“We built nothing that the forest could not forgive — only rooms that breathe with the day.”</blockquote>
@@ -343,36 +384,40 @@
         <p>Hand-finished in local laterite and reclaimed teak, each villa opens to its own slice of garden.</p>
       </div>
       <div class="stays-showcase">
-        <img class="stays-img" src="/rooms.png" alt="Rooms, dorms, balconies and baths at C'est la Stay">
-        <div class="stays-list">
-          <div class="stay-row">
+        <picture>
+          <source type="image/avif" srcset="/rooms-480.avif 480w, /rooms-960.avif 960w, /rooms-1440.avif 1440w" sizes="(max-width:900px) 100vw, 55vw">
+          <source type="image/webp" srcset="/rooms-480.webp 480w, /rooms-960.webp 960w, /rooms-1440.webp 1440w" sizes="(max-width:900px) 100vw, 55vw">
+          <img class="stays-img" src="/rooms.png" alt="Rooms, dorms, balconies and baths at C'est la Stay">
+        </picture>
+        <div class="stays-list" id="staysList">
+          <div class="stay-row" data-stay="Banyan Suite">
             <div class="stay-info">
-              <h3>Banyan Suite</h3>
-              <p>A treetop room beneath century-old branches, with an open-air bath.</p>
+              <h3 data-stay-name>Banyan Suite</h3>
+              <p data-stay-desc>A treetop room beneath century-old branches, with an open-air bath.</p>
             </div>
             <div class="stay-meta">
-              <div class="price">₹14,500 <small>/ night</small></div>
-              <a href="#">Reserve</a>
+              <div class="price" data-stay-price>₹14,500 <small>/ night</small></div>
+              <a href="#" data-book data-stay="Banyan Suite">Reserve</a>
             </div>
           </div>
-          <div class="stay-row">
+          <div class="stay-row" data-stay="Terracotta Villa">
             <div class="stay-info">
-              <h3>Terracotta Villa</h3>
-              <p>Two rooms of warm clay around a private plunge courtyard.</p>
+              <h3 data-stay-name>Terracotta Villa</h3>
+              <p data-stay-desc>Two rooms of warm clay around a private plunge courtyard.</p>
             </div>
             <div class="stay-meta">
-              <div class="price">₹22,000 <small>/ night</small></div>
-              <a href="#">Reserve</a>
+              <div class="price" data-stay-price>₹22,000 <small>/ night</small></div>
+              <a href="#" data-book data-stay="Terracotta Villa">Reserve</a>
             </div>
           </div>
-          <div class="stay-row">
+          <div class="stay-row" data-stay="Aura Loft">
             <div class="stay-info">
-              <h3>Aura Loft</h3>
-              <p>A skylit loft for two, framing the dawn over the canopy.</p>
+              <h3 data-stay-name>Aura Loft</h3>
+              <p data-stay-desc>A skylit loft for two, framing the dawn over the canopy.</p>
             </div>
             <div class="stay-meta">
-              <div class="price">₹18,000 <small>/ night</small></div>
-              <a href="#">Reserve</a>
+              <div class="price" data-stay-price>₹18,000 <small>/ night</small></div>
+              <a href="#" data-book data-stay="Aura Loft">Reserve</a>
             </div>
           </div>
         </div>
@@ -421,7 +466,11 @@
           <div><b>500m</b><span>to the beach</span></div>
         </div>
       </div>
-      <img class="shot" src="/heroImage.png" alt="The grounds of C'est la Stay at golden hour">
+      <picture>
+        <source type="image/avif" srcset="/heroImage-480.avif 480w, /heroImage-960.avif 960w, /heroImage-1440.avif 1440w" sizes="(max-width:900px) 100vw, 50vw">
+        <source type="image/webp" srcset="/heroImage-480.webp 480w, /heroImage-960.webp 960w, /heroImage-1440.webp 1440w" sizes="(max-width:900px) 100vw, 50vw">
+        <img class="shot" src="/heroImage.png" alt="The grounds of C'est la Stay at golden hour">
+      </picture>
     </div>
   </section>
 
@@ -429,7 +478,7 @@
     <div class="wrap">
       <h2>Your room is <em>waiting</em>.</h2>
       <p>Reserve direct for the garden-view guarantee and a welcome of cold hibiscus tea.</p>
-      <button class="btn btn-solid">Check availability</button>
+      <button class="btn btn-solid" data-book>Check availability</button>
     </div>
   </section>
 </main>
@@ -452,10 +501,11 @@
       <div>
         <h4>Stay in touch</h4>
         <p style="font-size:14px;color:var(--ink-soft)">Seasonal notes from the forest.</p>
-        <form class="news" onsubmit="return false">
-          <input type="email" placeholder="Your email">
-          <button type="submit">→</button>
+        <form class="news" id="newsForm">
+          <input type="email" id="newsEmail" placeholder="Your email" aria-label="Your email">
+          <button type="submit" aria-label="Subscribe">→</button>
         </form>
+        <p class="news-msg" id="newsMsg" role="status"></p>
       </div>
     </div>
     <div class="foot-bottom">
@@ -465,8 +515,47 @@
   </div>
 </footer>
 
+<!-- Booking modal -->
+<div class="modal" id="bookModal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Reserve your stay">
+  <div class="modal-card">
+    <button class="modal-close" type="button" data-book-close aria-label="Close">&times;</button>
+    <div id="bookForm">
+      <h3>Reserve your stay</h3>
+      <p class="sub">No prepayment — a real host confirms by email within 24 hours.</p>
+      <form id="bookFormEl" novalidate>
+        <div class="mrow">
+          <div class="mfield"><label for="bkFirst">First name</label><input id="bkFirst" autocomplete="given-name"></div>
+          <div class="mfield"><label for="bkLast">Last name</label><input id="bkLast" autocomplete="family-name"></div>
+        </div>
+        <div class="mrow">
+          <div class="mfield"><label for="bkEmail">Email</label><input id="bkEmail" type="email" autocomplete="email"></div>
+          <div class="mfield"><label for="bkPhone">Phone <span style="text-transform:none;letter-spacing:0">(optional)</span></label><input id="bkPhone" autocomplete="tel"></div>
+        </div>
+        <div class="mrow">
+          <div class="mfield"><label for="bkCheckIn">Arrival</label><input id="bkCheckIn" type="date"></div>
+          <div class="mfield"><label for="bkCheckOut">Departure</label><input id="bkCheckOut" type="date"></div>
+        </div>
+        <div class="mrow">
+          <div class="mfield"><label for="bkGuests">Guests</label><select id="bkGuests"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></div>
+          <div class="mfield"><label for="bkStay">Stay</label><select id="bkStay"></select></div>
+        </div>
+        <div class="mfield"><label for="bkNotes">Special requests <span style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="bkNotes" rows="2"></textarea></div>
+        <p class="modal-msg" id="bkMsg" role="status"></p>
+        <button class="btn btn-solid" type="submit" id="bkSubmit">Request to reserve</button>
+      </form>
+    </div>
+    <div class="modal-done" id="bookDone" style="display:none">
+      <div class="tick">✓</div>
+      <h3>Thank you</h3>
+      <p class="sub" id="bookDoneMsg"></p>
+      <button class="btn btn-solid" type="button" data-book-close>Close</button>
+    </div>
+  </div>
+</div>
+
 <script src="/particles.js"></script>
 <script type="module" src="/earthen-init.js"></script>
+<script src="/site.js" defer></script>
 
 </body>
 </html>
