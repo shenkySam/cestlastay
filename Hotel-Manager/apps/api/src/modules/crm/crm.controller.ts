@@ -10,12 +10,27 @@ import {
 } from '@nestjs/common';
 import { CrmService } from './crm.service';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { UserRole } from '@hms/shared';
 import { CreateDiscountDto } from './dto/create-discount.dto';
+import { SubscribeDto } from './dto/subscribe.dto';
 
 @Controller('crm')
 export class CrmController {
   constructor(private readonly service: CrmService) {}
+
+  // ── Newsletter ──────────────────────────────────────
+  @Post('subscribe')
+  @Public()
+  subscribe(@Body() dto: SubscribeDto) {
+    return this.service.subscribe(dto);
+  }
+
+  @Get('subscribers')
+  @Roles(UserRole.ADMIN)
+  listSubscribers() {
+    return this.service.listSubscribers();
+  }
 
   // ── Email logs ──────────────────────────────────────
   @Get('emails')

@@ -8,6 +8,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
 
+<!-- Preload the LCP hero image (responsive AVIF — see scripts/optimize-images.mjs) -->
+<link rel="preload" as="image" type="image/avif"
+      imagesrcset="/heroMain-480.avif 480w, /heroMain-960.avif 960w, /heroMain-1440.avif 1440w"
+      imagesizes="100vw">
+
 <!-- ===== SEO / social / icons (carried over from the guest app) ===== -->
 <meta name="theme-color" content="#f4efe5">
 <meta name="description" content="C'est La Stay — an earthen boutique hostel &amp; guest house in Auroville: clay rooms, banyan shade, farm-table dining and the Matrimandir minutes away. Book direct.">

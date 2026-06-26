@@ -1,7 +1,71 @@
-import { MapPin, Phone, Mail } from 'lucide-react';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { MapPin, Phone, Mail, Loader2, Check } from 'lucide-react';
 import { brand, nav, footer } from '../../lib/content';
 import { scrollToSection } from '../../hooks/useSmoothScroll';
+import api from '../../lib/api';
 import Logo from '../ui/Logo';
+import Button from '../ui/Button';
+
+type SubStatus = 'idle' | 'submitting' | 'done' | 'error';
+
+/** Newsletter signup — posts to the public POST /crm/subscribe endpoint. */
+function NewsletterForm() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<SubStatus>('idle');
+  const [msg, setMsg] = useState('');
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      setStatus('error');
+      setMsg('Please enter a valid email.');
+      return;
+    }
+    setStatus('submitting');
+    try {
+      await api.post('/crm/subscribe', { email: email.trim(), source: 'guest-footer' });
+      setStatus('done');
+      setMsg('Thank you — you’re on the list.');
+      setEmail('');
+    } catch {
+      setStatus('error');
+      setMsg('Couldn’t subscribe just now. Please try again.');
+    }
+  };
+
+  if (status === 'done') {
+    return (
+      <p className="mt-6 flex items-center gap-2 font-sans text-sm text-palm-700">
+        <Check size={16} strokeWidth={1.8} aria-hidden /> {msg}
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="mt-6" noValidate>
+      <label htmlFor="newsletter-email" className="eyebrow mb-2 block">
+        Newsletter
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id="newsletter-email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@email.com"
+          autoComplete="email"
+          className="field flex-1"
+          aria-label="Email address"
+        />
+        <Button type="submit" variant="primary" disabled={status === 'submitting'}>
+          {status === 'submitting' ? <Loader2 size={16} className="animate-spin" /> : 'Join'}
+        </Button>
+      </div>
+      {status === 'error' && <p className="mt-2 font-sans text-xs text-red-600">{msg}</p>}
+    </form>
+  );
+}
 
 export default function Footer() {
   return (
@@ -12,6 +76,7 @@ export default function Footer() {
           <div className="md:col-span-1">
             <Logo className="h-11" light={false} />
             <p className="mt-4 max-w-xs font-sans text-sm text-muted">{footer.closingText}</p>
+            <NewsletterForm />
           </div>
 
           {/* Explore — in-page anchors only */}

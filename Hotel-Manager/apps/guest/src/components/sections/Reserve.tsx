@@ -54,11 +54,18 @@ export default function Reserve() {
     getRoomCategories()
       .then((cats) => {
         if (!active) return;
-        setCategories(cats);
-        if (cats.length) {
+        // Only offer the public "stays" (categories that map to a card on the
+        // page) — hides internal/admin-only categories from the guest form.
+        const stayNames = new Set(
+          rooms.items.map((r) => (r.categoryKey ?? r.name).trim().toLowerCase()),
+        );
+        const stayCats = cats.filter((c) => stayNames.has(c.name.trim().toLowerCase()));
+        const list = stayCats.length ? stayCats : cats;
+        setCategories(list);
+        if (list.length) {
           setForm((f) => ({
             ...f,
-            roomId: cats.some((c) => c.id === f.roomId) ? f.roomId : cats[0].id,
+            roomId: list.some((c) => c.id === f.roomId) ? f.roomId : list[0].id,
           }));
         }
       })

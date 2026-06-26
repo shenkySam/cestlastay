@@ -542,3 +542,16 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ==================== NEWSLETTER ====================
+
+model NewsletterSubscriber {
+  id     String  @id @default(uuid())
+  email  String  @unique
+  source String? // where the signup came from, e.g. "guest-footer"
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("newsletter_subscribers")
+}
