@@ -1,5 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
-import { UserRole } from '@hms/shared';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -20,7 +19,4 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   phone?: string;
-
-  @IsEnum(UserRole)
-  role: UserRole;
 }
