@@ -84,6 +84,12 @@ export function initSphere(mount, opts = {}) {
     camera.updateProjectionMatrix();
   }
 
+  // Continuous Y-axis auto-spin, layered under the cursor-follow so both motions
+  // co-exist. AUTO_SPIN is the single knob: radians/sec (negative reverses).
+  const AUTO_SPIN = 0.18; // ≈ 10°/s, gentle (tunable)
+  let spin = 0, followY = 0, followX = 0;
+  const clock = new THREE.Clock();
+
   let running = true;
   if ('IntersectionObserver' in window) {
     new IntersectionObserver(([e]) => { running = e.isIntersecting; }, { threshold: 0.01 }).observe(canvas);
@@ -95,10 +101,14 @@ export function initSphere(mount, opts = {}) {
 
   function loop() {
     requestAnimationFrame(loop);
+    const dt = clock.getDelta();
     if (!running) return;
     if (follow) {
-      mesh.rotation.y += (target.y - mesh.rotation.y) * 0.07;
-      mesh.rotation.x += (target.x - mesh.rotation.x) * 0.07;
+      spin += AUTO_SPIN * dt;                  // continuous Y-axis auto-spin
+      followY += (target.y - followY) * 0.07;  // unchanged cursor-follow easing
+      followX += (target.x - followX) * 0.07;
+      mesh.rotation.y = spin + followY;        // spin + cursor offset on Y
+      mesh.rotation.x = followX;               // cursor tilt unchanged
     } else {
       controls.update();
     }

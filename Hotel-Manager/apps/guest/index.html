@@ -228,6 +228,8 @@
 
   @media(max-width:900px){
     .nav-links{display:none}
+    .nav-links.open{display:flex;flex-direction:column;gap:0;position:absolute;top:100%;left:0;right:0;background:rgba(244,239,229,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:8px 0}
+    .nav-links.open a{padding:14px 24px;border-top:1px solid var(--line)}
     .menu-toggle{display:block}
     .m3d-grid{grid-template-columns:1fr;gap:30px}
     .m3d-stage{max-height:460px}
@@ -260,6 +262,8 @@
   /* header map icon (top-right, beside Reserve) */
   .map-link{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);color:var(--ink-soft);transition:all .2s;margin-right:14px}
   .map-link:hover{color:var(--clay);border-color:var(--clay)}
+  .login-link{display:inline-flex;align-items:center;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);transition:color .2s;margin-right:18px}
+  .login-link:hover{color:var(--clay)}
   .nav-actions{display:flex;align-items:center}
 
   /* booking modal */
@@ -297,7 +301,7 @@
 <header>
   <div class="wrap nav">
     <a href="#top" class="brand">C'est La <em>Stay</em></a>
-    <nav class="nav-links">
+    <nav class="nav-links" id="primaryNav">
       <a href="#stays">Stays</a>
       <a href="#experiences">Experiences</a>
       <a href="#auroville">Auroville</a>
@@ -307,9 +311,10 @@
       <a class="map-link" href="https://www.google.com/maps?q=11.999652,79.800917" target="_blank" rel="noopener" aria-label="View location on Google Maps" title="Edayanchavadi, Auroville — view on map">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
       </a>
+      <a class="login-link" href="https://app.cestlastay.com/guest-portal" data-login>Login</a>
       <button class="btn btn-solid" data-book>Reserve</button>
     </div>
-    <button class="menu-toggle">☰</button>
+    <button class="menu-toggle" data-menu-toggle aria-label="Open menu" aria-expanded="false" aria-controls="primaryNav">☰</button>
   </div>
 </header>
 
