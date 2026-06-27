@@ -122,14 +122,9 @@ export default function GuestBillPage() {
   async function loadInvoice(bId: string) {
     setLoading(true);
     try {
+      // Read-only: the bill appears once staff issue it (404 until then)
       const { data } = await api.get(`/invoices/booking/${bId}`).catch(() => ({ data: null }));
-      if (data) {
-        setInvoice(data);
-      } else {
-        // No invoice yet — generate it (only if checked in)
-        const { data: generated } = await api.post(`/invoices/booking/${bId}/generate`).catch(() => ({ data: null }));
-        if (generated) setInvoice(generated);
-      }
+      setInvoice(data);
     } finally {
       setLoading(false);
     }
@@ -169,7 +164,7 @@ export default function GuestBillPage() {
       ) : !invoice ? (
         <div className="card p-8 text-center text-gray-400">
           <p className="text-3xl mb-2">🧾</p>
-          <p>No invoice available yet. Check back after check-in.</p>
+          <p>No bill yet — it will appear here once our staff issue it.</p>
         </div>
       ) : (
         <>
@@ -243,7 +238,7 @@ export default function GuestBillPage() {
             <div className="border-t border-gray-200 px-4 py-3 space-y-1.5 text-sm">
               {[
                 ['Subtotal', invoice.subtotal],
-                ['Tax (10%)', invoice.taxAmount],
+                ['Tax', invoice.taxAmount],
                 ...(Number(invoice.discountAmount) > 0
                   ? [['Discount', -Number(invoice.discountAmount)]]
                   : []),

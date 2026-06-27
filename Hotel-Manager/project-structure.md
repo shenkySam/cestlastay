@@ -102,10 +102,10 @@ apps/api/
 │       ├── services/
 │       │   ├── services.module.ts      # Imports NotificationsModule
 │       │   ├── services.controller.ts  # /services, /services/:id, /services/:id/rate
-│       │   ├── services.service.ts     # create (notifies staff), update (status lifecycle), rate
+│       │   ├── services.service.ts     # create (notifies staff), update (status lifecycle + pricing), rate
 │       │   └── dto/
 │       │       ├── create-service-request.dto.ts
-│       │       ├── update-service-request.dto.ts
+│       │       ├── update-service-request.dto.ts  # incl. estimatedCost/actualCost (folio billing)
 │       │       └── rate-service-request.dto.ts
 │       │
 │       ├── housekeeping/
@@ -116,17 +116,25 @@ apps/api/
 │       │       ├── create-housekeeping-task.dto.ts
 │       │       └── update-housekeeping-task.dto.ts
 │       │
-│       ├── invoices/                   # Phase 4 — billing
+│       ├── invoices/                   # Phase 4 — billing (staff-built folio)
 │       │   ├── invoices.module.ts
-│       │   ├── invoices.controller.ts  # /invoices, /invoices/:id, /invoices/booking/:bookingId, .../generate
-│       │   └── invoices.service.ts     # generateForBooking (10% tax, line items, INV-YYYYMMDD-XXXX)
-│       │
-│       ├── payments/                   # Phase 4 — Stripe
-│       │   ├── payments.module.ts
-│       │   ├── payments.controller.ts  # /payments, /payments/intent, /payments/webhook (PUBLIC, raw body)
-│       │   ├── payments.service.ts     # createPaymentIntent, handleWebhook (payment_intent.succeeded)
+│       │   ├── invoices.controller.ts  # /invoices, /invoices/:id, /invoices/booking/:bookingId (guest read, DRAFT hidden),
+│       │   │                           #   POST booking/:bookingId (create DRAFT), :id/issue, :id/items CRUD, billable-services
+│       │   ├── invoices.service.ts     # createFolio (room charge by source), item CRUD + recalc (TAX_RATE env),
+│       │   │                           #   issue (DRAFT→PENDING), getBillableServices, INV-YYYYMMDD-XXXX
 │       │   └── dto/
-│       │       └── create-payment-intent.dto.ts
+│       │       ├── create-folio.dto.ts        # { includeRoomCharge? }
+│       │       ├── add-invoice-item.dto.ts    # { serviceRequestId? } OR { description, quantity?, unitPrice }
+│       │       ├── update-invoice-item.dto.ts
+│       │       └── update-invoice.dto.ts      # { discountAmount?, dueDate? }
+│       │
+│       ├── payments/                   # Phase 4 — Stripe + manual payments
+│       │   ├── payments.module.ts
+│       │   ├── payments.controller.ts  # /payments, /payments/manual (staff), /payments/intent, /payments/webhook (PUBLIC, raw body)
+│       │   ├── payments.service.ts     # createPaymentIntent, recordManualPayment, handleWebhook (payment_intent.succeeded)
+│       │   └── dto/
+│       │       ├── create-payment-intent.dto.ts
+│       │       └── record-manual-payment.dto.ts   # { invoiceId, amount, method, notes? }
 │       │
 │       ├── crm/                        # Phase 5 — email automation + discount codes
 │       │   ├── crm.module.ts
@@ -204,7 +212,7 @@ apps/web/src/
 │   │   ├── DashboardPage.tsx       # Live stats (rooms, check-ins, recent bookings)
 │   │   ├── StaffPage.tsx           # Staff management — add/activate/delete users
 │   │   ├── RoomsPage.tsx           # Room grid with create/edit/delete modal
-│   │   ├── BookingsPage.tsx        # Booking table with status + search filter
+│   │   ├── BookingsPage.tsx        # Booking table with status + search filter + Folio button (InvoiceEditor)
 │   │   ├── GuestsPage.tsx          # Guest table with search
 │   │   ├── AnalyticsPage.tsx       # Phase 6 — revenue/occupancy/source charts
 │   │   ├── CrmPage.tsx             # Phase 5 — email logs + discount codes
@@ -214,9 +222,9 @@ apps/web/src/
 │   ├── staff/
 │   │   ├── DashboardPage.tsx       # Live stats + today's check-ins
 │   │   ├── RoomDashboardPage.tsx   # Color-coded room grid, inline status change, real-time WS
-│   │   ├── BookingsPage.tsx        # Booking list + 4-step create wizard
+│   │   ├── BookingsPage.tsx        # Booking list + 4-step create wizard + Folio button (InvoiceEditor)
 │   │   ├── CheckInPage.tsx         # Lookup by booking# or name → check-in / check-out / cancel
-│   │   ├── ServiceQueuePage.tsx    # Ticket list + detail panel, assign + status actions
+│   │   ├── ServiceQueuePage.tsx    # Ticket list + detail panel, assign + status actions + cost pricing (folio billing)
 │   │   ├── HousekeepingPage.tsx    # Task cards, status progression, create modal
 │   │   ├── OtaBookingsPage.tsx     # Phase 6 — OTA manual booking entry + revenue
 │   │   └── GuestsPage.tsx          # Guest list with inline edit + booking history
@@ -224,10 +232,13 @@ apps/web/src/
 │   └── guest/
 │       ├── GuestPortalPage.tsx     # Login via booking number + last name
 │       ├── GuestHomePage.tsx       # Quick-action hub
-│       ├── ServiceRequestPage.tsx  # Submit + track service requests (also used for /complaints)
-│       └── BillPage.tsx            # Phase 4 — invoice view + inline Stripe Elements payment
+│       ├── ServiceRequestPage.tsx  # Submit + track service requests (Services tab)
+│       └── BillPage.tsx            # Phase 4 — read-only bill (appears once staff issue it) + inline Stripe Elements payment
 │
 ├── components/
+│   ├── invoices/
+│   │   └── InvoiceEditor.tsx       # Staff/admin folio modal — create draft (room-charge toggle), line-item CRUD,
+│   │                               #   unbilled-services picker, discount/due date, issue to guest, record manual payment
 │   ├── layouts/
 │   │   ├── AdminLayout.tsx         # Sidebar + notification header
 │   │   ├── StaffLayout.tsx         # Sidebar + notification header
