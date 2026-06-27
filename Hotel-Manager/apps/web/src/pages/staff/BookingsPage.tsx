@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { IBooking, IGuest, IRoom, IRoomCategory, BookingStatus, BookingSource } from '@shared/index';
+import InvoiceEditor from '@/components/invoices/InvoiceEditor';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -29,6 +30,7 @@ export default function StaffBookingsPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [search, setSearch] = useState('');
   const [showWizard, setShowWizard] = useState(false);
+  const [folioBooking, setFolioBooking] = useState<IBooking | null>(null);
 
   // Wizard state
   const [step, setStep] = useState<Step>('guest');
@@ -175,8 +177,8 @@ export default function StaffBookingsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Booking #', 'Guest', 'Room', 'Check-in', 'Check-out', 'Nights', 'Total', 'Status'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>
+                {['Booking #', 'Guest', 'Room', 'Check-in', 'Check-out', 'Nights', 'Total', 'Status', ''].map((h, i) => (
+                  <th key={i} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -201,6 +203,14 @@ export default function StaffBookingsPage() {
                       {b.status.replace('_', ' ')}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      onClick={() => setFolioBooking(b)}
+                    >
+                      Folio
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -209,6 +219,11 @@ export default function StaffBookingsPage() {
             <div className="text-center py-12 text-gray-400">No bookings found.</div>
           )}
         </div>
+      )}
+
+      {/* ── Invoice / Folio editor ───────────────────────────────── */}
+      {folioBooking && (
+        <InvoiceEditor booking={folioBooking} onClose={() => setFolioBooking(null)} />
       )}
 
       {/* ── Booking Wizard Modal ─────────────────────────────────── */}
