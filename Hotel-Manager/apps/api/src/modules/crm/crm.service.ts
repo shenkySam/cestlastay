@@ -11,6 +11,7 @@ import {
   postStayDiscountTemplate,
 } from './email-templates';
 import { CreateDiscountDto } from './dto/create-discount.dto';
+import { SubscribeDto } from './dto/subscribe.dto';
 
 const codeGen = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
 
@@ -267,6 +268,25 @@ export class CrmService {
     if (!existing) throw new NotFoundException(`Discount ${id} not found`);
     await this.prisma.loyaltyDiscount.delete({ where: { id } });
     return { message: 'Discount deleted' };
+  }
+
+  // ── Newsletter ────────────────────────────────────────────────
+
+  async subscribe(dto: SubscribeDto) {
+    const email = dto.email.trim().toLowerCase();
+    const subscriber = await this.prisma.newsletterSubscriber.upsert({
+      where: { email },
+      update: {},
+      create: { email, source: dto.source ?? 'guest-footer' },
+    });
+    return { ok: true, id: subscriber.id };
+  }
+
+  async listSubscribers() {
+    return this.prisma.newsletterSubscriber.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    });
   }
 
   // ── Helpers ───────────────────────────────────────────────────

@@ -6,6 +6,7 @@ const NAV: NavItem[] = [
   { label: 'Dashboard',        href: '/admin',           icon: '📊' },
   { label: 'Staff Management', href: '/admin/staff',     icon: '👥' },
   { label: 'Room Management',  href: '/admin/rooms',     icon: '🛏' },
+  { label: 'Stays & Pricing',  href: '/admin/stays',     icon: '🏝' },
   { label: 'Bookings',         href: '/admin/bookings',  icon: '📅' },
   { label: 'Guests',           href: '/admin/guests',    icon: '👤' },
   { label: 'Analytics',        href: '/admin/analytics', icon: '📈' },

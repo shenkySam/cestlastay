@@ -15,6 +15,7 @@ import GuestPortalPage from '@/pages/guest/GuestPortalPage';
 // Admin pages
 import AdminDashboardPage from '@/pages/admin/DashboardPage';
 import AdminRoomsPage from '@/pages/admin/RoomsPage';
+import AdminStaysPage from '@/pages/admin/StaysPage';
 import AdminBookingsPage from '@/pages/admin/BookingsPage';
 import AdminGuestsPage from '@/pages/admin/GuestsPage';
 import AdminStaffPage from '@/pages/admin/StaffPage';
@@ -61,6 +62,7 @@ export default function App() {
                 <Route index element={<AdminDashboardPage />} />
                 <Route path="staff"     element={<AdminStaffPage />} />
                 <Route path="rooms"     element={<AdminRoomsPage />} />
+                <Route path="stays"     element={<AdminStaysPage />} />
                 <Route path="bookings"  element={<AdminBookingsPage />} />
                 <Route path="guests"    element={<AdminGuestsPage />} />
                 <Route path="analytics" element={<AdminAnalyticsPage />} />

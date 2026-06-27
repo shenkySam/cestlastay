@@ -42,10 +42,14 @@ export function initScene(mount, opts = {}) {
   const COUNT = COLS * ROWS;
   const GRID_W = 30, GRID_D = 20;
 
-  // Ripple disc placement — right of centre, behind where the sphere sits.
+  // Ripple disc placement. DCX/DCY are fallbacks; the live center tracks the
+  // on-screen position of the Matrimandir sphere (#sphere) each frame (see
+  // frameTick) so the rings stay centered on it across scroll + viewport width.
   const DCX = isMobile ? 0 : 3.4;
   const DCY = -0.2;
   const DZ = -0.6;
+  let dcxCur = DCX, dcyCur = DCY;
+  const sphereEl = document.getElementById('sphere');
   const DISC_R = isMobile ? 3.6 : 4.6;
   const TILT = 1.02; // ~58° — so the concentric rings read in perspective
 
@@ -164,8 +168,8 @@ export function initScene(mount, opts = {}) {
     else if (id === 2) {
       const lx = ripple[i3], lz = ripple[i3 + 1], rad = ripple[i3 + 2];
       const wv = Math.sin(rad * 1.7 - t * 2.2) * 0.55; // traveling radial ripple
-      out[0] = DCX + lx;
-      out[1] = DCY + lz * Math.sin(TILT) + wv;
+      out[0] = dcxCur + lx;
+      out[1] = dcyCur + lz * Math.sin(TILT) + wv;
       out[2] = DZ + lz * Math.cos(TILT);
     }
     else {
@@ -187,6 +191,20 @@ export function initScene(mount, opts = {}) {
     else if (prog <= Fm) { idA = 1; idB = 2; k = (prog - Fp) / (Fm - Fp); }
     else { idA = 2; idB = 3; k = (prog - Fm) / (1 - Fm); recede = ease(k); }
     k = ease(k);
+
+    // Center the ripple disc on the sphere's live on-screen position (inverse
+    // of the camera projection at the disc plane z=DZ). One layout read/frame.
+    const sEl = sphereEl || document.getElementById('sphere');
+    if (sEl) {
+      const r = sEl.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) {
+        const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+        const tanHalf = Math.tan((62 * Math.PI / 180) / 2);
+        const negViewZ = 7 - DZ; // camera at z=7, disc plane at z=DZ
+        dcxCur = ((cx / w) * 2 - 1) * tanHalf * (w / h) * negViewZ;
+        dcyCur = (-((cy / h) * 2 - 1)) * tanHalf * negViewZ;
+      }
+    }
 
     for (let i = 0; i < COUNT; i++) {
       const i3 = i * 3;

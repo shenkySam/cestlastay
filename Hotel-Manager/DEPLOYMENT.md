@@ -14,6 +14,22 @@ This monorepo deploys as **three independent services** that connect at runtime 
 
 Push to GitHub first (Railway & Vercel deploy from the repo).
 
+### Live values (current)
+
+| Service | URL / value |
+|---------|-------------|
+| **API** (Railway) | `https://cestlastay-production.up.railway.app` |
+| **API base path** | `https://cestlastay-production.up.railway.app/api/v1` |
+| **Landing** | `https://cestlastay.com` (+ `https://www.cestlastay.com`) |
+| **Admin/portal** | `https://app.cestlastay.com` |
+
+Required env for the public booking + newsletter to work:
+
+- **Railway (API):** `CORS_ORIGINS="https://cestlastay.com,https://www.cestlastay.com,https://app.cestlastay.com"`
+- **Vercel (guest):** `VITE_ENABLE_BOOKING_API=true`, `VITE_API_URL=https://cestlastay-production.up.railway.app/api/v1`, `VITE_PORTAL_URL=https://app.cestlastay.com`
+
+`VITE_*` are inlined at build time — redeploy the guest project after changing them. `CORS_ORIGINS` is read at API boot — redeploy/restart the API after changing it.
+
 ---
 
 ## 1) Railway — API

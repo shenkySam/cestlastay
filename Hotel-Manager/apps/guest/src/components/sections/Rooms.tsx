@@ -1,15 +1,42 @@
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { Star, Award } from 'lucide-react';
-import { rooms } from '../../lib/content';
+import { Star, Award, MapPin } from 'lucide-react';
+import { rooms, location } from '../../lib/content';
 import type { Villa } from '../../lib/content';
 import Img from '../ui/Img';
 import Button from '../ui/Button';
 import Reveal from '../ui/Reveal';
 import Carousel from '../ui/Carousel';
 import { selectRoom } from '../../lib/events';
+import { getRoomCategories, isBookingApiEnabled } from '../../lib/booking';
+import type { IRoomCategory } from '../../types/booking.types';
 
 const pill =
   'inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-sans text-xs text-white backdrop-blur-md';
+
+/**
+ * A stay card merged with its live backend category (when the booking API is on
+ * and a category named like the stay exists). `reserveId` is the value passed to
+ * the reservation form: a real IRoomCategory.id when matched, else the demo id.
+ */
+type DisplayVilla = Villa & { reserveId: string };
+
+function mergeVillas(items: Villa[], categories: IRoomCategory[]): DisplayVilla[] {
+  if (!categories.length) return items.map((v) => ({ ...v, reserveId: v.id }));
+  return items.map((v) => {
+    const key = (v.categoryKey ?? v.name).trim().toLowerCase();
+    const cat = categories.find((c) => c.name.trim().toLowerCase() === key);
+    if (!cat) return { ...v, reserveId: v.id };
+    return {
+      ...v,
+      name: cat.name,
+      description: cat.description ?? v.description,
+      // basePrice serializes as a string (Prisma Decimal) — coerce to a number.
+      pricePerNight: Number(cat.basePrice) || v.pricePerNight,
+      reserveId: cat.id,
+    };
+  });
+}
 
 /**
  * Tall "vertical capsule" photo card. The huge radius rounds the top and bottom
@@ -17,7 +44,7 @@ const pill =
  * Only the carousel's centred (active) card reveals its full detail + CTA;
  * neighbours fade to a quiet, titled photo.
  */
-function VillaCard({ villa, isActive }: { villa: Villa; isActive: boolean }) {
+function VillaCard({ villa, isActive }: { villa: DisplayVilla; isActive: boolean }) {
   return (
     <article
       className={clsx(
@@ -33,6 +60,19 @@ function VillaCard({ villa, isActive }: { villa: Villa; isActive: boolean }) {
       />
       {/* Dark gradient so the overlaid copy stays legible over any photo */}
       <div className="pointer-events-none absolute inset-0 scrim-bottom" aria-hidden />
+
+      {/* Map pin — top-right, opens the property location in Google Maps */}
+      <a
+        href={location.mapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`View location on map — ${location.label}`}
+        title="View on map"
+        className="absolute right-5 top-5 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-md transition-colors hover:bg-white/30"
+      >
+        <MapPin size={16} strokeWidth={1.8} aria-hidden />
+      </a>
 
       {/* Centred overlay, padded up so it clears the capsule's curved bottom */}
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center px-10 pb-[15%] text-center">
@@ -76,7 +116,7 @@ function VillaCard({ villa, isActive }: { villa: Villa; isActive: boolean }) {
             href="#reserve"
             variant="light"
             className="mt-5"
-            onClick={() => selectRoom(villa.id)}
+            onClick={() => selectRoom(villa.reserveId)}
           >
             Reserve now
           </Button>
@@ -87,6 +127,23 @@ function VillaCard({ villa, isActive }: { villa: Villa; isActive: boolean }) {
 }
 
 export default function Rooms() {
+  // Live room categories (only when the booking API is on). Cards fall back to
+  // the hardcoded content until/unless a category named like the stay exists.
+  const [categories, setCategories] = useState<IRoomCategory[]>([]);
+
+  useEffect(() => {
+    if (!isBookingApiEnabled) return;
+    let active = true;
+    getRoomCategories()
+      .then((cats) => active && setCategories(cats))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const items = mergeVillas(rooms.items, categories);
+
   return (
     <section id="rooms" className="section">
       <div className="container-x">
@@ -102,7 +159,7 @@ export default function Rooms() {
       {/* Coverflow lives in the content column so cards stay a sane size on wide screens */}
       <Reveal className="container-x mt-14">
         <Carousel
-          items={rooms.items}
+          items={items}
           getKey={(v) => v.id}
           ariaLabel="Villas"
           renderItem={(v, isActive) => <VillaCard villa={v} isActive={isActive} />}

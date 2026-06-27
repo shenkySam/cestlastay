@@ -29,6 +29,14 @@ export interface Amenity {
 export interface Villa {
   id: string;
   name: string;
+  /**
+   * Links this card to a backend RoomCategory by its `name`. When the booking
+   * API is on and a category with this name exists, the card's name, description
+   * and price come live from the admin (GET /rooms/categories). Defaults to the
+   * card's own `name` when omitted — so creating a category named exactly like a
+   * stay is all it takes to make its pricing admin-editable.
+   */
+  categoryKey?: string;
   type: string;
   description: string;
   pricePerNight: number;
@@ -304,4 +312,12 @@ export const footer = {
   ],
   // In-page anchors only — single, continuous experience.
   social: ['Instagram', 'Journal', 'Newsletter'],
+};
+
+/** Property location — drives the map-pin links on the stay cards. */
+export const location = {
+  lat: 11.999652,
+  lng: 79.800917,
+  label: footer.contact.address,
+  mapsUrl: 'https://www.google.com/maps?q=11.999652,79.800917',
 };
