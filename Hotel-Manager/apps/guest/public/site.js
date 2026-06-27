@@ -115,7 +115,34 @@
   );
   $$('[data-book-close]').forEach((el) => el.addEventListener('click', closeModal));
   if (modal) modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(); closeNav(); } });
+
+  // Mobile nav (hamburger) toggle
+  const menuToggle = $('[data-menu-toggle]');
+  const navLinks = $('#primaryNav');
+  function openNav() {
+    if (!navLinks || !menuToggle) return;
+    navLinks.classList.add('open');
+    menuToggle.setAttribute('aria-expanded', 'true');
+    menuToggle.setAttribute('aria-label', 'Close menu');
+    menuToggle.textContent = '✕';
+  }
+  function closeNav() {
+    if (!navLinks || !menuToggle) return;
+    navLinks.classList.remove('open');
+    menuToggle.setAttribute('aria-expanded', 'false');
+    menuToggle.setAttribute('aria-label', 'Open menu');
+    menuToggle.textContent = '☰';
+  }
+  if (menuToggle && navLinks) {
+    menuToggle.addEventListener('click', () => {
+      navLinks.classList.contains('open') ? closeNav() : openNav();
+    });
+    $$('a', navLinks).forEach((a) => a.addEventListener('click', closeNav));
+    document.addEventListener('click', (e) => {
+      if (navLinks.classList.contains('open') && !e.target.closest('header')) closeNav();
+    });
+  }
 
   const bookForm = $('#bookFormEl');
   if (bookForm) {
@@ -260,6 +287,13 @@
         msg.classList.add('err');
       }
     });
+  }
+
+  // Login link points at the Hotel-Manager guest portal (prod URL in the HTML);
+  // swap to the local portal origin during dev, matching the API base split above.
+  if (isLocal) {
+    const login = $('[data-login]');
+    if (login) login.setAttribute('href', 'http://localhost:5173/guest-portal');
   }
 
   loadCategories();
