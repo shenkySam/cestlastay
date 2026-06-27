@@ -73,6 +73,35 @@
            focus:outline-none focus:ring-2 focus:ring-white/60 focus:border-white/60 transition-colors;
   }
 
+  /* ── Login screen — "earthen luxury" guest-site theme (scoped to LoginPage) ──
+     Warm cream/clay palette + Cormorant Garamond headings + Jost UI to match
+     apps/guest. Kept as dedicated classes so the shared auth/guest-portal glass
+     styles above stay untouched. */
+  .login-card {
+    @apply relative rounded-3xl border border-white/40 bg-white/20 backdrop-blur-xl shadow-2xl;
+  }
+  /* Top-edge glass shine */
+  .login-card::before {
+    content: '';
+    @apply pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-3xl;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
+  }
+
+  .login-input {
+    @apply block w-full px-4 py-3 rounded-2xl text-sm text-[#3a2a1f] bg-white/25
+           border border-white/40 placeholder-[#3a2a1f]/40 backdrop-blur-sm
+           transition-colors focus:outline-none focus:bg-white/90
+           focus:border-[#b1542e] focus:ring-2 focus:ring-[#b1542e]/40;
+  }
+
+  .login-btn {
+    @apply inline-flex items-center justify-center rounded-full bg-[#b1542e] px-6
+           text-sm font-medium tracking-wide text-white shadow-md transition-all
+           hover:-translate-y-0.5 hover:bg-[#8a3f20] hover:shadow-lg active:translate-y-0
+           focus:outline-none focus:ring-2 focus:ring-[#b1542e]/50 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
