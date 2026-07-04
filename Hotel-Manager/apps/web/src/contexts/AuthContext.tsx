@@ -95,6 +95,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       staff: null,
       // Store bookingId so BillPage can retrieve the invoice
       bookingId: data.booking.id,
+      // Booking summary (rooms + dates) so the guest home can render it offline
+      booking: {
+        id: data.booking.id,
+        bookingNumber: data.booking.bookingNumber,
+        checkInDate: data.booking.checkInDate,
+        checkOutDate: data.booking.checkOutDate,
+        rooms: (data.booking.rooms ?? []).map((r: any) => ({
+          roomNumber: r.room?.roomNumber ?? '',
+          categoryName: r.room?.category?.name ?? '',
+        })),
+      },
     } as AuthUser & { bookingId: string };
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('isGuest', 'true');

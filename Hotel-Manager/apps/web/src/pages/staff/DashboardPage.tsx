@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { IBooking, IRoom, BookingStatus, RoomStatus } from '@shared/index';
+import { roomNumbersLabel } from '@/lib/rooms';
 import { format } from 'date-fns';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
@@ -90,7 +91,7 @@ export default function StaffDashboardPage() {
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-mono text-xs text-blue-700">{b.bookingNumber}</td>
                   <td className="px-4 py-2">{b.guest?.firstName} {b.guest?.lastName}</td>
-                  <td className="px-4 py-2">#{b.room?.roomNumber}</td>
+                  <td className="px-4 py-2">{roomNumbersLabel(b)}</td>
                   <td className="px-4 py-2 text-gray-600">
                     {format(new Date(b.checkInDate), 'dd MMM yyyy')}
                   </td>

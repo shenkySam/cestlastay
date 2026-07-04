@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { IBooking, BookingStatus } from '@shared/index';
+import { roomNumbersLabel } from '@/lib/rooms';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -42,7 +43,7 @@ export default function StaffCheckInPage() {
     try {
       const { data } = await api.post(`/bookings/${booking.id}/check-in`);
       setBooking(data);
-      toast.success(`${booking.guest?.firstName} checked in to room #${booking.room?.roomNumber}`);
+      toast.success(`${booking.guest?.firstName} checked in to room ${roomNumbersLabel(booking)}`);
     } finally {
       setProcessing(false);
     }
@@ -115,8 +116,12 @@ export default function StaffCheckInPage() {
 
           <div className="grid grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4 text-sm">
             <div>
-              <p className="text-gray-500 text-xs">Room</p>
-              <p className="font-semibold">#{booking.room?.roomNumber} — {booking.room?.category?.name}</p>
+              <p className="text-gray-500 text-xs">Room{(booking.rooms?.length ?? 0) > 1 ? 's' : ''}</p>
+              <p className="font-semibold">
+                {(booking.rooms ?? [])
+                  .map((r) => `#${r.room?.roomNumber} — ${r.room?.category?.name}`)
+                  .join(', ') || '—'}
+              </p>
             </div>
             <div>
               <p className="text-gray-500 text-xs">Guests</p>

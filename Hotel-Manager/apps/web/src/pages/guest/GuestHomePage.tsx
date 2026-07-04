@@ -5,11 +5,16 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 const ACTIONS = [
-  { label: 'Request Service',   icon: '🛎', href: '/guest/services' },
-  { label: 'File a Complaint',  icon: '📝', href: '/guest/complaints' },
-  { label: 'View My Bill',      icon: '💳', href: '/guest/bill' },
-  { label: 'Express Check-out', icon: '🚪', href: '/guest/bill' },
+  { label: 'Requests & Complaints', icon: '🛎', href: '/guest/services' },
+  { label: 'View My Bill',          icon: '💳', href: '/guest/bill' },
 ];
+
+interface StoredBooking {
+  bookingNumber: string;
+  checkInDate: string;
+  checkOutDate: string;
+  rooms: { roomNumber: string; categoryName: string }[];
+}
 
 function StarPicker({
   value,
@@ -49,6 +54,18 @@ export default function GuestHomePage() {
   const [alreadyRated, setAlreadyRated] = useState(false);
 
   const bookingId = (user as any)?.bookingId;
+  const booking: StoredBooking | undefined = (user as any)?.booking;
+  const stayNights = booking
+    ? Math.max(
+        1,
+        Math.ceil(
+          (new Date(booking.checkOutDate).getTime() - new Date(booking.checkInDate).getTime()) /
+            86400000,
+        ),
+      )
+    : 0;
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
   // Check if the guest has already submitted a rating for this booking
   useEffect(() => {
@@ -82,6 +99,43 @@ export default function GuestHomePage() {
           How can we make your stay more comfortable?
         </p>
       </div>
+
+      {/* Booking summary */}
+      {booking && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-gray-900">Your Stay</p>
+            <span className="font-mono text-xs text-blue-700">{booking.bookingNumber}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {booking.rooms.map((r) => (
+              <span
+                key={r.roomNumber}
+                className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 py-1.5 text-sm"
+              >
+                <span className="font-semibold">Room {r.roomNumber}</span>
+                {r.categoryName && <span className="text-blue-600">· {r.categoryName}</span>}
+              </span>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div>
+              <p className="text-xs text-gray-500">Check-in</p>
+              <p className="font-medium text-gray-800">{fmtDate(booking.checkInDate)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Check-out</p>
+              <p className="font-medium text-gray-800">{fmtDate(booking.checkOutDate)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">Duration</p>
+              <p className="font-medium text-gray-800">
+                {stayNights} night{stayNights !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         {ACTIONS.map((action) => (

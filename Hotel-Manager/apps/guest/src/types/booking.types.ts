@@ -49,18 +49,25 @@ export interface IRoom {
   updatedAt: string;
 }
 
+export interface IBookingRoom {
+  id: string;
+  bookingId: string;
+  roomId: string;
+  room?: IRoom;
+  roomRate: number;
+  createdAt: string;
+}
+
 export interface IBooking {
   id: string;
   bookingNumber: string;
   guestId: string;
-  roomId: string;
-  room?: IRoom;
+  rooms?: IBookingRoom[];
   checkInDate: string;
   checkOutDate: string;
   numberOfGuests: number;
   status: BookingStatus;
   source: BookingSource;
-  roomRate: number;
   totalAmount: number;
   specialRequests?: string;
   createdAt: string;

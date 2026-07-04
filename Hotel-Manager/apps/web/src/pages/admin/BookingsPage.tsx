@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import { IBooking, BookingStatus } from '@shared/index';
 import InvoiceEditor from '@/components/invoices/InvoiceEditor';
+import { roomNumbersLabel } from '@/lib/rooms';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -95,7 +96,7 @@ export default function AdminBookingsPage() {
                   <td className="px-4 py-3 font-medium">
                     {b.guest?.firstName} {b.guest?.lastName}
                   </td>
-                  <td className="px-4 py-3">#{b.room?.roomNumber}</td>
+                  <td className="px-4 py-3">{roomNumbersLabel(b)}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {format(new Date(b.checkInDate), 'dd MMM yyyy')}
                   </td>
