@@ -67,7 +67,13 @@ export default function StaffServiceQueuePage() {
       const { data } = await api.get('/services', {
         params: filterStatus ? { status: filterStatus } : {},
       });
-      setRequests(data);
+      // Queue is worked top→bottom: oldest request first, regardless of priority
+      setRequests(
+        [...data].sort(
+          (a: ServiceRequest, b: ServiceRequest) =>
+            new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime(),
+        ),
+      );
     } finally {
       setLoading(false);
     }
