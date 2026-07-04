@@ -30,7 +30,7 @@ export class CrmService {
   async sendBookingConfirmation(bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { guest: true, room: { include: { category: true } } },
+      include: { guest: true, rooms: { include: { room: { include: { category: true } } } } },
     });
     if (!booking) return;
 
@@ -38,8 +38,8 @@ export class CrmService {
       guestFirstName: booking.guest.firstName,
       guestLastName: booking.guest.lastName,
       bookingNumber: booking.bookingNumber,
-      roomNumber: booking.room.roomNumber,
-      roomCategory: booking.room.category.name,
+      roomNumber: booking.rooms.map((r) => r.room.roomNumber).join(', '),
+      roomCategory: [...new Set(booking.rooms.map((r) => r.room.category.name))].join(', '),
       checkInDate: booking.checkInDate,
       checkOutDate: booking.checkOutDate,
       totalAmount: Number(booking.totalAmount),
@@ -58,7 +58,7 @@ export class CrmService {
   async sendCheckInReminder(bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { guest: true, room: { include: { category: true } } },
+      include: { guest: true, rooms: { include: { room: { include: { category: true } } } } },
     });
     if (!booking) return;
 
@@ -66,8 +66,8 @@ export class CrmService {
       guestFirstName: booking.guest.firstName,
       guestLastName: booking.guest.lastName,
       bookingNumber: booking.bookingNumber,
-      roomNumber: booking.room.roomNumber,
-      roomCategory: booking.room.category.name,
+      roomNumber: booking.rooms.map((r) => r.room.roomNumber).join(', '),
+      roomCategory: [...new Set(booking.rooms.map((r) => r.room.category.name))].join(', '),
       checkInDate: booking.checkInDate,
       checkOutDate: booking.checkOutDate,
       totalAmount: Number(booking.totalAmount),

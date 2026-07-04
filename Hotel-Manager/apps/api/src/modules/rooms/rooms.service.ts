@@ -115,28 +115,39 @@ export class RoomsService {
   }
 
   async checkAvailability(checkIn: Date, checkOut: Date, categoryId?: string) {
-    const occupied = await this.prisma.booking.findMany({
-      where: {
-        status: { in: ['CONFIRMED', 'CHECKED_IN'] as any },
-        AND: [
-          { checkInDate: { lt: checkOut } },
-          { checkOutDate: { gt: checkIn } },
-        ],
-      },
-      select: { roomId: true },
-    });
-
-    const occupiedRoomIds = occupied.map((b) => b.roomId);
+    const occupiedRoomIds = await this.getOccupiedRoomIds(checkIn, checkOut);
 
     return this.prisma.room.findMany({
       where: {
         status: 'AVAILABLE' as any,
-        id: { notIn: occupiedRoomIds },
+        id: { notIn: [...occupiedRoomIds] },
         ...(categoryId && { categoryId }),
       },
       include: ROOM_INCLUDE,
       orderBy: [{ floor: 'asc' }, { roomNumber: 'asc' }],
     });
+  }
+
+  // Room ids held by CONFIRMED/CHECKED_IN bookings overlapping [checkIn, checkOut)
+  async getOccupiedRoomIds(
+    checkIn: Date,
+    checkOut: Date,
+    excludeBookingId?: string,
+  ): Promise<Set<string>> {
+    const rows = await this.prisma.bookingRoom.findMany({
+      where: {
+        booking: {
+          ...(excludeBookingId && { id: { not: excludeBookingId } }),
+          status: { in: ['CONFIRMED', 'CHECKED_IN'] as any },
+          AND: [
+            { checkInDate: { lt: checkOut } },
+            { checkOutDate: { gt: checkIn } },
+          ],
+        },
+      },
+      select: { roomId: true },
+    });
+    return new Set(rows.map((r) => r.roomId));
   }
 
   private async findOneOrThrow(id: string) {

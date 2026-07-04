@@ -4,11 +4,12 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { BookingSource } from '@hms/shared';
 import { CreateOtaBookingDto } from './dto/create-ota-booking.dto';
+import { RoomsService } from '../rooms/rooms.service';
 import { format } from 'date-fns';
 
 const BOOKING_INCLUDE = {
   guest: true,
-  room: { include: { category: true } },
+  rooms: { include: { room: { include: { category: true } } } },
   createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
 } as const;
 
@@ -31,15 +32,26 @@ const OTA_SOURCES: BookingSource[] = [
 
 @Injectable()
 export class OtaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rooms: RoomsService,
+  ) {}
 
   async create(dto: CreateOtaBookingDto, createdById: string) {
     if (!OTA_SOURCES.includes(dto.source)) {
       throw new BadRequestException('source must be an OTA platform');
     }
 
-    const room = await this.prisma.room.findUnique({ where: { id: dto.roomId } });
-    if (!room) throw new NotFoundException(`Room ${dto.roomId} not found`);
+    const roomIds = [...new Set(dto.roomIds)];
+    const rooms = await this.prisma.room.findMany({
+      where: { id: { in: roomIds } },
+      include: { category: true },
+    });
+    if (rooms.length !== roomIds.length) {
+      const found = new Set(rooms.map((r) => r.id));
+      const missing = roomIds.filter((id) => !found.has(id));
+      throw new NotFoundException(`Room ${missing.join(', ')} not found`);
+    }
 
     const checkIn = new Date(dto.checkInDate);
     const checkOut = new Date(dto.checkOutDate);
@@ -47,18 +59,21 @@ export class OtaService {
       throw new BadRequestException('Check-out date must be after check-in date');
     }
 
-    await this.assertNoOverlap(dto.roomId, checkIn, checkOut);
+    await this.assertRoomsFree(roomIds, checkIn, checkOut);
 
     // Resolve guest — either by id or create-on-the-fly from booking data
     const guestId = await this.resolveGuest(dto);
 
     const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-    const category = await this.prisma.roomCategory.findUnique({ where: { id: room.categoryId } });
-    const baseRate = Number(category?.basePrice ?? 0);
 
-    // OTA-supplied total takes precedence (often differs from rack rate due to OTA pricing)
-    const total = dto.totalAmount !== undefined ? dto.totalAmount : baseRate * nights;
-    const rate = nights > 0 ? total / nights : baseRate;
+    // Per-room rate snapshots come from the category rack rate; the OTA-supplied
+    // total takes precedence for the booking total (OTA pricing often differs).
+    const bookingRooms = rooms.map((room) => ({
+      roomId: room.id,
+      roomRate: Number(room.category.basePrice),
+    }));
+    const rackTotal = bookingRooms.reduce((sum, r) => sum + r.roomRate * nights, 0);
+    const total = dto.totalAmount !== undefined ? dto.totalAmount : rackTotal;
 
     // Commission — explicit value, otherwise apply default rate to total
     const commission = dto.otaCommission !== undefined
@@ -71,28 +86,25 @@ export class OtaService {
       data: {
         bookingNumber,
         guestId,
-        roomId: dto.roomId,
         checkInDate: checkIn,
         checkOutDate: checkOut,
         numberOfGuests: dto.numberOfGuests,
         status: 'CONFIRMED' as any,
         source: dto.source as any,
-        roomRate: rate,
         totalAmount: total,
         otaBookingId: dto.otaBookingId,
         otaCommission: commission,
         specialRequests: dto.specialRequests,
         createdById,
+        rooms: { create: bookingRooms },
       },
       include: BOOKING_INCLUDE,
     });
 
-    if (room.status === 'AVAILABLE') {
-      await this.prisma.room.update({
-        where: { id: dto.roomId },
-        data: { status: 'RESERVED' as any },
-      });
-    }
+    await this.prisma.room.updateMany({
+      where: { id: { in: roomIds }, status: 'AVAILABLE' as any },
+      data: { status: 'RESERVED' as any },
+    });
 
     return booking;
   }
@@ -193,20 +205,17 @@ export class OtaService {
     return guest.id;
   }
 
-  private async assertNoOverlap(roomId: string, checkIn: Date, checkOut: Date) {
-    const overlap = await this.prisma.booking.findFirst({
-      where: {
-        roomId,
-        status: { in: ['CONFIRMED', 'CHECKED_IN'] as any },
-        AND: [
-          { checkInDate: { lt: checkOut } },
-          { checkOutDate: { gt: checkIn } },
-        ],
-      },
-    });
-    if (overlap) {
+  private async assertRoomsFree(roomIds: string[], checkIn: Date, checkOut: Date) {
+    const occupied = await this.rooms.getOccupiedRoomIds(checkIn, checkOut);
+    const clashIds = roomIds.filter((id) => occupied.has(id));
+    if (clashIds.length > 0) {
+      const clashRooms = await this.prisma.room.findMany({
+        where: { id: { in: clashIds } },
+        select: { roomNumber: true },
+      });
+      const numbers = clashRooms.map((r) => `#${r.roomNumber}`).join(', ');
       throw new ConflictException(
-        `Room is already booked for the selected dates (${overlap.bookingNumber})`,
+        `Room${clashIds.length > 1 ? 's' : ''} ${numbers} already booked for the selected dates`,
       );
     }
   }

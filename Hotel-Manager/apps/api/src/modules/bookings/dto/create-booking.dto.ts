@@ -1,5 +1,5 @@
 import {
-  IsString, IsDateString, IsNumber, IsOptional, IsEnum, Min,
+  IsString, IsDateString, IsNumber, IsOptional, IsEnum, Min, IsArray, ArrayNotEmpty,
 } from 'class-validator';
 import { BookingSource } from '@hms/shared';
 
@@ -7,8 +7,10 @@ export class CreateBookingDto {
   @IsString()
   guestId: string;
 
-  @IsString()
-  roomId: string;
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  roomIds: string[];
 
   @IsDateString()
   checkInDate: string;

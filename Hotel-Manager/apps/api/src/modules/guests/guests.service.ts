@@ -33,7 +33,7 @@ export class GuestsService {
     await this.findOne(id);
     return this.prisma.booking.findMany({
       where: { guestId: id },
-      include: { room: { include: { category: true } } },
+      include: { rooms: { include: { room: { include: { category: true } } } } },
       orderBy: { createdAt: 'desc' },
     });
   }

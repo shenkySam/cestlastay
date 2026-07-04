@@ -16,11 +16,14 @@ import { randomBytes } from 'crypto';
 
 const BOOKING_INCLUDE = {
   guest: true,
-  room: { include: { category: true } },
+  rooms: { include: { room: { include: { category: true } } } },
   createdBy: {
     select: { id: true, firstName: true, lastName: true, email: true },
   },
 } as const;
+
+const roomNumbersOf = (booking: { rooms: { room: { roomNumber: string } }[] }) =>
+  booking.rooms.map((r) => `#${r.room.roomNumber}`).join(', ');
 
 @Injectable()
 export class BookingsService {
@@ -43,7 +46,7 @@ export class BookingsService {
       where: {
         ...(filters?.status && { status: filters.status as any }),
         ...(filters?.guestId && { guestId: filters.guestId }),
-        ...(filters?.roomId && { roomId: filters.roomId }),
+        ...(filters?.roomId && { rooms: { some: { roomId: filters.roomId } } }),
         ...(filters?.search && {
           OR: [
             { bookingNumber: { contains: filters.search, mode: 'insensitive' } },
@@ -76,8 +79,16 @@ export class BookingsService {
   }
 
   async create(dto: CreateBookingDto, createdById: string) {
-    const room = await this.prisma.room.findUnique({ where: { id: dto.roomId } });
-    if (!room) throw new NotFoundException(`Room ${dto.roomId} not found`);
+    const roomIds = [...new Set(dto.roomIds)];
+    const rooms = await this.prisma.room.findMany({
+      where: { id: { in: roomIds } },
+      include: { category: true },
+    });
+    if (rooms.length !== roomIds.length) {
+      const found = new Set(rooms.map((r) => r.id));
+      const missing = roomIds.filter((id) => !found.has(id));
+      throw new NotFoundException(`Room ${missing.join(', ')} not found`);
+    }
 
     const checkIn = new Date(dto.checkInDate);
     const checkOut = new Date(dto.checkOutDate);
@@ -86,13 +97,15 @@ export class BookingsService {
       throw new BadRequestException('Check-out date must be after check-in date');
     }
 
-    await this.assertNoOverlap(dto.roomId, checkIn, checkOut);
+    await this.assertRoomsFree(roomIds, checkIn, checkOut);
 
     const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
 
-    const category = await this.prisma.roomCategory.findUnique({ where: { id: room.categoryId } });
-    const rate = Number(category?.basePrice ?? 0);
-    const total = rate * nights;
+    const bookingRooms = rooms.map((room) => ({
+      roomId: room.id,
+      roomRate: Number(room.category.basePrice),
+    }));
+    const total = bookingRooms.reduce((sum, r) => sum + r.roomRate * nights, 0);
 
     const bookingNumber = await this.generateBookingNumber();
 
@@ -100,24 +113,23 @@ export class BookingsService {
       data: {
         bookingNumber,
         guestId: dto.guestId,
-        roomId: dto.roomId,
         checkInDate: checkIn,
         checkOutDate: checkOut,
         numberOfGuests: dto.numberOfGuests,
         status: 'CONFIRMED' as any,
         source: (dto.source ?? 'DIRECT') as any,
-        roomRate: rate,
         totalAmount: total,
         specialRequests: dto.specialRequests,
         discountCode: dto.discountCode,
         createdById,
+        rooms: { create: bookingRooms },
       },
       include: BOOKING_INCLUDE,
     });
 
-    // Mark room as RESERVED
-    await this.prisma.room.update({
-      where: { id: dto.roomId },
+    // Mark rooms as RESERVED
+    await this.prisma.room.updateMany({
+      where: { id: { in: roomIds } },
       data: { status: 'RESERVED' as any },
     });
 
@@ -179,16 +191,15 @@ export class BookingsService {
       data: {
         bookingNumber,
         guestId: guest.id,
-        roomId: room.id,
         checkInDate: checkIn,
         checkOutDate: checkOut,
         numberOfGuests: dto.numberOfGuests,
         status: (isAvailable ? 'CONFIRMED' : 'PENDING') as any,
         source: 'DIRECT' as any,
-        roomRate: rate,
         totalAmount: total,
         specialRequests: dto.specialRequests,
         createdById,
+        rooms: { create: [{ roomId: room.id, roomRate: rate }] },
       },
       include: BOOKING_INCLUDE,
     });
@@ -214,7 +225,7 @@ export class BookingsService {
       if (newCheckOut <= newCheckIn) {
         throw new BadRequestException('Check-out must be after check-in');
       }
-      await this.assertNoOverlap(booking.roomId, newCheckIn, newCheckOut, id);
+      await this.assertRoomsFree(booking.rooms.map((r) => r.roomId), newCheckIn, newCheckOut, id);
     }
 
     return this.prisma.booking.update({
@@ -246,8 +257,8 @@ export class BookingsService {
       include: BOOKING_INCLUDE,
     });
 
-    await this.prisma.room.update({
-      where: { id: booking.roomId },
+    await this.prisma.room.updateMany({
+      where: { id: { in: booking.rooms.map((r) => r.roomId) } },
       data: { status: 'OCCUPIED' as any },
     });
 
@@ -256,7 +267,7 @@ export class BookingsService {
     await this.notifications.notifyStaff({
       type: 'CHECK_IN',
       title: `Check-in: ${updated.guest.firstName} ${updated.guest.lastName}`,
-      message: `Room #${updated.room.roomNumber} — ${booking.bookingNumber}`,
+      message: `Room ${roomNumbersOf(updated)} — ${booking.bookingNumber}`,
       metadata: { bookingId: id },
       link: '/staff/checkin',
     });
@@ -280,21 +291,23 @@ export class BookingsService {
       include: BOOKING_INCLUDE,
     });
 
-    await this.prisma.room.update({
-      where: { id: booking.roomId },
+    const roomIds = booking.rooms.map((r) => r.roomId);
+
+    await this.prisma.room.updateMany({
+      where: { id: { in: roomIds } },
       data: { status: 'CLEANING' as any },
     });
 
-    // Auto-create housekeeping task
-    await this.prisma.housekeepingTask.create({
-      data: {
-        roomId: booking.roomId,
+    // Auto-create one housekeeping task per room
+    await this.prisma.housekeepingTask.createMany({
+      data: roomIds.map((roomId) => ({
+        roomId,
         taskType: 'checkout_cleaning',
         status: 'PENDING' as any,
         priority: 2,
         scheduledFor: new Date(),
         notes: `Post-checkout cleaning for booking ${booking.bookingNumber}`,
-      },
+      })),
     });
 
     this.gateway.emitCheckedOut(updated);
@@ -302,7 +315,7 @@ export class BookingsService {
     await this.notifications.notifyStaff({
       type: 'CHECK_OUT',
       title: `Check-out: ${updated.guest.firstName} ${updated.guest.lastName}`,
-      message: `Room #${updated.room.roomNumber} — housekeeping task created`,
+      message: `Room ${roomNumbersOf(updated)} — housekeeping task${roomIds.length > 1 ? 's' : ''} created`,
       metadata: { bookingId: id },
       link: '/staff/housekeeping',
     });
@@ -323,10 +336,13 @@ export class BookingsService {
       include: BOOKING_INCLUDE,
     });
 
-    // Free the room if it was reserved
-    if (booking.room.status === RoomStatus.RESERVED) {
-      await this.prisma.room.update({
-        where: { id: booking.roomId },
+    // Free the rooms that were reserved for this booking
+    const reservedRoomIds = booking.rooms
+      .filter((r) => r.room.status === RoomStatus.RESERVED)
+      .map((r) => r.roomId);
+    if (reservedRoomIds.length > 0) {
+      await this.prisma.room.updateMany({
+        where: { id: { in: reservedRoomIds } },
         data: { status: 'AVAILABLE' as any },
       });
     }
@@ -361,25 +377,23 @@ export class BookingsService {
     return created.id;
   }
 
-  private async assertNoOverlap(
-    roomId: string,
+  private async assertRoomsFree(
+    roomIds: string[],
     checkIn: Date,
     checkOut: Date,
     excludeBookingId?: string,
   ) {
-    const overlap = await this.prisma.booking.findFirst({
-      where: {
-        roomId,
-        id: excludeBookingId ? { not: excludeBookingId } : undefined,
-        status: { in: ['CONFIRMED', 'CHECKED_IN'] as any },
-        AND: [
-          { checkInDate: { lt: checkOut } },
-          { checkOutDate: { gt: checkIn } },
-        ],
-      },
-    });
-    if (overlap) {
-      throw new ConflictException(`Room is already booked for the selected dates (${overlap.bookingNumber})`);
+    const occupied = await this.rooms.getOccupiedRoomIds(checkIn, checkOut, excludeBookingId);
+    const clashIds = roomIds.filter((id) => occupied.has(id));
+    if (clashIds.length > 0) {
+      const clashRooms = await this.prisma.room.findMany({
+        where: { id: { in: clashIds } },
+        select: { roomNumber: true },
+      });
+      const numbers = clashRooms.map((r) => `#${r.roomNumber}`).join(', ');
+      throw new ConflictException(
+        `Room${clashIds.length > 1 ? 's' : ''} ${numbers} already booked for the selected dates`,
+      );
     }
   }
 

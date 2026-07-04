@@ -16,7 +16,7 @@ const INVOICE_INCLUDE = {
   booking: {
     include: {
       guest: true,
-      room: { include: { category: true } },
+      rooms: { include: { room: { include: { category: true } } } },
     },
   },
   items: { orderBy: { createdAt: 'asc' as const } },
@@ -72,7 +72,7 @@ export class InvoicesService {
   async findAll() {
     return this.prisma.invoice.findMany({
       include: {
-        booking: { include: { guest: true, room: true } },
+        booking: { include: { guest: true, rooms: { include: { room: true } } } },
         payments: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -88,7 +88,7 @@ export class InvoicesService {
 
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { room: { include: { category: true } } },
+      include: { rooms: { include: { room: { include: { category: true } } } } },
     });
     if (!booking) throw new NotFoundException(`Booking ${bookingId} not found`);
 
@@ -98,8 +98,19 @@ export class InvoicesService {
       (new Date(booking.checkOutDate).getTime() - new Date(booking.checkInDate).getTime()) /
         (1000 * 60 * 60 * 24),
     );
-    const roomRate = Number(booking.roomRate);
-    const roomTotal = round2(roomRate * nights);
+
+    // One room-charge line per room on the booking
+    const nightsLabel = `${nights} night${nights !== 1 ? 's' : ''}`;
+    const roomItems = booking.rooms.map((br) => {
+      const rate = Number(br.roomRate);
+      return {
+        description: `${br.room.category.name} (Room ${br.room.roomNumber}) — ${nightsLabel}`,
+        quantity: nights,
+        unitPrice: rate,
+        totalPrice: round2(rate * nights),
+      };
+    });
+    const roomTotal = round2(roomItems.reduce((sum, i) => sum + i.totalPrice, 0));
 
     const subtotal = includeRoomCharge ? roomTotal : 0;
     const taxAmount = round2(subtotal * this.taxRate());
@@ -121,16 +132,7 @@ export class InvoicesService {
         paidAmount: 0,
         balanceDue: totalAmount,
         dueDate: new Date(booking.checkOutDate),
-        ...(includeRoomCharge && {
-          items: {
-            create: {
-              description: `${booking.room.category.name} — ${nights} night${nights !== 1 ? 's' : ''}`,
-              quantity: nights,
-              unitPrice: roomRate,
-              totalPrice: roomTotal,
-            },
-          },
-        }),
+        ...(includeRoomCharge && { items: { create: roomItems } }),
       },
       include: INVOICE_INCLUDE,
     });
