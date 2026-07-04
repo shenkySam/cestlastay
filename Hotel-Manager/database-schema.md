@@ -153,14 +153,12 @@ Central booking records.
 | `id` | UUID | PK | Booking ID |
 | `booking_number` | VARCHAR | UNIQUE, NOT NULL | Booking number (BKG-20260426-0001) |
 | `guest_id` | UUID | FK (guests), NOT NULL | Guest profile |
-| `room_id` | UUID | FK (rooms), NOT NULL | Assigned room |
-| `check_in_date` | DATE | NOT NULL | Scheduled check-in date |
-| `check_out_date` | DATE | NOT NULL | Scheduled check-out date |
+| `check_in_date` | DATE | NOT NULL | Scheduled check-in date (shared by all rooms) |
+| `check_out_date` | DATE | NOT NULL | Scheduled check-out date (shared by all rooms) |
 | `number_of_guests` | INTEGER | NOT NULL | Number of guests |
 | `status` | ENUM | DEFAULT 'PENDING' | PENDING, CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED, NO_SHOW |
 | `source` | ENUM | DEFAULT 'DIRECT' | DIRECT, WALK_IN, BOOKING_COM, AIRBNB, EXPEDIA, AGODA, OTHER_OTA |
-| `room_rate` | DECIMAL(10,2) | NOT NULL | Nightly room rate |
-| `total_amount` | DECIMAL(10,2) | NOT NULL | Total booking amount |
+| `total_amount` | DECIMAL(10,2) | NOT NULL | Total booking amount (Σ room rate × nights) |
 | `discount_code` | VARCHAR | NULL | Applied discount code |
 | `discount_amount` | DECIMAL(10,2) | NULL | Discount amount applied |
 | `special_requests` | TEXT | NULL | Guest special requests |
@@ -175,10 +173,27 @@ Central booking records.
 **Indexes:**
 - `idx_bookings_number` on `booking_number`
 - `idx_bookings_guest` on `guest_id`
-- `idx_bookings_room` on `room_id`
 - `idx_bookings_status` on `status`
 - `idx_bookings_dates` on `(check_in_date, check_out_date)`
 - `idx_bookings_source` on `source`
+
+---
+
+#### `booking_rooms`
+Join table — one row per room on a booking (a booking can span multiple rooms; all rooms share the booking's dates).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK | Booking-room ID |
+| `booking_id` | UUID | FK (bookings, CASCADE), NOT NULL | Parent booking |
+| `room_id` | UUID | FK (rooms), NOT NULL | Assigned room |
+| `room_rate` | DECIMAL(10,2) | NOT NULL | Per-room nightly rate snapshot |
+| `created_at` | TIMESTAMP | DEFAULT now() | Creation timestamp |
+
+**Indexes:**
+- UNIQUE on `(booking_id, room_id)`
+- `idx_booking_rooms_booking` on `booking_id`
+- `idx_booking_rooms_room` on `room_id`
 
 ---
 
