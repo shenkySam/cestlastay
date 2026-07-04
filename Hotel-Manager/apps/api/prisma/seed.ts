@@ -216,15 +216,16 @@ async function main() {
       create: {
         bookingNumber: 'BKG-20260501-0001',
         guestId: guestProfile.id,
-        roomId: room201.id,
         checkInDate: new Date('2026-05-01'),
         checkOutDate: new Date('2026-05-05'),
         numberOfGuests: 2,
         status: 'CONFIRMED',
         source: 'DIRECT',
-        roomRate: 150,
         totalAmount: 600,
         createdById: admin.id,
+        rooms: {
+          create: [{ roomId: room201.id, roomRate: 150 }],
+        },
       },
     });
 

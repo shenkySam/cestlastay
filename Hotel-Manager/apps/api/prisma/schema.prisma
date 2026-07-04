@@ -249,7 +249,7 @@ model Room {
   lastCleanedAt    DateTime?  @map("last_cleaned_at")
   maintenanceNotes String?    @map("maintenance_notes")
 
-  bookings          Booking[]
+  bookingRooms      BookingRoom[]
   housekeepingTasks HousekeepingTask[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -268,14 +268,11 @@ model Booking {
   bookingNumber   String        @unique @map("booking_number")
   guestId         String        @map("guest_id")
   guest           Guest         @relation(fields: [guestId], references: [id])
-  roomId          String        @map("room_id")
-  room            Room          @relation(fields: [roomId], references: [id])
   checkInDate     DateTime      @map("check_in_date")
   checkOutDate    DateTime      @map("check_out_date")
   numberOfGuests  Int           @map("number_of_guests")
   status          BookingStatus @default(PENDING)
   source          BookingSource @default(DIRECT)
-  roomRate        Decimal       @map("room_rate") @db.Decimal(10, 2)
   totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
   discountCode    String?       @map("discount_code")
   discountAmount  Decimal?      @map("discount_amount") @db.Decimal(10, 2)
@@ -287,6 +284,7 @@ model Booking {
   createdById     String        @map("created_by_id")
   createdBy       User          @relation("BookingCreatedBy", fields: [createdById], references: [id])
 
+  rooms           BookingRoom[]
   invoice         Invoice?
   serviceRequests ServiceRequest[]
   rating          Rating?
@@ -296,11 +294,26 @@ model Booking {
 
   @@index([bookingNumber])
   @@index([guestId])
-  @@index([roomId])
   @@index([status])
   @@index([checkInDate, checkOutDate])
   @@index([source])
   @@map("bookings")
+}
+
+model BookingRoom {
+  id        String   @id @default(uuid())
+  bookingId String   @map("booking_id")
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  roomId    String   @map("room_id")
+  room      Room     @relation(fields: [roomId], references: [id])
+  roomRate  Decimal  @map("room_rate") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([bookingId, roomId])
+  @@index([bookingId])
+  @@index([roomId])
+  @@map("booking_rooms")
 }
 
 // ==================== SERVICE MANAGEMENT ====================

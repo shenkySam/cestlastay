@@ -2,19 +2,26 @@ import { BookingStatus, BookingSource } from '../constants/statuses';
 import { IGuest } from './user.types';
 import { IRoom } from './room.types';
 
+export interface IBookingRoom {
+  id: string;
+  bookingId: string;
+  roomId: string;
+  room?: IRoom;
+  roomRate: number;
+  createdAt: string;
+}
+
 export interface IBooking {
   id: string;
   bookingNumber: string;
   guestId: string;
   guest?: IGuest;
-  roomId: string;
-  room?: IRoom;
+  rooms?: IBookingRoom[];
   checkInDate: string;
   checkOutDate: string;
   numberOfGuests: number;
   status: BookingStatus;
   source: BookingSource;
-  roomRate: number;
   totalAmount: number;
   discountCode?: string;
   discountAmount?: number;
