@@ -88,7 +88,8 @@ export class AuthService {
       where: {
         bookingNumber: dto.bookingNumber,
         guest: { lastName: { equals: dto.lastName, mode: 'insensitive' } },
-        status: { in: ['CONFIRMED', 'CHECKED_IN'] },
+        // Portal access only while the guest is actually staying (checked in)
+        status: 'CHECKED_IN',
       },
       include: {
         guest: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -100,7 +101,7 @@ export class AuthService {
       },
     });
 
-    if (!booking) throw new NotFoundException('Booking not found or not active');
+    if (!booking) throw new NotFoundException('Booking not found or not checked in yet');
 
     // Issue a short-lived guest portal token
     const token = this.jwt.sign(
