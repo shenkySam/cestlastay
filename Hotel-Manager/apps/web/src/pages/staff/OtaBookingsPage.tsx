@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { IBooking, IGuest, IRoom, BookingSource, BookingStatus } from '@shared/index';
+import { roomNumbersLabel } from '@/lib/rooms';
 
 const OTA_SOURCES: BookingSource[] = [
   BookingSource.BOOKING_COM,
@@ -43,7 +44,7 @@ const TOMORROW = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 const EMPTY_FORM = {
   source: BookingSource.BOOKING_COM as BookingSource,
   otaBookingId: '',
-  roomId: '',
+  roomIds: [] as string[],
   checkInDate: TODAY,
   checkOutDate: TOMORROW,
   numberOfGuests: 1,
@@ -119,9 +120,18 @@ export default function StaffOtaBookingsPage() {
     setForm((f) => ({ ...f, guestId: g.id }));
   }
 
+  function toggleRoom(roomId: string) {
+    setForm((f) => ({
+      ...f,
+      roomIds: f.roomIds.includes(roomId)
+        ? f.roomIds.filter((id) => id !== roomId)
+        : [...f.roomIds, roomId],
+    }));
+  }
+
   async function handleSubmit() {
-    if (!form.roomId || !form.otaBookingId) {
-      toast.error('Room and OTA booking ID are required');
+    if (form.roomIds.length === 0 || !form.otaBookingId) {
+      toast.error('At least one room and the OTA booking ID are required');
       return;
     }
     if (form.useExistingGuest && !form.guestId) {
@@ -139,7 +149,7 @@ export default function StaffOtaBookingsPage() {
       const payload: Record<string, unknown> = {
         source: form.source,
         otaBookingId: form.otaBookingId.trim(),
-        roomId: form.roomId,
+        roomIds: form.roomIds,
         checkInDate: form.checkInDate,
         checkOutDate: form.checkOutDate,
         numberOfGuests: form.numberOfGuests,
@@ -170,6 +180,10 @@ export default function StaffOtaBookingsPage() {
     1,
     Math.ceil((new Date(form.checkOutDate).getTime() - new Date(form.checkInDate).getTime()) / 86400000),
   );
+
+  const selectedPerNight = rooms
+    .filter((r) => form.roomIds.includes(r.id))
+    .reduce((sum, r) => sum + Number(r.category?.basePrice ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -279,7 +293,7 @@ export default function StaffOtaBookingsPage() {
                     <span className="badge badge-blue">{SOURCE_LABEL[b.source] ?? b.source}</span>
                   </td>
                   <td className="px-4 py-3 font-medium">{b.guest?.firstName} {b.guest?.lastName}</td>
-                  <td className="px-4 py-3">#{b.room?.roomNumber}</td>
+                  <td className="px-4 py-3">{roomNumbersLabel(b)}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {format(new Date(b.checkInDate), 'dd MMM yyyy')}
                   </td>
@@ -333,19 +347,38 @@ export default function StaffOtaBookingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Room</label>
-              <select
-                className="input"
-                value={form.roomId}
-                onChange={(e) => setForm({ ...form, roomId: e.target.value })}
-              >
-                <option value="">Select room…</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    Room #{r.roomNumber} — {r.category?.name} (Floor {r.floor})
-                  </option>
-                ))}
-              </select>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Room{form.roomIds.length > 1 ? `s (${form.roomIds.length})` : ''}
+              </label>
+              <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-100">
+                {rooms.map((r) => {
+                  const checked = form.roomIds.includes(r.id);
+                  return (
+                    <label
+                      key={r.id}
+                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
+                        checked ? 'bg-blue-50' : ''
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleRoom(r.id)}
+                      />
+                      <span className="font-medium">Room #{r.roomNumber}</span>
+                      <span className="text-gray-500">
+                        {r.category?.name} (Floor {r.floor}) · ${Number(r.category?.basePrice ?? 0).toFixed(0)}/night
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {form.roomIds.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Rack total: ${(selectedPerNight * wizardNights).toFixed(2)} — {form.roomIds.length} room
+                  {form.roomIds.length !== 1 ? 's' : ''} × {wizardNights} night{wizardNights !== 1 ? 's' : ''}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3">
