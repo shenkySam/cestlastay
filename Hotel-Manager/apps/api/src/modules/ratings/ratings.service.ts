@@ -58,7 +58,7 @@ export class RatingsService {
               bookingNumber: true,
               checkInDate: true,
               checkOutDate: true,
-              room: { select: { roomNumber: true } },
+              rooms: { select: { room: { select: { roomNumber: true } } } },
             },
           },
         },

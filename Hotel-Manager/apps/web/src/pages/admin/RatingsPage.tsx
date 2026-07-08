@@ -21,7 +21,7 @@ interface RatingItem {
     bookingNumber: string;
     checkInDate: string;
     checkOutDate: string;
-    room: { roomNumber: string };
+    rooms: { room: { roomNumber: string } }[];
   };
 }
 
@@ -144,7 +144,8 @@ export default function RatingsPage() {
                     <span className="text-gray-400 font-normal text-sm ml-2">{r.guest.email}</span>
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    Booking {r.booking.bookingNumber} · Room {r.booking.room.roomNumber} ·{' '}
+                    Booking {r.booking.bookingNumber} · Room{' '}
+                    {r.booking.rooms.map((br) => br.room.roomNumber).join(', ')} ·{' '}
                     {format(new Date(r.booking.checkInDate), 'dd MMM')}–
                     {format(new Date(r.booking.checkOutDate), 'dd MMM yyyy')}
                   </p>

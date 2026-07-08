@@ -8,7 +8,13 @@ import { format } from 'date-fns';
 
 const SR_INCLUDE = {
   guest: { select: { id: true, firstName: true, lastName: true, email: true } },
-  booking: { select: { id: true, bookingNumber: true, room: { select: { roomNumber: true } } } },
+  booking: {
+    select: {
+      id: true,
+      bookingNumber: true,
+      rooms: { select: { room: { select: { roomNumber: true } } } },
+    },
+  },
   assignedTo: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
 } as const;
 

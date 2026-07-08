@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { IBooking, BookingSource, PaymentMethod } from '@shared/index';
+import { roomNumbersLabel } from '@/lib/rooms';
 
 interface InvoiceItem {
   id: string;
@@ -108,8 +109,16 @@ export default function InvoiceEditor({ booking, onClose }: { booking: IBooking;
     1,
     Math.ceil((new Date(booking.checkOutDate).getTime() - new Date(booking.checkInDate).getTime()) / 86400000),
   );
-  const roomChargeDesc = `${booking.room?.category?.name ?? 'Room'} — ${nights} night${nights !== 1 ? 's' : ''}`;
-  const hasRoomCharge = invoice?.items.some((i) => i.description === roomChargeDesc) ?? false;
+  const nightsLabel = `${nights} night${nights !== 1 ? 's' : ''}`;
+  // One room-charge line per room on the booking (matches the API's createFolio descriptions)
+  const roomCharges = (booking.rooms ?? []).map((br) => ({
+    description: `${br.room?.category?.name ?? 'Room'} (Room ${br.room?.roomNumber}) — ${nightsLabel}`,
+    unitPrice: Number(br.roomRate),
+  }));
+  const roomChargeTotal = roomCharges.reduce((sum, rc) => sum + rc.unitPrice * nights, 0);
+  const missingRoomCharges = roomCharges.filter(
+    (rc) => !invoice?.items.some((i) => i.description === rc.description),
+  );
 
   useEffect(() => {
     load();
@@ -173,12 +182,12 @@ export default function InvoiceEditor({ booking, onClose }: { booking: IBooking;
       setNewPrice('');
     });
 
-  const addRoomCharge = () =>
+  const addRoomCharge = (rc: { description: string; unitPrice: number }) =>
     run(async () => {
       const { data } = await api.post(`/invoices/${invoice!.id}/items`, {
-        description: roomChargeDesc,
+        description: rc.description,
         quantity: nights,
-        unitPrice: Number(booking.roomRate),
+        unitPrice: rc.unitPrice,
       });
       applyInvoice(data);
     });
@@ -260,8 +269,8 @@ export default function InvoiceEditor({ booking, onClose }: { booking: IBooking;
           <div>
             <h3 className="font-semibold text-gray-900 text-lg">Invoice / Folio</h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              {booking.bookingNumber} · {booking.guest?.firstName} {booking.guest?.lastName} · Room #
-              {booking.room?.roomNumber} · {humanize(booking.source)}
+              {booking.bookingNumber} · {booking.guest?.firstName} {booking.guest?.lastName} · Room{' '}
+              {roomNumbersLabel(booking, 4)} · {humanize(booking.source)}
             </p>
           </div>
           <button className="text-gray-400 hover:text-gray-600 text-xl leading-none" onClick={onClose}>
@@ -285,8 +294,9 @@ export default function InvoiceEditor({ booking, onClose }: { booking: IBooking;
                   checked={includeRoomCharge}
                   onChange={(e) => setIncludeRoomCharge(e.target.checked)}
                 />
-                Include room charge — {roomChargeDesc} × {fmt(booking.roomRate)} ={' '}
-                {fmt(Number(booking.roomRate) * nights)}
+                Include room charge{roomCharges.length !== 1 ? 's' : ''} —{' '}
+                {roomCharges.length} room{roomCharges.length !== 1 ? 's' : ''} × {nightsLabel} ={' '}
+                {fmt(roomChargeTotal)}
               </label>
               {isOta && (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
@@ -444,15 +454,16 @@ export default function InvoiceEditor({ booking, onClose }: { booking: IBooking;
                     </button>
                   </div>
                   <div className="flex gap-2 flex-wrap text-sm">
-                    {!hasRoomCharge && (
+                    {missingRoomCharges.map((rc) => (
                       <button
+                        key={rc.description}
                         className="btn-secondary text-sm"
                         disabled={saving}
-                        onClick={addRoomCharge}
+                        onClick={() => addRoomCharge(rc)}
                       >
-                        + Room charge ({fmt(Number(booking.roomRate) * nights)})
+                        + {rc.description} ({fmt(rc.unitPrice * nights)})
                       </button>
-                    )}
+                    ))}
                     <button
                       className="btn-secondary text-sm"
                       onClick={() => {

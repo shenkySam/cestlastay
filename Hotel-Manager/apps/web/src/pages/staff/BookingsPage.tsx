@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { IBooking, IGuest, IRoom, IRoomCategory, BookingStatus, BookingSource } from '@shared/index';
 import InvoiceEditor from '@/components/invoices/InvoiceEditor';
+import { roomNumbersLabel } from '@/lib/rooms';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -41,7 +42,7 @@ export default function StaffBookingsPage() {
   const [useExistingGuest, setUseExistingGuest] = useState(true);
   const [categories, setCategories] = useState<IRoomCategory[]>([]);
   const [availableRooms, setAvailableRooms] = useState<IRoom[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<IRoom | null>(null);
+  const [selectedRooms, setSelectedRooms] = useState<IRoom[]>([]);
   const [checkIn, setCheckIn] = useState(TODAY);
   const [checkOut, setCheckOut] = useState(TOMORROW);
   const [numberOfGuests, setNumberOfGuests] = useState(1);
@@ -74,7 +75,7 @@ export default function StaffBookingsPage() {
     setNewGuest(EMPTY_GUEST);
     setGuestSearch('');
     setGuestResults([]);
-    setSelectedRoom(null);
+    setSelectedRooms([]);
     setCheckIn(TODAY);
     setCheckOut(TOMORROW);
     setNumberOfGuests(1);
@@ -95,8 +96,18 @@ export default function StaffBookingsPage() {
       params: { checkIn, checkOut },
     });
     setAvailableRooms(data);
+    // Drop selections that are no longer available for the (possibly new) dates
+    setSelectedRooms((prev) => prev.filter((r) => data.some((d: IRoom) => d.id === r.id)));
     const { data: cats } = await api.get('/rooms/categories');
     setCategories(cats);
+  }
+
+  function toggleRoom(room: IRoom) {
+    setSelectedRooms((prev) =>
+      prev.some((r) => r.id === room.id)
+        ? prev.filter((r) => r.id !== room.id)
+        : [...prev, room],
+    );
   }
 
   async function handleCreateBooking() {
@@ -109,7 +120,7 @@ export default function StaffBookingsPage() {
       }
       await api.post('/bookings', {
         guestId,
-        roomId: selectedRoom!.id,
+        roomIds: selectedRooms.map((r) => r.id),
         checkInDate: checkIn,
         checkOutDate: checkOut,
         numberOfGuests,
@@ -133,6 +144,12 @@ export default function StaffBookingsPage() {
     1,
     Math.ceil((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86400000),
   );
+
+  const selectedPerNight = selectedRooms.reduce(
+    (sum, r) => sum + Number(r.category?.basePrice ?? 0),
+    0,
+  );
+  const selectedTotal = selectedPerNight * wizardNights;
 
   // ── Render ──────────────────────────────────────────────────────
 
@@ -189,7 +206,7 @@ export default function StaffBookingsPage() {
                   <td className="px-4 py-3 font-medium">
                     {b.guest?.firstName} {b.guest?.lastName}
                   </td>
-                  <td className="px-4 py-3">#{b.room?.roomNumber}</td>
+                  <td className="px-4 py-3">{roomNumbersLabel(b)}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {format(new Date(b.checkInDate), 'dd MMM yyyy')}
                   </td>
@@ -410,33 +427,49 @@ export default function StaffBookingsPage() {
                   {availableRooms.length === 0 && (
                     <p className="text-gray-500 text-sm text-center py-6">No available rooms for selected dates.</p>
                   )}
-                  {availableRooms.map((room) => (
-                    <button
-                      key={room.id}
-                      onClick={() => setSelectedRoom(room)}
-                      className={`w-full text-left rounded-lg border-2 px-4 py-3 transition-colors ${
-                        selectedRoom?.id === room.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold">Room #{room.roomNumber}</span>
-                        <span className="text-blue-700 font-bold">
-                          ${(Number(room.category?.basePrice ?? 0) * wizardNights).toFixed(0)} total
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-600 mt-0.5">
-                        {room.category?.name} · Floor {room.floor} · ${Number(room.category?.basePrice ?? 0).toFixed(0)}/night
-                      </div>
-                    </button>
-                  ))}
+                  {availableRooms.map((room) => {
+                    const checked = selectedRooms.some((r) => r.id === room.id);
+                    return (
+                      <button
+                        key={room.id}
+                        onClick={() => toggleRoom(room)}
+                        className={`w-full text-left rounded-lg border-2 px-4 py-3 transition-colors ${
+                          checked
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="flex items-center gap-2 font-semibold">
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                              checked ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 text-transparent'
+                            }`}>✓</span>
+                            Room #{room.roomNumber}
+                          </span>
+                          <span className="text-blue-700 font-bold">
+                            ${(Number(room.category?.basePrice ?? 0) * wizardNights).toFixed(0)} total
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 mt-0.5 ml-6">
+                          {room.category?.name} · Floor {room.floor} · ${Number(room.category?.basePrice ?? 0).toFixed(0)}/night
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm">
+                  <span className="text-gray-600">
+                    {selectedRooms.length} room{selectedRooms.length !== 1 ? 's' : ''} selected
+                  </span>
+                  <span className="font-bold text-blue-700">
+                    ${selectedTotal.toFixed(2)} for {wizardNights} night{wizardNights !== 1 ? 's' : ''}
+                  </span>
                 </div>
                 <div className="flex gap-3 pt-1">
                   <button className="btn-secondary flex-1" onClick={() => setStep('dates')}>← Back</button>
                   <button
                     className="btn-primary flex-1"
-                    disabled={!selectedRoom}
+                    disabled={selectedRooms.length === 0}
                     onClick={() => setStep('confirm')}
                   >
                     Review →
@@ -454,12 +487,13 @@ export default function StaffBookingsPage() {
                     ['Guest', selectedGuest
                       ? `${selectedGuest.firstName} ${selectedGuest.lastName}`
                       : `${newGuest.firstName} ${newGuest.lastName} (new)`],
-                    ['Room', `#${selectedRoom?.roomNumber} — ${selectedRoom?.category?.name}`],
+                    [`Room${selectedRooms.length !== 1 ? 's' : ''}`,
+                      selectedRooms.map((r) => `#${r.roomNumber} — ${r.category?.name}`).join(', ')],
                     ['Check-in', format(new Date(checkIn), 'dd MMM yyyy')],
                     ['Check-out', format(new Date(checkOut), 'dd MMM yyyy')],
                     ['Nights', String(wizardNights)],
-                    ['Rate', `$${Number(selectedRoom?.category?.basePrice ?? 0).toFixed(0)}/night`],
-                    ['Total', `$${(Number(selectedRoom?.category?.basePrice ?? 0) * wizardNights).toFixed(2)}`],
+                    ['Rate', `$${selectedPerNight.toFixed(0)}/night`],
+                    ['Total', `$${selectedTotal.toFixed(2)}`],
                     ['Source', source.replace('_', ' ')],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between px-4 py-2">

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { IRoom, IBooking, RoomStatus, BookingStatus } from '@shared/index';
+import { roomNumbersLabel } from '@/lib/rooms';
 
 interface Stats {
   available: number;
@@ -95,7 +96,7 @@ export default function AdminDashboardPage() {
                 <tr key={b.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2 font-mono text-xs text-blue-700">{b.bookingNumber}</td>
                   <td className="px-4 py-2">{b.guest?.firstName} {b.guest?.lastName}</td>
-                  <td className="px-4 py-2">#{b.room?.roomNumber}</td>
+                  <td className="px-4 py-2">{roomNumbersLabel(b)}</td>
                   <td className="px-4 py-2 text-gray-600">
                     {new Date(b.checkInDate).toLocaleDateString()}
                   </td>

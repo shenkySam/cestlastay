@@ -43,7 +43,7 @@ interface Invoice {
     checkInDate: string;
     checkOutDate: string;
     numberOfGuests: number;
-    room: { roomNumber: string; category: { name: string } };
+    rooms: { room: { roomNumber: string; category: { name: string } } }[];
     guest: { firstName: string; lastName: string; email: string };
   };
 }
@@ -189,9 +189,13 @@ export default function GuestBillPage() {
                 <p className="font-medium">{invoice.booking.bookingNumber}</p>
               </div>
               <div>
-                <p className="text-gray-500 text-xs">Room</p>
+                <p className="text-gray-500 text-xs">
+                  Room{invoice.booking.rooms.length !== 1 ? 's' : ''}
+                </p>
                 <p className="font-medium">
-                  #{invoice.booking.room.roomNumber} — {invoice.booking.room.category.name}
+                  {invoice.booking.rooms
+                    .map((r) => `#${r.room.roomNumber} — ${r.room.category.name}`)
+                    .join(', ')}
                 </p>
               </div>
               <div>

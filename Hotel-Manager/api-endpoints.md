@@ -79,14 +79,16 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 |--------|------|--------|-------------|
 | POST | `/bookings/public` | [PUBLIC] | Self-service booking from the guest landing — finds/creates guest, picks an available room in the category, creates booking |
 | GET | `/bookings` | ADMIN, STAFF | List bookings — `?status=&guestId=&roomId=&search=` |
-| GET | `/bookings/:id` | ADMIN, STAFF | Get booking with guest, room, createdBy |
-| POST | `/bookings` | ADMIN, STAFF | Create booking — validates no overlap, marks room RESERVED |
+| GET | `/bookings/:id` | ADMIN, STAFF | Get booking with guest, rooms (`rooms[].room`), createdBy |
+| POST | `/bookings` | ADMIN, STAFF | Create booking — body takes `roomIds: string[]`; validates all rooms exist and are free, marks each room RESERVED |
 | PATCH | `/bookings/:id` | ADMIN, STAFF | Update dates / numberOfGuests / status |
-| POST | `/bookings/:id/check-in` | ADMIN, STAFF | Set CHECKED_IN, room → OCCUPIED, notifies all staff |
-| POST | `/bookings/:id/check-out` | ADMIN, STAFF | Set CHECKED_OUT, room → CLEANING, auto-creates housekeeping task, notifies staff |
-| POST | `/bookings/:id/cancel` | ADMIN, STAFF | Cancel booking, frees room if RESERVED |
+| POST | `/bookings/:id/check-in` | ADMIN, STAFF | Set CHECKED_IN, all rooms → OCCUPIED, notifies all staff |
+| POST | `/bookings/:id/check-out` | ADMIN, STAFF | Set CHECKED_OUT, all rooms → CLEANING, auto-creates one housekeeping task per room, notifies staff |
+| POST | `/bookings/:id/cancel` | ADMIN, STAFF | Cancel booking, frees its rooms that are RESERVED |
 
 **Booking number format:** `BKG-YYYYMMDD-XXXX` (sequential per day)
+
+**Multi-room bookings:** a booking holds one or more rooms via `booking_rooms` — responses expose `rooms: [{ roomId, roomRate, room: {...} }]` instead of a single `room`. All rooms share the booking's check-in/out dates; `totalAmount` = Σ(per-room rate × nights). `POST /bookings/public` remains single-room (one landing-form category) but returns the same `rooms[]` shape.
 
 **`POST /bookings/public` body** (no auth — used by the C'est La Stay landing, attributed to the `system@hotel.com` user):
 ```json
@@ -202,7 +204,7 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 | GET | `/invoices/:id` | ADMIN, STAFF | Get a single invoice with line items + payments + booking |
 | GET | `/invoices/booking/:bookingId` | Any authenticated (incl. GUEST) | Invoice for a booking — used by guest BillPage and the staff `<InvoiceEditor>`. **Guests get 404 while status is `DRAFT`** (folio hidden until issued) and can only access their own booking (403 otherwise) |
 | GET | `/invoices/booking/:bookingId/billable-services` | ADMIN, STAFF | `COMPLETED` service requests with a cost set and not yet on any invoice — the "pull unbilled services" picker |
-| POST | `/invoices/booking/:bookingId` | ADMIN, STAFF | Create the **DRAFT** folio. Body `{ "includeRoomCharge": bool }` (optional) — defaults to **false for OTA-source bookings** (room already paid via OTA), **true for DIRECT/WALK_IN**. 409 if a folio already exists |
+| POST | `/invoices/booking/:bookingId` | ADMIN, STAFF | Create the **DRAFT** folio. Body `{ "includeRoomCharge": bool }` (optional) — defaults to **false for OTA-source bookings** (room already paid via OTA), **true for DIRECT/WALK_IN**. When included, creates **one room-charge line per room** (`{category} (Room {number}) — N nights` at that room's rate). 409 if a folio already exists |
 | PATCH | `/invoices/:id` | ADMIN, STAFF | Update `discountAmount` / `dueDate` → recalc |
 | POST | `/invoices/:id/issue` | ADMIN, STAFF | `DRAFT → PENDING` — reveals the invoice to the guest. 400 if not DRAFT |
 | POST | `/invoices/:id/items` | ADMIN, STAFF | Add line item → recalc. Either `{ "serviceRequestId" }` (description + cost pulled from the ticket) **or** `{ "description", "unitPrice", "quantity"? }` (manual line, quantity defaults 1) |
@@ -312,7 +314,7 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 | GET | `/ota/bookings` | ADMIN, STAFF | List OTA bookings — `?source=&status=` |
 | GET | `/ota/revenue` | ADMIN, STAFF | Revenue + commission rollup grouped by OTA source |
 
-**`POST /ota/bookings` body:** `roomId`, `checkInDate`, `checkOutDate`, `numberOfGuests`, `source` (must be an OTA source), `otaBookingId`, optional `otaCommission`, `totalAmount`, and either an existing `guestId` or inline `guestFirstName/guestLastName/guestEmail/guestPhone`.
+**`POST /ota/bookings` body:** `roomIds: string[]`, `checkInDate`, `checkOutDate`, `numberOfGuests`, `source` (must be an OTA source), `otaBookingId`, optional `otaCommission`, `totalAmount` (OTA-supplied total wins over the rack total; commission is computed on it), and either an existing `guestId` or inline `guestFirstName/guestLastName/guestEmail/guestPhone`.
 
 ---
 
@@ -364,5 +366,5 @@ All routes are **ADMIN-only** and accept an optional `?from=&to=` date range.
 
 ```json
 { "statusCode": 403, "message": "Forbidden resource" }
-{ "statusCode": 409, "message": "Room is already booked for the selected dates (BKG-20260501-0001)" }
+{ "statusCode": 409, "message": "Room #201 already booked for the selected dates" }
 ```

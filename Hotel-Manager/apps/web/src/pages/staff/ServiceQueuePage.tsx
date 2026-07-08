@@ -19,7 +19,7 @@ interface ServiceRequest {
   startedAt?: string;
   completedAt?: string;
   guest: { id: string; firstName: string; lastName: string; email: string };
-  booking?: { bookingNumber: string; room?: { roomNumber: string } };
+  booking?: { bookingNumber: string; rooms?: { room: { roomNumber: string } }[] };
   assignedTo?: { id: string; user: { firstName: string; lastName: string } };
 }
 
@@ -181,7 +181,8 @@ export default function StaffServiceQueuePage() {
                 <div className="flex items-center justify-between text-xs text-gray-500">
                   <span>
                     {sr.guest.firstName} {sr.guest.lastName}
-                    {sr.booking?.room && ` · Room #${sr.booking.room.roomNumber}`}
+                    {!!sr.booking?.rooms?.length &&
+                      ` · Room ${sr.booking.rooms.map((r) => `#${r.room.roomNumber}`).join(', ')}`}
                   </span>
                   <span>{format(new Date(sr.requestedAt), 'dd MMM HH:mm')}</span>
                 </div>
@@ -208,8 +209,11 @@ export default function StaffServiceQueuePage() {
                 {selected.booking && (
                   <div><span className="text-gray-500">Booking: </span>{selected.booking.bookingNumber}</div>
                 )}
-                {selected.booking?.room && (
-                  <div><span className="text-gray-500">Room: </span>#{selected.booking.room.roomNumber}</div>
+                {!!selected.booking?.rooms?.length && (
+                  <div>
+                    <span className="text-gray-500">Room: </span>
+                    {selected.booking.rooms.map((r) => `#${r.room.roomNumber}`).join(', ')}
+                  </div>
                 )}
                 <div><span className="text-gray-500">Priority: </span>
                   <span className={PRIORITY_COLOR[selected.priority]}>{PRIORITY_LABEL[selected.priority]}</span>

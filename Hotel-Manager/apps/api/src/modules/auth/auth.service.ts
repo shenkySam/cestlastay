@@ -92,7 +92,11 @@ export class AuthService {
       },
       include: {
         guest: { select: { id: true, firstName: true, lastName: true, email: true } },
-        room: { select: { roomNumber: true, category: { select: { name: true } } } },
+        rooms: {
+          include: {
+            room: { select: { roomNumber: true, category: { select: { name: true } } } },
+          },
+        },
       },
     });
 

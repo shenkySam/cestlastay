@@ -99,7 +99,8 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 | `guests` | userId (nullable), firstName, lastName, email, phone | Can exist without user account (walk-ins) |
 | `room_categories` | name, type, basePrice, maxOccupancy, amenities[] | Room types |
 | `rooms` | roomNumber, categoryId, floor, status | Status: AVAILABLE/OCCUPIED/RESERVED/MAINTENANCE/CLEANING/OUT_OF_ORDER |
-| `bookings` | bookingNumber, guestId, roomId, checkInDate, checkOutDate, status, source | Format: `BKG-YYYYMMDD-XXXX` |
+| `bookings` | bookingNumber, guestId, checkInDate, checkOutDate, status, source, totalAmount | Format: `BKG-YYYYMMDD-XXXX`. Rooms live in `booking_rooms` |
+| `booking_rooms` | bookingId, roomId, roomRate | One row per room on a booking (multi-room support); unique (bookingId, roomId) |
 | `service_requests` | ticketNumber, guestId, bookingId, type, status, priority, assignedToId | assignedToId → staff.id. Format: `SRV-YYYYMMDD-XXXX` |
 | `housekeeping_tasks` | roomId, assignedToId, taskType, status, scheduledFor | assignedToId → staff.id. taskType: checkout_cleaning / daily_cleaning / deep_cleaning |
 | `invoices` | bookingId (unique), status, subtotal, taxAmount, totalAmount, balanceDue | One invoice per booking |
@@ -190,7 +191,7 @@ React Router v6 nested routes with `Outlet`.
 import api from '@/lib/api';
 
 const { data } = await api.get('/rooms', { params: { status: 'AVAILABLE' } });
-const { data } = await api.post('/bookings', { guestId, roomId, checkInDate, ... });
+const { data } = await api.post('/bookings', { guestId, roomIds: [id1, id2], checkInDate, ... });
 await api.patch(`/rooms/${id}/status`, { status: 'MAINTENANCE' });
 ```
 

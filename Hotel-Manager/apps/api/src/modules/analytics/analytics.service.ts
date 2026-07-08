@@ -38,6 +38,7 @@ export class AnalyticsService {
           source: true,
           status: true,
           otaCommission: true,
+          rooms: { select: { roomId: true } },
         },
       }),
       this.prisma.payment.findMany({
@@ -57,9 +58,9 @@ export class AnalyticsService {
     for (const day of days) {
       const dayStart = startOfDay(day);
       const dayEnd = endOfDay(day);
-      const roomsOccupied = bookings.filter(
-        (b) => new Date(b.checkInDate) <= dayEnd && new Date(b.checkOutDate) > dayStart,
-      ).length;
+      const roomsOccupied = bookings
+        .filter((b) => new Date(b.checkInDate) <= dayEnd && new Date(b.checkOutDate) > dayStart)
+        .reduce((sum, b) => sum + b.rooms.length, 0);
       occupiedRoomNights += roomsOccupied;
     }
     const totalRoomNights = totalRooms * days.length;
@@ -147,7 +148,7 @@ export class AnalyticsService {
             { checkOutDate: { gte: rangeStart } },
           ],
         },
-        select: { checkInDate: true, checkOutDate: true },
+        select: { checkInDate: true, checkOutDate: true, rooms: { select: { roomId: true } } },
       }),
     ]);
 
@@ -155,9 +156,9 @@ export class AnalyticsService {
     return days.map((day) => {
       const dayStart = startOfDay(day);
       const dayEnd = endOfDay(day);
-      const occupied = bookings.filter(
-        (b) => new Date(b.checkInDate) <= dayEnd && new Date(b.checkOutDate) > dayStart,
-      ).length;
+      const occupied = bookings
+        .filter((b) => new Date(b.checkInDate) <= dayEnd && new Date(b.checkOutDate) > dayStart)
+        .reduce((sum, b) => sum + b.rooms.length, 0);
       const rate = totalRooms > 0 ? Math.round((occupied / totalRooms) * 1000) / 10 : 0;
       return {
         date: format(day, 'yyyy-MM-dd'),
@@ -208,7 +209,7 @@ export class AnalyticsService {
         status: { notIn: ['CANCELLED', 'NO_SHOW'] as any },
         createdAt: { gte: rangeStart },
       },
-      include: { room: { include: { category: true } } },
+      include: { rooms: { include: { room: { include: { category: true } } } } },
     });
 
     const map: Record<string, {
@@ -219,17 +220,24 @@ export class AnalyticsService {
       revenue: number;
     }> = {};
     for (const b of bookings) {
-      if (!map[b.roomId]) {
-        map[b.roomId] = {
-          roomId: b.roomId,
-          roomNumber: b.room.roomNumber,
-          categoryName: b.room.category.name,
-          bookings: 0,
-          revenue: 0,
-        };
+      // Fan the booking total out across its rooms, proportionally to each room's rate
+      const rateSum = b.rooms.reduce((sum, br) => sum + Number(br.roomRate), 0);
+      for (const br of b.rooms) {
+        const share = rateSum > 0
+          ? Number(b.totalAmount) * (Number(br.roomRate) / rateSum)
+          : Number(b.totalAmount) / (b.rooms.length || 1);
+        if (!map[br.roomId]) {
+          map[br.roomId] = {
+            roomId: br.roomId,
+            roomNumber: br.room.roomNumber,
+            categoryName: br.room.category.name,
+            bookings: 0,
+            revenue: 0,
+          };
+        }
+        map[br.roomId].bookings += 1;
+        map[br.roomId].revenue += share;
       }
-      map[b.roomId].bookings += 1;
-      map[b.roomId].revenue += Number(b.totalAmount);
     }
 
     return Object.values(map)

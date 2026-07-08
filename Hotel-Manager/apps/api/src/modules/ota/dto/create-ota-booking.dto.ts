@@ -1,5 +1,5 @@
 import {
-  IsString, IsDateString, IsNumber, IsOptional, IsEnum, IsIn, Min,
+  IsString, IsDateString, IsNumber, IsOptional, IsEnum, IsIn, Min, IsArray, ArrayNotEmpty,
 } from 'class-validator';
 import { BookingSource } from '@hms/shared';
 
@@ -12,8 +12,10 @@ const OTA_SOURCES = [
 ] as const;
 
 export class CreateOtaBookingDto {
-  @IsString()
-  roomId: string;
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  roomIds: string[];
 
   @IsDateString()
   checkInDate: string;
