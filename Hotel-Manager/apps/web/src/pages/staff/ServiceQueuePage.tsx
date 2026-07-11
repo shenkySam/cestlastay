@@ -35,6 +35,9 @@ const PRIORITY_COLOR: Record<number, string> = {
   1: 'text-gray-500', 2: 'text-blue-600', 3: 'text-yellow-600', 4: 'text-orange-600', 5: 'text-red-600',
 };
 
+// Unfinished tickets (still need attention) float to the top of the queue.
+const ACTIVE_STATUSES: ServiceStatus[] = [ServiceStatus.PENDING, ServiceStatus.IN_PROGRESS];
+
 export default function StaffServiceQueuePage() {
   const { socket } = useSocket();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
@@ -67,12 +70,14 @@ export default function StaffServiceQueuePage() {
       const { data } = await api.get('/services', {
         params: filterStatus ? { status: filterStatus } : {},
       });
-      // Queue is worked top→bottom: oldest request first, regardless of priority
+      // Active tickets (PENDING/IN_PROGRESS) first, then newest-first within each group.
       setRequests(
-        [...data].sort(
-          (a: ServiceRequest, b: ServiceRequest) =>
-            new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime(),
-        ),
+        [...data].sort((a: ServiceRequest, b: ServiceRequest) => {
+          const aActive = ACTIVE_STATUSES.includes(a.status) ? 0 : 1;
+          const bActive = ACTIVE_STATUSES.includes(b.status) ? 0 : 1;
+          if (aActive !== bActive) return aActive - bActive;
+          return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+        }),
       );
     } finally {
       setLoading(false);
