@@ -5,6 +5,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BookingSource } from '@hms/shared';
 import { CreateOtaBookingDto } from './dto/create-ota-booking.dto';
 import { RoomsService } from '../rooms/rooms.service';
+import {
+  retryOnUniqueViolation,
+  sequenceJitter,
+  BOOKING_NUMBER_TARGET,
+} from '../../common/prisma-retry';
 import { format } from 'date-fns';
 
 const BOOKING_INCLUDE = {
@@ -80,26 +85,32 @@ export class OtaService {
       ? dto.otaCommission
       : Math.round(total * (DEFAULT_COMMISSION_RATE[dto.source] ?? 0.15) * 100) / 100;
 
-    const bookingNumber = await this.generateBookingNumber();
-
-    const booking = await this.prisma.booking.create({
-      data: {
-        bookingNumber,
-        guestId,
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-        numberOfGuests: dto.numberOfGuests,
-        status: 'CONFIRMED' as any,
-        source: dto.source as any,
-        totalAmount: total,
-        otaBookingId: dto.otaBookingId,
-        otaCommission: commission,
-        specialRequests: dto.specialRequests,
-        createdById,
-        rooms: { create: bookingRooms },
+    // Same BKG- namespace and unique column as BookingsService, so the collision
+    // window is cross-module: allocate inside the retry closure.
+    const booking = await retryOnUniqueViolation(
+      async (attempt) => {
+        const bookingNumber = await this.generateBookingNumber(attempt);
+        return this.prisma.booking.create({
+          data: {
+            bookingNumber,
+            guestId,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            numberOfGuests: dto.numberOfGuests,
+            status: 'CONFIRMED' as any,
+            source: dto.source as any,
+            totalAmount: total,
+            otaBookingId: dto.otaBookingId,
+            otaCommission: commission,
+            specialRequests: dto.specialRequests,
+            createdById,
+            rooms: { create: bookingRooms },
+          },
+          include: BOOKING_INCLUDE,
+        });
       },
-      include: BOOKING_INCLUDE,
-    });
+      { tokens: BOOKING_NUMBER_TARGET, label: 'booking number' },
+    );
 
     await this.prisma.room.updateMany({
       where: { id: { in: roomIds }, status: 'AVAILABLE' as any },
@@ -220,7 +231,7 @@ export class OtaService {
     }
   }
 
-  private async generateBookingNumber(): Promise<string> {
+  private async generateBookingNumber(attempt = 1): Promise<string> {
     const datePart = format(new Date(), 'yyyyMMdd');
     const prefix = `BKG-${datePart}-`;
     const latest = await this.prisma.booking.findFirst({
@@ -230,6 +241,8 @@ export class OtaService {
     const nextSeq = latest
       ? parseInt(latest.bookingNumber.split('-').pop() ?? '0', 10) + 1
       : 1;
-    return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+    // On a retry, scatter the candidate so concurrent writers stop colliding in lockstep.
+    const seq = nextSeq + sequenceJitter(attempt);
+    return `${prefix}${String(seq).padStart(4, '0')}`;
   }
 }

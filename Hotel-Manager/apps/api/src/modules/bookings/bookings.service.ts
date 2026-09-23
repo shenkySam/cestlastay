@@ -11,6 +11,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CrmService } from '../crm/crm.service';
 import { GuestsService } from '../guests/guests.service';
 import { RoomsService } from '../rooms/rooms.service';
+import {
+  retryOnUniqueViolation,
+  isUniqueViolation,
+  sequenceJitter,
+  BOOKING_NUMBER_TARGET,
+} from '../../common/prisma-retry';
 import { format } from 'date-fns';
 import { randomBytes } from 'crypto';
 
@@ -107,25 +113,31 @@ export class BookingsService {
     }));
     const total = bookingRooms.reduce((sum, r) => sum + r.roomRate * nights, 0);
 
-    const bookingNumber = await this.generateBookingNumber();
-
-    const booking = await this.prisma.booking.create({
-      data: {
-        bookingNumber,
-        guestId: dto.guestId,
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-        numberOfGuests: dto.numberOfGuests,
-        status: 'CONFIRMED' as any,
-        source: (dto.source ?? 'DIRECT') as any,
-        totalAmount: total,
-        specialRequests: dto.specialRequests,
-        discountCode: dto.discountCode,
-        createdById,
-        rooms: { create: bookingRooms },
+    // The number is generated inside the closure so that a collision with a
+    // concurrent create is retried with a fresh one instead of throwing a 500.
+    const booking = await retryOnUniqueViolation(
+      async (attempt) => {
+        const bookingNumber = await this.generateBookingNumber(attempt);
+        return this.prisma.booking.create({
+          data: {
+            bookingNumber,
+            guestId: dto.guestId,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            numberOfGuests: dto.numberOfGuests,
+            status: 'CONFIRMED' as any,
+            source: (dto.source ?? 'DIRECT') as any,
+            totalAmount: total,
+            specialRequests: dto.specialRequests,
+            discountCode: dto.discountCode,
+            createdById,
+            rooms: { create: bookingRooms },
+          },
+          include: BOOKING_INCLUDE,
+        });
       },
-      include: BOOKING_INCLUDE,
-    });
+      { tokens: BOOKING_NUMBER_TARGET, label: 'booking number' },
+    );
 
     // Mark rooms as RESERVED
     await this.prisma.room.updateMany({
@@ -184,25 +196,31 @@ export class BookingsService {
     const rate = Number(category?.basePrice ?? 0);
     const total = rate * nights;
 
-    const bookingNumber = await this.generateBookingNumber();
     const createdById = await this.resolveSystemUserId();
 
-    const booking = await this.prisma.booking.create({
-      data: {
-        bookingNumber,
-        guestId: guest.id,
-        checkInDate: checkIn,
-        checkOutDate: checkOut,
-        numberOfGuests: dto.numberOfGuests,
-        status: (isAvailable ? 'CONFIRMED' : 'PENDING') as any,
-        source: 'DIRECT' as any,
-        totalAmount: total,
-        specialRequests: dto.specialRequests,
-        createdById,
-        rooms: { create: [{ roomId: room.id, roomRate: rate }] },
+    // See create(): the number is allocated inside the retry closure.
+    const booking = await retryOnUniqueViolation(
+      async (attempt) => {
+        const bookingNumber = await this.generateBookingNumber(attempt);
+        return this.prisma.booking.create({
+          data: {
+            bookingNumber,
+            guestId: guest.id,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            numberOfGuests: dto.numberOfGuests,
+            status: (isAvailable ? 'CONFIRMED' : 'PENDING') as any,
+            source: 'DIRECT' as any,
+            totalAmount: total,
+            specialRequests: dto.specialRequests,
+            createdById,
+            rooms: { create: [{ roomId: room.id, roomRate: rate }] },
+          },
+          include: BOOKING_INCLUDE,
+        });
       },
-      include: BOOKING_INCLUDE,
-    });
+      { tokens: BOOKING_NUMBER_TARGET, label: 'booking number' },
+    );
 
     if (isAvailable) {
       // Lock the room and send the confirmation email (fire-and-forget).
@@ -359,22 +377,33 @@ export class BookingsService {
    */
   private async resolveSystemUserId(): Promise<string> {
     const email = 'system@hotel.com';
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    const existing = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (existing) return existing.id;
 
-    const created = await this.prisma.user.create({
-      data: {
-        email,
-        // Random, non-bcrypt value → no password can ever match (login impossible).
-        passwordHash: randomBytes(32).toString('hex'),
-        firstName: 'Online',
-        lastName: 'Bookings',
-        role: 'STAFF' as any,
-        status: 'ACTIVE' as any,
-        emailVerified: true,
-      },
-    });
-    return created.id;
+    try {
+      const created = await this.prisma.user.create({
+        data: {
+          email,
+          // Random, non-bcrypt value → no password can ever match (login impossible).
+          passwordHash: randomBytes(32).toString('hex'),
+          firstName: 'Online',
+          lastName: 'Bookings',
+          role: 'STAFF' as any,
+          status: 'ACTIVE' as any,
+          emailVerified: true,
+        },
+        select: { id: true },
+      });
+      return created.id;
+    } catch (err) {
+      // Another concurrent public booking created the row between our read and
+      // write. users.email is the only unique column here, so re-reading it is a
+      // sufficient discriminator.
+      if (!isUniqueViolation(err)) throw err;
+      const raced = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
+      if (raced) return raced.id;
+      throw err;
+    }
   }
 
   private async assertRoomsFree(
@@ -397,7 +426,7 @@ export class BookingsService {
     }
   }
 
-  private async generateBookingNumber(): Promise<string> {
+  private async generateBookingNumber(attempt = 1): Promise<string> {
     const datePart = format(new Date(), 'yyyyMMdd');
     const prefix = `BKG-${datePart}-`;
     const latest = await this.prisma.booking.findFirst({
@@ -407,6 +436,8 @@ export class BookingsService {
     const nextSeq = latest
       ? parseInt(latest.bookingNumber.split('-').pop() ?? '0', 10) + 1
       : 1;
-    return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+    // On a retry, scatter the candidate so concurrent writers stop colliding in lockstep.
+    const seq = nextSeq + sequenceJitter(attempt);
+    return `${prefix}${String(seq).padStart(4, '0')}`;
   }
 }
