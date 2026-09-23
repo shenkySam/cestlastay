@@ -6,6 +6,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  retryOnUniqueViolation,
+  violates,
+  sequenceJitter,
+  INVOICE_NUMBER_TARGET,
+  INVOICE_BOOKING_TARGET,
+} from '../../common/prisma-retry';
 import { format } from 'date-fns';
 import { CreateFolioDto } from './dto/create-folio.dto';
 import { AddInvoiceItemDto } from './dto/add-invoice-item.dto';
@@ -118,24 +125,39 @@ export class InvoicesService {
     const discountAmount = includeRoomCharge ? Number(booking.discountAmount ?? 0) : 0;
     const totalAmount = Math.max(0, round2(subtotal + taxAmount - discountAmount));
 
-    const invoiceNumber = await this.generateInvoiceNumber();
-
-    return this.prisma.invoice.create({
-      data: {
-        invoiceNumber,
-        bookingId,
-        status: 'DRAFT' as any,
-        subtotal,
-        taxAmount,
-        discountAmount,
-        totalAmount,
-        paidAmount: 0,
-        balanceDue: totalAmount,
-        dueDate: new Date(booking.checkOutDate),
-        ...(includeRoomCharge && { items: { create: roomItems } }),
-      },
-      include: INVOICE_INCLUDE,
-    });
+    try {
+      // `return await`, so the catch below sees the rejection. The number is
+      // allocated inside the closure so a collision retries with a fresh one.
+      return await retryOnUniqueViolation(
+        async (attempt) => {
+          const invoiceNumber = await this.generateInvoiceNumber(attempt);
+          return this.prisma.invoice.create({
+            data: {
+              invoiceNumber,
+              bookingId,
+              status: 'DRAFT' as any,
+              subtotal,
+              taxAmount,
+              discountAmount,
+              totalAmount,
+              paidAmount: 0,
+              balanceDue: totalAmount,
+              dueDate: new Date(booking.checkOutDate),
+              ...(includeRoomCharge && { items: { create: roomItems } }),
+            },
+            include: INVOICE_INCLUDE,
+          });
+        },
+        { tokens: INVOICE_NUMBER_TARGET, label: 'invoice number' },
+      );
+    } catch (err) {
+      // invoices.booking_id is also unique: a folio created concurrently for this
+      // booking slipped past the pre-check above. Report it as the same conflict.
+      if (violates(err, INVOICE_BOOKING_TARGET)) {
+        throw new ConflictException('An invoice already exists for this booking');
+      }
+      throw err;
+    }
   }
 
   // Add a line item: from a priced service request, or free-form
@@ -302,7 +324,7 @@ export class InvoicesService {
     return invoice;
   }
 
-  private async generateInvoiceNumber(): Promise<string> {
+  private async generateInvoiceNumber(attempt = 1): Promise<string> {
     const datePart = format(new Date(), 'yyyyMMdd');
     const prefix = `INV-${datePart}-`;
     const latest = await this.prisma.invoice.findFirst({
@@ -312,6 +334,8 @@ export class InvoicesService {
     const nextSeq = latest
       ? parseInt(latest.invoiceNumber.split('-').pop() ?? '0', 10) + 1
       : 1;
-    return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+    // On a retry, scatter the candidate so concurrent writers stop colliding in lockstep.
+    const seq = nextSeq + sequenceJitter(attempt);
+    return `${prefix}${String(seq).padStart(4, '0')}`;
   }
 }

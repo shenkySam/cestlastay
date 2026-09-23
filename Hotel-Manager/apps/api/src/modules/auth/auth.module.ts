@@ -13,6 +13,9 @@ import { RolesGuard } from './guards/roles.guard';
   imports: [
     PassportModule,
     JwtModule.registerAsync({
+      // Global so the notifications gateway can verify WebSocket handshake tokens
+      // against the same secret, without a second copy of this config.
+      global: true,
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
