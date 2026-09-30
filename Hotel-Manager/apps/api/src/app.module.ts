@@ -13,6 +13,7 @@ import { HousekeepingModule } from './modules/housekeeping/housekeeping.module';
 import { InvoicesModule } from './modules/invoices/invoices.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { CrmModule } from './modules/crm/crm.module';
+import { InboundEmailModule } from './modules/inbound-email/inbound-email.module';
 import { OtaModule } from './modules/ota/ota.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { RatingsModule } from './modules/ratings/ratings.module';
@@ -33,6 +34,7 @@ import { RatingsModule } from './modules/ratings/ratings.module';
     InvoicesModule,
     PaymentsModule,
     CrmModule,
+    InboundEmailModule,
     OtaModule,
     AnalyticsModule,
     RatingsModule,
