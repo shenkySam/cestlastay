@@ -1,7 +1,6 @@
 import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import { OAuthLoginDto } from './dto/oauth-login.dto';
 import { GuestPortalDto } from './dto/guest-portal.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -12,17 +11,19 @@ import { Public } from './decorators/public.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Sign-in is Google / Apple only — there is no email + password login.
   @Public()
-  @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  googleLogin(@Body() dto: OAuthLoginDto) {
+    return this.authService.oauthLogin('google', dto.idToken);
   }
 
   @Public()
-  @Post('login')
+  @Post('apple')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  appleLogin(@Body() dto: OAuthLoginDto) {
+    return this.authService.oauthLogin('apple', dto.idToken);
   }
 
   @Public()

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { IUser, UserRole } from '@shared/index';
 import api from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
+import type { OAuthProvider } from '@/lib/oauth';
 
 interface AuthUser extends Omit<IUser, 'createdAt' | 'updatedAt' | 'emailVerified' | 'lastLoginAt'> {
   staff?: { id: string; employeeId: string; department: string; position: string } | null;
@@ -12,7 +13,8 @@ interface AuthContextValue {
   user: AuthUser | null;
   accessToken: string | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** Exchange a Google / Apple ID token for our session (there is no password login). */
+  login: (provider: OAuthProvider, idToken: string) => Promise<void>;
   guestLogin: (bookingNumber: string, lastName: string) => Promise<void>;
   logout: () => void;
   isRole: (...roles: UserRole[]) => boolean;
@@ -73,8 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('auth:logout', logout);
   }, [logout]);
 
-  const login = async (email: string, password: string) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = async (provider: OAuthProvider, idToken: string) => {
+    const { data } = await api.post(`/auth/${provider}`, { idToken });
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('refreshToken', data.refreshToken);
     setAccessToken(data.accessToken);

@@ -1,8 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
+import { SYSTEM_USER_EMAIL } from '../src/common/system-user';
 
 const prisma = new PrismaClient();
+
+// Sign-in is Google / Apple only, matched by email — set this to the Google or
+// Apple account you'll sign in with to get an admin login on a fresh database.
+const ADMIN_EMAIL = (process.env.SEED_ADMIN_EMAIL || 'admin@hotel.com').trim().toLowerCase();
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -76,13 +79,11 @@ async function main() {
   console.log(`✅ Created ${roomsData.length} rooms`);
 
   // ── Admin user ───────────────────────────────────────────────────────────────
-  const adminHash = await bcrypt.hash('Admin123!', 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@hotel.com' },
+    where: { email: ADMIN_EMAIL },
     update: {},
     create: {
-      email: 'admin@hotel.com',
-      passwordHash: adminHash,
+      email: ADMIN_EMAIL,
       firstName: 'Hotel',
       lastName: 'Admin',
       phone: '+1000000001',
@@ -96,12 +97,11 @@ async function main() {
 
   // ── System user (creator for public / self-service bookings) ───────────────────
   await prisma.user.upsert({
-    where: { email: 'system@hotel.com' },
+    where: { email: SYSTEM_USER_EMAIL },
     update: {},
     create: {
-      email: 'system@hotel.com',
-      // Random, non-bcrypt value → no password can match; non-interactive account.
-      passwordHash: randomBytes(32).toString('hex'),
+      // Non-interactive account — AuthService refuses to sign it in.
+      email: SYSTEM_USER_EMAIL,
       firstName: 'Online',
       lastName: 'Bookings',
       role: 'STAFF',
@@ -110,16 +110,14 @@ async function main() {
     },
   });
 
-  console.log('✅ System: system@hotel.com (online-booking creator)');
+  console.log(`✅ System: ${SYSTEM_USER_EMAIL} (online-booking creator)`);
 
   // ── Staff user ────────────────────────────────────────────────────────────────
-  const staffHash = await bcrypt.hash('Staff123!', 12);
   const staffUser = await prisma.user.upsert({
     where: { email: 'staff@hotel.com' },
     update: {},
     create: {
       email: 'staff@hotel.com',
-      passwordHash: staffHash,
       firstName: 'Front',
       lastName: 'Desk',
       phone: '+1000000002',
@@ -144,13 +142,11 @@ async function main() {
   console.log(`✅ Staff: ${staffUser.email}`);
 
   // ── Housekeeping staff ────────────────────────────────────────────────────────
-  const hkHash = await bcrypt.hash('Staff123!', 12);
   const hkUser = await prisma.user.upsert({
     where: { email: 'housekeeping@hotel.com' },
     update: {},
     create: {
       email: 'housekeeping@hotel.com',
-      passwordHash: hkHash,
       firstName: 'Maria',
       lastName: 'Santos',
       phone: '+1000000003',
@@ -173,13 +169,11 @@ async function main() {
   });
 
   // ── Guest user ────────────────────────────────────────────────────────────────
-  const guestHash = await bcrypt.hash('Guest123!', 12);
   const guestUser = await prisma.user.upsert({
     where: { email: 'guest@hotel.com' },
     update: {},
     create: {
       email: 'guest@hotel.com',
-      passwordHash: guestHash,
       firstName: 'John',
       lastName: 'Smith',
       phone: '+1000000010',
@@ -259,11 +253,10 @@ async function main() {
   }
 
   console.log('\n🎉 Seed complete!\n');
-  console.log('Test Credentials:');
-  console.log('  Admin:        admin@hotel.com        / Admin123!');
-  console.log('  Staff:        staff@hotel.com        / Staff123!');
-  console.log('  Housekeeping: housekeeping@hotel.com / Staff123!');
-  console.log('  Guest:        guest@hotel.com        / Guest123!');
+  console.log(`Admin sign-in: Google / Apple account ${ADMIN_EMAIL}`);
+  if (!process.env.SEED_ADMIN_EMAIL) {
+    console.log('  (set SEED_ADMIN_EMAIL to your own Google / Apple email to be able to sign in)');
+  }
   console.log('\nGuest Portal: bookingNumber=BKG-20260501-0001, lastName=Smith');
 }
 

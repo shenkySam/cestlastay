@@ -43,8 +43,9 @@ apps/api/
 │       ├── auth/
 │       │   ├── auth.module.ts          # Registers JwtAuthGuard + RolesGuard as APP_GUARD (global);
 │       │   │                           #   JwtModule is global so the WS gateway can verify handshake tokens
-│       │   ├── auth.controller.ts      # /auth/register, /login, /guest-portal, /refresh, /me, /logout
-│       │   ├── auth.service.ts         # JWT signing, bcrypt, guest portal access
+│       │   ├── auth.controller.ts      # /auth/google, /apple, /guest-portal, /refresh, /me, /logout
+│       │   ├── auth.service.ts         # JWT signing, Google/Apple sign-in, guest portal access
+│       │   ├── oauth-verifier.service.ts # Verifies Google/Apple ID tokens (JWKS, issuer, audience)
 │       │   ├── strategies/
 │       │   │   └── jwt.strategy.ts     # Validates JWT, looks up user in DB
 │       │   ├── guards/

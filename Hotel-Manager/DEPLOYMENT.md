@@ -47,6 +47,8 @@ Required env for the public booking + newsletter to work:
    | `DIRECT_URL` | Neon **direct** connection — used by `prisma migrate deploy` |
    | `JWT_SECRET`, `JWT_REFRESH_SECRET` | random ≥32-char strings |
    | `JWT_EXPIRES_IN` (`15m`), `JWT_REFRESH_EXPIRES_IN` (`7d`) | optional, have defaults |
+   | `GOOGLE_CLIENT_ID` | Google OAuth **Web** client ID — sign-in is Google/Apple only. Add the admin web app origin under *Authorized JavaScript origins* |
+   | `APPLE_CLIENT_ID` | Apple **Services ID** (Sign in with Apple). Register the admin web app domain + return URL `https://<admin-domain>/login` |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | payments |
    | `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME` | email (optional) |
    | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | SMS (optional) |
@@ -71,6 +73,7 @@ Required env for the public booking + newsletter to work:
    - `VITE_API_URL` = `<railway-api-domain>/api/v1`  (e.g. `https://hms-api-production.up.railway.app/api/v1` — **include** `/api/v1`)
    - `VITE_SOCKET_URL` = `<railway-api-domain>`  (bare origin, **no** `/api/v1` — Socket.IO connects to the root)
    - `VITE_STRIPE_PUBLISHABLE_KEY` = `pk_...`  (optional, for guest payment flows)
+   - `VITE_GOOGLE_CLIENT_ID`, `VITE_APPLE_CLIENT_ID` = same values as the API's `GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID` (a provider left unset is hidden on the login page — with neither set, nobody can sign in)
    > Vite inlines `VITE_*` at **build time** — set them before deploying, and redeploy if they change.
 4. Deploy → note the URL (e.g. `https://hms-admin.vercel.app`).
 

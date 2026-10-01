@@ -27,6 +27,12 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
+    // Sign-in calls: LoginPage shows the error inline. A 401 here means "no
+    // such account", not an expired session — don't refresh/redirect or toast.
+    if (/^\/auth\/(google|apple)$/.test(original?.url ?? '')) {
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       const refreshToken = localStorage.getItem('refreshToken');
       if (!refreshToken) {

@@ -37,8 +37,10 @@ Universal user table for all roles (Admin, Staff, Guest).
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | UUID | PK | Unique user identifier |
-| `email` | VARCHAR | UNIQUE, NOT NULL | Login email |
-| `password_hash` | VARCHAR | NOT NULL | Bcrypt hashed password |
+| `email` | VARCHAR | UNIQUE, NOT NULL | Email; first Google/Apple sign-in is matched on it |
+| `google_id` | VARCHAR | UNIQUE, NULL | Google account `sub`, linked on first Google sign-in |
+| `apple_id` | VARCHAR | UNIQUE, NULL | Apple account `sub`, linked on first Apple sign-in |
+| `password_hash` | VARCHAR | NULL | **Legacy, unused** — password login removed; drop in a follow-up migration |
 | `first_name` | VARCHAR | NOT NULL | First name |
 | `last_name` | VARCHAR | NOT NULL | Last name |
 | `phone` | VARCHAR | NULL | Contact number |

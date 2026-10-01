@@ -18,7 +18,7 @@ import {
   BOOKING_NUMBER_TARGET,
 } from '../../common/prisma-retry';
 import { format } from 'date-fns';
-import { randomBytes } from 'crypto';
+import { SYSTEM_USER_EMAIL } from '../../common/system-user';
 
 const BOOKING_INCLUDE = {
   guest: true,
@@ -376,7 +376,7 @@ export class BookingsService {
    * use so public bookings work even on a database that wasn't seeded.
    */
   private async resolveSystemUserId(): Promise<string> {
-    const email = 'system@hotel.com';
+    const email = SYSTEM_USER_EMAIL;
     const existing = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (existing) return existing.id;
 
@@ -384,8 +384,6 @@ export class BookingsService {
       const created = await this.prisma.user.create({
         data: {
           email,
-          // Random, non-bcrypt value → no password can ever match (login impossible).
-          passwordHash: randomBytes(32).toString('hex'),
           firstName: 'Online',
           lastName: 'Bookings',
           role: 'STAFF' as any,
