@@ -11,7 +11,7 @@ Hotel-Manager/
 ├── apps/
 │   ├── api/              # NestJS backend — port 3000 (REST + Socket.IO)
 │   ├── web/              # React + Vite admin/staff/guest portal — port 5173
-│   └── guest/            # React + Vite "C'est La Stay" public landing — port 5174
+│   └── guest/            # "C'est La Stay" public landing — static index.html + public/*.js (Vite-served) — port 5174
 ├── packages/
 │   └── shared/           # Shared TypeScript types and enums
 ├── docs/                 # ADRs + SEO plan
@@ -31,7 +31,9 @@ apps/api/
 │   ├── app.module.ts                   # Root module — registers all feature modules
 │   │
 │   ├── common/
-│   │   └── cors.ts                     # getCorsOrigins() — shared CORS allow-list (HTTP + WS)
+│   │   ├── cors.ts                     # getCorsOrigins() — shared CORS allow-list (HTTP + WS)
+│   │   └── prisma-retry.ts             # retryOnUniqueViolation() + sequenceJitter() — retries BKG/INV number
+│   │                                   #   allocation on P2002 collisions, 409 when exhausted
 │   │
 │   ├── prisma/
 │   │   ├── prisma.module.ts            # @Global() module
@@ -39,7 +41,8 @@ apps/api/
 │   │
 │   └── modules/
 │       ├── auth/
-│       │   ├── auth.module.ts          # Registers JwtAuthGuard + RolesGuard as APP_GUARD (global)
+│       │   ├── auth.module.ts          # Registers JwtAuthGuard + RolesGuard as APP_GUARD (global);
+│       │   │                           #   JwtModule is global so the WS gateway can verify handshake tokens
 │       │   ├── auth.controller.ts      # /auth/register, /login, /guest-portal, /refresh, /me, /logout
 │       │   ├── auth.service.ts         # JWT signing, bcrypt, guest portal access
 │       │   ├── strategies/
@@ -68,7 +71,8 @@ apps/api/
 │       │   ├── notifications.controller.ts  # /notifications, /notifications/read-all, /notifications/:id/read
 │       │   ├── notifications.service.ts     # notifyUser(), notifyStaff(), findForUser(), markRead()
 │       │   └── notifications.gateway.ts    # Single Socket.IO gateway — handles all WS events
-│       │                                   # emitRoomStatusChanged, emitCheckedIn, emitCheckedOut, sendToUser
+│       │                                   # JWT verified in handshake middleware; staff join "staff" + user:<id>
+│       │                                   # emitRoomStatusChanged, emitCheckedIn, emitCheckedOut (→ staff room), sendToUser
 │       │
 │       ├── rooms/
 │       │   ├── rooms.module.ts         # Imports NotificationsModule
@@ -138,12 +142,18 @@ apps/api/
 │       │
 │       ├── crm/                        # Phase 5 — email automation + discount codes
 │       │   ├── crm.module.ts
-│       │   ├── crm.controller.ts       # /crm/emails, /crm/triggers, /crm/discount-codes
-│       │   ├── crm.service.ts          # email log queries, discount CRUD, @Cron triggers
+│       │   ├── crm.controller.ts       # /crm/emails, /crm/triggers, /crm/discount-codes, /crm/subscribe (PUBLIC), /crm/subscribers
+│       │   ├── crm.service.ts          # email log queries, discount CRUD, newsletter upsert, @Cron triggers
 │       │   ├── email.service.ts        # SendGrid wrapper (STUB mode when no API key)
 │       │   ├── email-templates.ts      # HTML email bodies
 │       │   └── dto/
-│       │       └── create-discount.dto.ts
+│       │       ├── create-discount.dto.ts
+│       │       └── subscribe.dto.ts    # { email, source? }
+│       │
+│       ├── inbound-email/              # stay@cestlastay.com → team inboxes (Resend)
+│       │   ├── inbound-email.module.ts
+│       │   ├── inbound-email.controller.ts  # POST /webhooks/resend (PUBLIC, raw body, Svix-signed)
+│       │   └── inbound-email.service.ts     # verify signature, fetch email + attachments, re-send with Reply-To
 │       │
 │       ├── ota/                        # Phase 6 — OTA manual booking entry
 │       │   ├── ota.module.ts
@@ -165,8 +175,9 @@ apps/api/
 │               └── create-rating.dto.ts
 │
 ├── prisma/
-│   ├── schema.prisma               # Full DB schema — 16 models, 16 enums
-│   ├── migrations/                 # 20260427091801_init, 20260617000000_add_ratings_feature
+│   ├── schema.prisma               # Full DB schema — 18 models, 16 enums
+│   ├── migrations/                 # 20260427091801_init, 20260617000000_add_ratings_feature,
+│   │                               #   20260626120000_add_newsletter_subscriber, 20260704000000_add_multi_room_bookings
 │   └── seed.ts                     # Upsert-safe seed (3 categories, 7 rooms, 5 users, 1 sample booking + invoice)
 │
 ├── package.json
@@ -188,6 +199,7 @@ HousekeepingModule
 InvoicesModule
 PaymentsModule
 CrmModule
+InboundEmailModule
 OtaModule
 AnalyticsModule
 RatingsModule
@@ -212,6 +224,7 @@ apps/web/src/
 │   │   ├── DashboardPage.tsx       # Live stats (rooms, check-ins, recent bookings)
 │   │   ├── StaffPage.tsx           # Staff management — add/activate/delete users
 │   │   ├── RoomsPage.tsx           # Room grid with create/edit/delete modal
+│   │   ├── StaysPage.tsx           # /admin/stays — room categories (name/description/price shown on the landing)
 │   │   ├── BookingsPage.tsx        # Booking table with status + search filter + Folio button (InvoiceEditor)
 │   │   ├── GuestsPage.tsx          # Guest table with search
 │   │   ├── AnalyticsPage.tsx       # Phase 6 — revenue/occupancy/source charts
@@ -224,7 +237,8 @@ apps/web/src/
 │   │   ├── RoomDashboardPage.tsx   # Color-coded room grid, inline status change, real-time WS
 │   │   ├── BookingsPage.tsx        # Booking list + 4-step create wizard + Folio button (InvoiceEditor)
 │   │   ├── CheckInPage.tsx         # Lookup by booking# or name → check-in / check-out / cancel
-│   │   ├── ServiceQueuePage.tsx    # Ticket list + detail panel, assign + status actions + cost pricing (folio billing)
+│   │   ├── ServiceQueuePage.tsx    # Ticket list (active first, then priority desc, then oldest) + detail panel,
+│   │   │                           #   assign + status actions + cost pricing (folio billing)
 │   │   ├── HousekeepingPage.tsx    # Task cards, status progression, create modal
 │   │   ├── OtaBookingsPage.tsx     # Phase 6 — OTA manual booking entry + revenue
 │   │   └── GuestsPage.tsx          # Guest list with inline edit + booking history
@@ -253,12 +267,13 @@ apps/web/src/
 ├── contexts/
 │   ├── AuthContext.tsx             # login, guestLogin, logout, user state
 │   │                               # Boot: guests restore from localStorage.guestUser (not /auth/me)
-│   ├── SocketContext.tsx           # Socket.IO connection (skipped for guests)
+│   ├── SocketContext.tsx           # Socket.IO connection for any logged-in user (server puts guests in no rooms)
 │   └── NotificationContext.tsx    # Fetch + real-time notifications (skipped for guests)
 │
 └── lib/
     ├── api.ts                      # Axios instance — auto-attaches JWT, silent refresh, toast errors
-    └── socket.ts                   # Socket.IO client factory
+    ├── rooms.ts                    # roomNumbersLabel() — "#201, #202 +1" for multi-room bookings
+    └── socket.ts                   # Socket.IO client factory — token re-read per connect, re-arms after auth rejection
 ```
 
 ---
@@ -286,35 +301,30 @@ packages/shared/src/
 
 ## Guest Landing (`apps/guest/`)
 
-`C'est La Stay` — the public, single-page marketing/landing site (separate from the `web` portal). Vite + React + Tailwind with a lazy-loaded WebGL layer (three.js) and GSAP smooth-scroll. Deploys to Vercel; prod domain `cestlastay.com`.
+`C'est La Stay`: the public, single-page marketing/landing site, separate from the `web` portal. **The live site is a hand-written static page**: `index.html` plus plain, unbundled scripts in `public/`. Vite only serves it in dev and copies it to `dist/` on build. three.js is loaded from a CDN via an `importmap` in `index.html`. Deploys to Vercel; prod domain `cestlastay.com`.
 
 ```
-apps/guest/src/
-├── main.tsx
-├── App.tsx                         # Section composition + cream veil + Matrimandir
-│
-├── components/
-│   ├── layout/
-│   │   ├── Navbar.tsx              # Login link → ${VITE_PORTAL_URL}/guest-portal
-│   │   └── Footer.tsx
-│   ├── sections/                   # Hero, Rooms, Packages, Amenities, Stats,
-│   │   └── ...                     #   Matrimandir, Reserve, FooterCta
-│   ├── scenes/                     # WebGL/canvas — lazy-loaded so three.js stays
-│   │   └── ...                     #   out of the initial chunk (SceneBackground,
-│   │                               #   HeroScene, MatrimandirSphere, ClothAmenities)
-│   └── ui/                         # Button, Card, Carousel, Reveal, Marquee, …
-│
-├── hooks/                          # useSmoothScroll, useReveal, useParallax
-├── lib/
-│   ├── content.ts                  # No-code editing surface for all page copy
-│   ├── api.ts / booking.ts         # Public booking flow (gated by VITE_ENABLE_BOOKING_API)
-│   ├── gsap.ts / events.ts / portal.ts
-│   └── cloth/clothScene.ts
-├── types/booking.types.ts
-└── styles/globals.css
+apps/guest/
+├── index.html                      # The whole page: markup, styles, SEO/schema/GA, importmap (three@0.160 from unpkg).
+│                                   #   Login link → https://app.cestlastay.com/guest-portal; stay@cestlastay.com in contact + footer
+├── public/
+│   ├── site.js                     # Interactivity: booking modal → POST /bookings/public, availability → GET /rooms/availability,
+│   │                               #   live stay prices ← GET /rooms/categories, newsletter → POST /crm/subscribe.
+│   │                               #   API base picked by hostname (localhost:3000 vs the Railway prod URL)
+│   ├── earthen-init.js             # ES module: boots the WebGL sphere + scroll scene
+│   ├── sphere.js                   # Faceted golden Matrimandir sphere (three.js, pointer-follow)
+│   ├── scene-earthen.js            # Scroll-driven particle field: hero depth plane → quote frame → dome → terrain
+│   ├── particles.js                # 2D-canvas fireflies/embers (classic script, exposes window.Particles)
+│   ├── bimi-logo.svg               # SVG Tiny PS sender logo for the default._bimi DNS record (see DEPLOYMENT.md §7)
+│   ├── robots.txt, sitemap.xml, llms.txt, site.webmanifest, favicons
+│   └── *.png + *-{480,960,1440}.{avif,webp}   # photos + responsive variants
+├── scripts/optimize-images.mjs     # `pnpm optimize:images` — generates the AVIF/WebP variants with sharp (idempotent)
+├── vercel.json                     # Vite build via turbo, SPA rewrite, HSTS, immutable cache for images/fonts
+└── src/                            # ⚠ Unused React/Tailwind version of the landing (Navbar, sections, scenes, lib/content.ts, …).
+                                    #   Not referenced by index.html, so it does not ship. Edit index.html / public/*.js instead.
 ```
 
-> The booking form calls public API endpoints (`GET /rooms/categories`, `GET /rooms/availability`, `POST /bookings/public`) only when `VITE_ENABLE_BOOKING_API=true`.
+> The `VITE_ENABLE_BOOKING_API` / `VITE_API_URL` / `VITE_PORTAL_URL` vars in `apps/guest/.env.example` only apply to the unused `src/` app. The live page needs no env vars.
 
 ---
 

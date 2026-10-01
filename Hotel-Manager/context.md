@@ -14,7 +14,11 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 | Phase 4 | Invoices, Stripe Payments | ✅ Complete |
 | Phase 5 | CRM, Email Automation | ✅ Complete |
 | Phase 6 | OTA Management, Analytics | ✅ Complete |
-| Folio update | Staff/admin-built invoice folio — line items, service-request billing, manual payments, guest read-only bill (hidden while DRAFT) | 🧪 Built on `feat/staff-invoice-folio` — local testing |
+| Folio update | Staff/admin-built invoice folio — line items, service-request billing, manual payments, guest read-only bill (hidden while DRAFT) | ✅ Merged (PR #12, #25) |
+| Ratings | Post-stay guest reviews + admin summary | ✅ Merged (PR #15) |
+| Multi-room bookings | `booking_rooms` join table, `roomIds[]` in staff wizard + OTA entry | ✅ Merged (PR #28) |
+| Security/concurrency P0s | WS handshake auth + staff-scoped broadcasts; retry on BKG/INV number collisions; guest portal CHECKED_IN-only | ✅ Merged (PR #30, #31) |
+| Inbound email | `stay@cestlastay.com` → team inboxes via Resend webhook; BIMI logo | ✅ Merged (PR #32–#34) |
 
 ---
 
@@ -25,7 +29,8 @@ Hotel-Manager/
 ├── apps/
 │   ├── api/          # NestJS backend — port 3000 (REST + Socket.IO)
 │   ├── web/          # React + Vite admin/staff/guest portal — port 5173
-│   └── guest/        # React + Vite "C'est La Stay" public landing — port 5174
+│   └── guest/        # "C'est La Stay" public landing — static index.html + public/*.js — port 5174
+│                     #   (apps/guest/src/ is an unused React version — edit index.html / public/ instead)
 ├── packages/
 │   └── shared/       # Shared TypeScript types and enums
 ├── docs/             # ADRs + SEO plan
@@ -161,6 +166,7 @@ React Router v6 nested routes with `Outlet`.
   /admin/           → AdminDashboardPage ✅
   /admin/staff      → AdminStaffPage ✅
   /admin/rooms      → AdminRoomsPage ✅
+  /admin/stays      → AdminStaysPage ✅ (room categories — name/description/price shown on the landing)
   /admin/bookings   → AdminBookingsPage ✅
   /admin/guests     → AdminGuestsPage ✅
   /admin/analytics  → AdminAnalyticsPage ✅
@@ -208,6 +214,7 @@ if (isRole(UserRole.ADMIN)) { ... }
 ### Guest auth — important differences
 
 - Guests use `guestLogin(bookingNumber, lastName)` → `POST /auth/guest-portal`
+- Login only works while the booking is **`CHECKED_IN`**. Before check-in or after check-out the API returns 404 `Booking not found or not checked in yet`. The seed's sample booking is `CONFIRMED`, so check it in first to test the portal
 - Gets a 24h token, no refresh token
 - Token has `sub = guestId` (not a userId) — `GET /auth/me` does NOT work for guests
 - On boot, guest session is restored from `localStorage.guestUser` (set at login), NOT from `/auth/me`
@@ -236,19 +243,21 @@ import { UserRole, BookingStatus, RoomStatus, IBooking, IRoom } from '@shared/in
 
 **Single gateway** (`NotificationsGateway`) handles all real-time events on the default namespace `/`. `RoomsGateway` and `BookingsGateway` are thin wrappers that delegate to it.
 
+**Auth:** the JWT is verified in a Socket.IO handshake middleware (same rules as `JwtStrategy`). Bad or missing tokens get `connect_error: UNAUTHORIZED`. On connect, ADMIN/STAFF sockets are auto-joined to `staff` and `user:<userId>`. Guest sockets connect but join no rooms.
+
 **Events emitted by server:**
-- `room:status-changed` — broadcast to all clients when any room status changes
-- `booking:checked-in` — broadcast on check-in
-- `booking:checked-out` — broadcast on check-out
+- `room:status-changed` — to the `staff` room when any room status changes
+- `booking:checked-in` — to the `staff` room on check-in
+- `booking:checked-out` — to the `staff` room on check-out
 - `notification:new` — targeted to `user:<userId>` room
 
 **Client subscription flow:**
 ```typescript
-socket.emit('subscribe', { userId: user.id });   // join user:<userId> room
+socket.emit('subscribe', { userId: user.id });   // payload ignored — room comes from the token; already joined at connect
 socket.on('notification:new', (n) => { ... });
 ```
 
-Guests do NOT subscribe (skipped in `NotificationContext` because their token sub ≠ userId).
+`lib/socket.ts` passes `auth` as a function so every reconnect re-reads `localStorage.accessToken`, and re-arms the connection with backoff after an auth rejection. `NotificationContext` skips guests. Full reference: `websocket-events.md`.
 
 ---
 
@@ -258,7 +267,7 @@ Guests do NOT subscribe (skipped in `NotificationContext` because their token su
 
 2. **Seed `guest@hotel.com` user unnecessary** — has no purpose since guests access via booking ID. Safe to ignore.
 
-3. **Pre-existing TypeScript errors in web** — `ImportMeta.env` typing and one `UserStatus` literal error in `AuthContext.tsx` exist from Phase 1. They don't affect runtime (Vite handles `import.meta.env`).
+3. **Token refresh bypasses `VITE_API_URL`.** `apps/web/src/lib/api.ts` refreshes with a bare `axios.post('/api/v1/auth/refresh', …)` instead of the configured instance. In production that resolves against the Vercel origin, not the Railway API, so the refresh fails and staff/admin sessions are logged out when the 15-minute access token expires.
 
 4. **CRM emails fail-soft** — when `SENDGRID_API_KEY` is not configured (or doesn't start with `SG.`), `EmailService` falls back to STUB mode: logs are still written to `email_logs` with `status=SENT` and the email body is logged via `Logger`, but no real email is sent. This keeps Phase 5 functional during local dev.
 
@@ -290,18 +299,21 @@ SENDGRID_API_KEY=
 SENDGRID_FROM_EMAIL=
 SENDGRID_FROM_NAME=
 
-# Optional — Twilio SMS
+# Optional — Twilio SMS (keys reserved; not used by any code yet)
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
 TWILIO_PHONE_NUMBER=
+
+# Optional — Resend inbound stay@ forwarding (disabled with a warning if unset)
+RESEND_API_KEY=
+RESEND_WEBHOOK_SECRET=           # whsec_… from the Resend webhook
+RESEND_FORWARD_TO=               # comma-separated team inboxes
+RESEND_FORWARD_FROM="C'est La Stay Inbox <stay@cestlastay.com>"
 
 # apps/web/.env
 VITE_API_URL=http://localhost:3000/api/v1
 VITE_SOCKET_URL=http://localhost:3000
 VITE_STRIPE_PUBLISHABLE_KEY=   # Phase 4
-
-# apps/guest/.env  (public landing)
-VITE_API_URL=http://localhost:3000/api/v1
-VITE_PORTAL_URL=http://localhost:5173      # "Login" → ${VITE_PORTAL_URL}/guest-portal
-VITE_ENABLE_BOOKING_API=false              # flip to true to enable the public booking form
 ```
+
+The live guest landing needs **no env vars**: `apps/guest/public/site.js` picks the API base by hostname (`localhost:3000` in dev, the Railway URL in prod). The `VITE_*` vars in `apps/guest/.env.example` only feed the unused `src/` React app.

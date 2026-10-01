@@ -10,8 +10,8 @@ Complete PostgreSQL database schema for the Hotel Management System, managed via
 users (1) ──┬─── (0..1) staff
             └─── (0..1) guest (1) ─── (0..*) bookings
 
-rooms (1) ─── (0..*) bookings (1) ─── (0..1) invoice (1) ─── (0..*) payments
-                                  └─── (0..*) service_requests
+rooms (1) ─── (0..*) booking_rooms (1..*) ─── (1) bookings (1) ─── (0..1) invoice (1) ─── (0..*) payments
+                                                          └─── (0..*) service_requests
 
 rooms (1) ─── (0..*) housekeeping_tasks
 staff (1) ─── (0..*) housekeeping_tasks
@@ -21,6 +21,8 @@ invoice (1) ─── (0..*) invoice_items
 service_request (0..1) ─── (0..*) invoice_items
 
 bookings (1) ─── (0..1) rating (0..*) ─── (1) guests
+
+newsletter_subscribers — standalone (no relations)
 ```
 
 ---
@@ -409,6 +411,23 @@ Loyalty discount code management.
 **Indexes:**
 - `idx_loyalty_code` on `code`
 - `idx_loyalty_validity` on `(valid_from, valid_until)`
+
+---
+
+#### `newsletter_subscribers`
+Footer newsletter signups from the public landing (`POST /crm/subscribe`). Standalone, no foreign keys.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | UUID | PK | Subscriber ID |
+| `email` | VARCHAR | UNIQUE, NOT NULL | Stored trimmed + lowercased; signup is an upsert, so duplicates are no-ops |
+| `source` | VARCHAR | NULL | Where the signup came from (defaults to `guest-footer`) |
+| `created_at` | TIMESTAMP | DEFAULT now() | Signup time |
+
+**Indexes:**
+- on `created_at` (admin list is newest-first)
+
+Migration: `20260626120000_add_newsletter_subscriber`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 Real-time communication in HMS uses a **single Socket.IO gateway** on the default namespace `/` (no sub-namespaces). All events flow through `NotificationsGateway`.
 
-**Server URL:** `http://localhost:3000`
+**Server URL:** `VITE_SOCKET_URL` (dev: `http://localhost:3000`; prod: the bare Railway API origin, **no** `/api/v1`)
 
 ---
 
@@ -10,11 +10,12 @@ Real-time communication in HMS uses a **single Socket.IO gateway** on the defaul
 
 ```
 NotificationsGateway (namespace: "/")
+  ├── handshake middleware: verifies the JWT, rejects with UNAUTHORIZED
   ├── handles: subscribe / unsubscribe (client → server)
   ├── emits:  notification:new       → targeted to user:<userId> room
-  ├── emits:  room:status-changed    → broadcast to all clients
-  ├── emits:  booking:checked-in     → broadcast to all clients
-  └── emits:  booking:checked-out    → broadcast to all clients
+  ├── emits:  room:status-changed    → "staff" room (ADMIN + STAFF only)
+  ├── emits:  booking:checked-in     → "staff" room (ADMIN + STAFF only)
+  └── emits:  booking:checked-out    → "staff" room (ADMIN + STAFF only)
 
 RoomsGateway     → delegates to NotificationsGateway
 BookingsGateway  → delegates to NotificationsGateway
@@ -22,18 +23,41 @@ BookingsGateway  → delegates to NotificationsGateway
 
 ---
 
+## Authentication (Server)
+
+Sockets are authenticated **during the handshake** by a `server.use()` middleware registered in `NotificationsGateway.afterInit()`, not in `handleConnection`. A rejected client never gets message handlers bound, and receives a `connect_error` with message `UNAUTHORIZED`.
+
+The check mirrors `JwtStrategy.validate()` so socket access matches HTTP access:
+
+1. The token is read from `handshake.auth.token` (a leading `Bearer ` is stripped), then the `Authorization: Bearer …` header, then `?token=` in the query string.
+2. It is verified with `JWT_SECRET`. If `JWT_SECRET` is unset, the gateway logs an error at startup and every handshake is rejected.
+3. **Staff/admin tokens:** `sub` must be an existing user with `status = ACTIVE`.
+4. **Guest-portal tokens** (`role: GUEST`): must carry a `bookingId`, and `sub` must be an existing guest.
+
+On connect, ADMIN and STAFF sockets automatically join two rooms: `staff` (hotel-wide events) and `user:<userId>` (their own notifications). **Guest sockets join no rooms**: their `sub` is a guestId, so `user:<id>` would be the wrong room, and hotel-wide events are staff business. A guest can connect but receives nothing.
+
+---
+
 ## Connection (Frontend)
 
 ```typescript
-// apps/web/src/lib/socket.ts
+// apps/web/src/lib/socket.ts (simplified)
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:3000', {
-  auth: { token: accessToken },
+const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000', {
+  // Function form: called before EVERY (re)connect, so a token refreshed by
+  // api.ts (written to localStorage) is picked up without rebuilding the socket.
+  auth: (cb) => cb({ token: localStorage.getItem('accessToken') ?? fallbackToken ?? null }),
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 2000,
 });
 ```
 
-Managed by `SocketContext` — connects when user logs in, disconnects on logout. Guests do **not** connect (their token `sub` is a guestId, not a userId, so user-targeted events would be mis-routed).
+Managed by `SocketContext`, which connects whenever there is a logged-in user with an access token (guests included) and disconnects on logout.
+
+**Rejected handshakes:** socket.io does not retry on its own after the server rejects a handshake (`socket.active === false`). `lib/socket.ts` listens for `connect_error` and, while an access token is still in `localStorage`, re-arms the connection with exponential backoff (2s, doubling, capped at 30s; one pending retry at a time). `disconnectSocket()` clears the timer and resets the delay. Plain transport failures are left to socket.io's own reconnection.
 
 ---
 
@@ -44,36 +68,38 @@ Join the user-specific room to receive targeted notifications.
 
 ```typescript
 socket.emit('subscribe', { userId: 'user-uuid' });
-// Joins socket room: user:<userId>
+// Joins socket room: user:<id from the verified token>
 ```
 
+The `userId` in the payload is **ignored**. The room is always derived from the verified token, so a client cannot subscribe to another user's notifications. Staff/admin sockets are already in their room from connect time, so this is an idempotent no-op kept for compatibility with the existing client. Guests are ignored.
+
 ### `unsubscribe`
-Leave the user-specific room.
+Leave the user-specific room (again using the token's id, not the payload's).
 
 ```typescript
 socket.emit('unsubscribe', { userId: 'user-uuid' });
 ```
 
-Both are called automatically by `NotificationContext` when the user mounts/unmounts.
+Both are called automatically by `NotificationContext` when a staff/admin user mounts/unmounts (it skips guests).
 
 ---
 
 ## Server → Client Events
 
 ### `notification:new`
-**Targeted** — only sent to clients in the `user:<userId>` room.
-Fired by `NotificationsService.notifyUser()` which is called by:
-- `ServicesService.create()` — new service request (notifies all ADMIN + STAFF)
-- `HousekeepingService.create()` — new task created (notifies all ADMIN + STAFF)
-- `BookingsService.checkIn()` — guest checked in (notifies all ADMIN + STAFF)
-- `BookingsService.checkOut()` — guest checked out (notifies all ADMIN + STAFF)
+**Targeted**: only sent to clients in the `user:<userId>` room.
+Fired by `NotificationsService.notifyUser()`. Today every caller goes through `notifyStaff()`, which calls `notifyUser()` once for each ACTIVE ADMIN/STAFF user:
+- `ServicesService.create()`: new service request
+- `HousekeepingService.create()`: new task created
+- `BookingsService.checkIn()`: guest checked in
+- `BookingsService.checkOut()`: guest checked out
 
 **Payload:** full `Notification` DB record
 ```typescript
 {
   id: string;
   userId: string;
-  type: 'CHECK_IN' | 'CHECK_OUT' | 'SERVICE_REQUEST' | 'HOUSEKEEPING_ALERT' | 'BOOKING_CONFIRMATION' | ...;
+  type: 'CHECK_IN' | 'CHECK_OUT' | 'SERVICE_REQUEST' | 'HOUSEKEEPING_ALERT' | ...;
   status: 'UNREAD';
   title: string;
   message: string;
@@ -91,10 +117,12 @@ socket.on('notification:new', (n: INotification) => {
 });
 ```
 
+`ServiceQueuePage` also listens and reloads its list when `n.type === 'SERVICE_REQUEST'`.
+
 ---
 
 ### `room:status-changed`
-**Broadcast** — sent to all connected clients.
+**Staff-scoped**: sent only to the `staff` room (ADMIN + STAFF sockets).
 Fired whenever `RoomsService.updateStatus()` is called (via `PATCH /rooms/:id/status`).
 
 **Payload:** full Room object with category included
@@ -121,18 +149,18 @@ socket.on('room:status-changed', (updatedRoom: IRoom) => {
 ---
 
 ### `booking:checked-in`
-**Broadcast** — sent to all connected clients.
+**Staff-scoped**: sent only to the `staff` room (ADMIN + STAFF sockets).
 Fired by `BookingsService.checkIn()`.
 
-**Payload:** full Booking object (with guest, room, createdBy)
+**Payload:** full Booking object (with guest, rooms, createdBy)
 
 ---
 
 ### `booking:checked-out`
-**Broadcast** — sent to all connected clients.
+**Staff-scoped**: sent only to the `staff` room (ADMIN + STAFF sockets).
 Fired by `BookingsService.checkOut()`.
 
-**Payload:** full Booking object (with guest, room, createdBy)
+**Payload:** full Booking object (with guest, rooms, createdBy)
 
 ---
 
@@ -144,16 +172,13 @@ Fired by `BookingsService.checkOut()`.
 | `HOUSEKEEPING_ALERT` | Housekeeping task created | All ADMIN + STAFF |
 | `CHECK_IN` | Guest checks in | All ADMIN + STAFF |
 | `CHECK_OUT` | Guest checks out | All ADMIN + STAFF |
-| `BOOKING_CONFIRMATION` | Booking created (CRM email; persisted notification) | Guest |
-| `BOOKING_CANCELLATION` | Booking cancelled | Guest |
-| `PAYMENT_RECEIVED` | Defined in DB enum but not yet emitted — Phase 4 payments persist via Stripe webhook only, no WS broadcast | Guest + Staff |
 
-> The full `NotificationType` enum lives in `apps/api/prisma/schema.prisma`. Only the rows above are currently produced; the rest are reserved.
+> The full `NotificationType` enum lives in `apps/api/prisma/schema.prisma`. Only the four rows above produce in-app notifications. `BOOKING_CONFIRMATION` exists as an **email** type: `CrmService` sends it and records it in `email_logs`, not `notifications`. `BOOKING_CANCELLATION`, `COMPLAINT`, `PAYMENT_RECEIVED` and `SYSTEM` are reserved; nothing emits them yet. Stripe payments persist via the webhook only, with no WS broadcast.
 
 ---
 
 ## Notes
 
-- Notifications are **persisted to the DB** before being pushed — `GET /notifications` will return them even if the client was offline.
-- The `subscribe` event must be emitted after connecting. `NotificationContext` handles this automatically for logged-in staff/admin users.
-- Room and booking broadcast events are sent to all connected clients regardless of role — the frontend filters what to show.
+- Notifications are **persisted to the DB** before being pushed, so `GET /notifications` returns them even if the client was offline.
+- Staff/admin sockets are placed in their rooms at connect time. The `subscribe` event that `NotificationContext` sends afterwards is redundant but harmless.
+- Room and booking events go only to the `staff` room, because booking payloads carry guest PII and the only consumers are staff/admin pages. Guests receive no socket events.

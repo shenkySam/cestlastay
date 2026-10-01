@@ -14,7 +14,7 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 |--------|------|--------|-------------|
 | POST | `/auth/register` | [PUBLIC] | Create user account |
 | POST | `/auth/login` | [PUBLIC] | Login → returns `accessToken` + `refreshToken` |
-| POST | `/auth/guest-portal` | [PUBLIC] | Guest access via booking number + lastName → 24h token, no refresh |
+| POST | `/auth/guest-portal` | [PUBLIC] | Guest access via booking number + lastName (case-insensitive) → 24h token, no refresh. **Only while the booking is `CHECKED_IN`**; otherwise 404 `Booking not found or not checked in yet` |
 | POST | `/auth/refresh` | [PUBLIC] | Exchange refresh token for new access token |
 | GET | `/auth/me` | Any staff/admin | Returns current user profile. **Does NOT work for guest tokens** |
 | POST | `/auth/logout` | Any | Stateless logout |
@@ -87,6 +87,8 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 | POST | `/bookings/:id/cancel` | ADMIN, STAFF | Cancel booking, frees its rooms that are RESERVED |
 
 **Booking number format:** `BKG-YYYYMMDD-XXXX` (sequential per day)
+
+**Concurrent creates:** numbers are allocated read-max-then-increment, so two simultaneous creates can collide on the unique column. The create is retried on that collision (`retryOnUniqueViolation` in `apps/api/src/common/prisma-retry.ts`, up to 8 attempts with a widening random offset, so a retry can leave a gap in the sequence). If every attempt collides, the API returns **409** `Could not allocate a unique booking number. Please try again.` The same applies to invoice numbers and OTA bookings.
 
 **Multi-room bookings:** a booking holds one or more rooms via `booking_rooms` — responses expose `rooms: [{ roomId, roomRate, room: {...} }]` instead of a single `room`. All rooms share the booking's check-in/out dates; `totalAmount` = Σ(per-room rate × nights). `POST /bookings/public` remains single-room (one landing-form category) but returns the same `rooms[]` shape.
 
@@ -211,7 +213,7 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 | PATCH | `/invoices/:id/items/:itemId` | ADMIN, STAFF | Edit `description` / `quantity` / `unitPrice` → recalc |
 | DELETE | `/invoices/:id/items/:itemId` | ADMIN, STAFF | Remove line item → recalc |
 
-**Invoice number format:** `INV-YYYYMMDD-XXXX`
+**Invoice number format:** `INV-YYYYMMDD-XXXX` (retried on collision like booking numbers; two concurrent `POST /invoices/booking/:bookingId` calls for the same booking → the loser gets **409** `An invoice already exists for this booking`)
 
 **Recalc — runs after every item / discount change:**
 - `subtotal = Σ items.totalPrice` · `tax = subtotal × TAX_RATE/100` (env `TAX_RATE`, default 10) · `total = max(0, subtotal + tax − discount)` · `balanceDue = max(0, total − paidAmount)`
@@ -281,6 +283,8 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 | POST | `/crm/discount-codes` | ADMIN | Create discount code (PERCENTAGE / FIXED) |
 | PATCH | `/crm/discount-codes/:id/toggle` | ADMIN | Activate / deactivate code |
 | DELETE | `/crm/discount-codes/:id` | ADMIN | Delete code |
+| POST | `/crm/subscribe` | [PUBLIC] | Newsletter signup from the guest site footer. Body `{ "email", "source"? }` (`source` defaults to `guest-footer`). Email is trimmed + lowercased and upserted, so re-subscribing is a no-op. Returns `{ ok: true, id }` |
+| GET | `/crm/subscribers` | ADMIN | Newsletter subscribers, newest first (max 500) |
 
 **Automatic email triggers:**
 - `POST /bookings` → fires `BOOKING_CONFIRMATION`
@@ -353,15 +357,31 @@ All routes are **ADMIN-only** and accept an optional `?from=&to=` date range.
 
 ---
 
+## Inbound Email (Resend webhook)
+
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| POST | `/webhooks/resend` | [PUBLIC], Svix-signed | Forwards mail received at `stay@cestlastay.com` to the team inboxes |
+
+Resend receives mail for the domain and POSTs an `email.received` event here. `InboundEmailService` then:
+1. Verifies the Svix signature: HMAC-SHA256 over `${svix-id}.${svix-timestamp}.${rawBody}` with `RESEND_WEBHOOK_SECRET`, and rejects timestamps more than 5 minutes old. A missing secret, missing headers or a bad signature → **401**. Needs the raw body (`rawBody: true` in `main.ts`, same as the Stripe webhook).
+2. Ignores every other event type (`{ ignored: "<type>" }`).
+3. Fetches the full message and its attachments from the Resend API and re-sends it from `RESEND_FORWARD_FROM` to every address in `RESEND_FORWARD_TO`. The subject is prefixed with `[stay@]`, a "Forwarded message" header is added, and Reply-To is set to the original sender, so replying in Gmail answers the guest directly.
+4. Sends with `Idempotency-Key: inbound-forward-<email_id>`, so Resend's webhook retries don't produce duplicate forwards. If the send fails, the endpoint returns a non-2xx response and Resend retries later.
+
+If `RESEND_API_KEY` or `RESEND_FORWARD_TO` is unset, the event is acknowledged with `{ forwarded: false }` and a warning is logged. Env setup: see `setup-guide.md` / `DEPLOYMENT.md`.
+
+---
+
 ## Error Responses
 
 | Status | When |
 |--------|------|
 | 400 | Validation failure, bad dates, check-out before check-in |
-| 401 | Missing/invalid/expired JWT |
+| 401 | Missing/invalid/expired JWT; bad webhook signature |
 | 403 | Valid JWT but insufficient role |
-| 404 | Resource not found (silenced in frontend toast) |
-| 409 | Double booking conflict |
+| 404 | Resource not found (silenced in frontend toast); guest-portal login for a booking that isn't `CHECKED_IN` |
+| 409 | Double booking conflict; folio already exists for the booking; unique number allocation exhausted after retries |
 | 500 | Unexpected server error |
 
 ```json
