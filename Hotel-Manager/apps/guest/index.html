@@ -209,6 +209,8 @@
   .news input{flex:1;background:none;border:none;outline:none;font-family:'Jost',sans-serif;font-size:14px;color:var(--ink)}
   .news button{background:none;border:none;cursor:pointer;font-size:18px;color:var(--clay)}
   .foot-bottom{display:flex;justify-content:space-between;padding-top:28px;font-size:12px;letter-spacing:.08em;color:var(--ink-soft)}
+  .foot-bottom a{transition:color .2s}
+  .foot-bottom a:hover{color:var(--clay)}
 
   /* switcher */
   .switcher{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;display:flex;gap:4px;background:rgba(58,42,31,.92);backdrop-filter:blur(10px);padding:6px;border-radius:100px;box-shadow:0 10px 40px rgba(58,42,31,.28)}
@@ -533,7 +535,7 @@
     </div>
     <div class="foot-bottom">
       <span>© 2026 C'est La Stay · Auroville, Tamil Nadu</span>
-      <span>Privacy · Terms · Instagram</span>
+      <span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · Instagram</span>
     </div>
   </div>
 </footer>
