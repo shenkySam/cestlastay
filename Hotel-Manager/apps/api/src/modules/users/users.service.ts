@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto, UpdateUserStatusDto } from './dto/update-user.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
@@ -10,15 +9,17 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createStaffUser(dto: CreateStaffUserDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    // Sign-in matches this email case-insensitively, so store it normalized
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
     if (existing) throw new ConflictException('Email already in use');
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
-
+    // No password: the user signs in with the Google / Apple account for this email
     const user = await this.prisma.user.create({
       data: {
-        email: dto.email,
-        passwordHash,
+        email,
         firstName: dto.firstName,
         lastName: dto.lastName,
         phone: dto.phone,

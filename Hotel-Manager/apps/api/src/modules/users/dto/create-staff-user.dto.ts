@@ -1,13 +1,10 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { UserRole } from '@hms/shared';
 
 export class CreateStaffUserDto {
+  /** Must be the Google / Apple account email the person will sign in with. */
   @IsEmail()
   email: string;
-
-  @IsString()
-  @MinLength(8)
-  password: string;
 
   @IsString()
   @IsNotEmpty()

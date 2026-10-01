@@ -1,7 +1,14 @@
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@shared/index';
+import {
+  APPLE_CLIENT_ID,
+  GOOGLE_CLIENT_ID,
+  OAuthProvider,
+  renderGoogleButton,
+  signInWithApple,
+} from '@/lib/oauth';
 
 const ROLE_HOME: Record<UserRole, string> = {
   [UserRole.ADMIN]: '/admin',
@@ -12,9 +19,8 @@ const ROLE_HOME: Record<UserRole, string> = {
 export default function LoginPage() {
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,21 +29,43 @@ export default function LoginPage() {
     if (user) navigate(ROLE_HOME[user.role], { replace: true });
   }, [user, navigate]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const finishSignIn = async (provider: OAuthProvider, idToken: string) => {
     setError('');
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(provider, idToken);
       // AuthContext sets user → useEffect above redirects
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })
         ?.response?.data?.message;
-      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Login failed'));
+      setError(Array.isArray(msg) ? msg[0] : (msg ?? 'Sign-in failed — please try again'));
     } finally {
       setSubmitting(false);
     }
   };
+  // Google's button is rendered once; route its callback through a ref so it
+  // always reaches the latest finishSignIn.
+  const finishSignInRef = useRef(finishSignIn);
+  finishSignInRef.current = finishSignIn;
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID || !googleButtonRef.current) return;
+    renderGoogleButton(googleButtonRef.current, (idToken) =>
+      finishSignInRef.current('google', idToken),
+    ).catch(() => setError('Could not load Google sign-in. Check your connection and refresh.'));
+  }, []);
+
+  const handleApple = async () => {
+    setError('');
+    try {
+      const idToken = await signInWithApple();
+      if (idToken) await finishSignIn('apple', idToken);
+    } catch {
+      setError('Apple sign-in failed — please try again.');
+    }
+  };
+
+  const noProviders = !GOOGLE_CLIENT_ID && !APPLE_CLIENT_ID;
 
   return (
     <div
@@ -66,53 +94,59 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="login-card p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-5">
             {error && (
               <div className="bg-red-500/15 border border-red-400/40 text-red-900 px-4 py-3 rounded-xl text-sm">
                 {error}
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-[#3a2a1f]/80 mb-1.5">
-                Email address
-              </label>
-              <input
-                type="email"
-                className="login-input"
-                placeholder="you@hotel.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-              />
-            </div>
+            <p className="text-sm text-center text-[#3a2a1f]/80">
+              Use the Google or Apple account your administrator registered for you.
+            </p>
 
-            <div>
-              <label className="block text-sm font-medium text-[#3a2a1f]/80 mb-1.5">
-                Password
-              </label>
-              <input
-                type="password"
-                className="login-input"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {noProviders ? (
+              <p className="text-sm text-center text-[#3a2a1f]/80">
+                {import.meta.env.DEV
+                  ? 'Sign-in is not configured — set VITE_GOOGLE_CLIENT_ID and/or VITE_APPLE_CLIENT_ID.'
+                  : 'Sign-in is temporarily unavailable.'}
+              </p>
+            ) : (
+              <div
+                className={`space-y-3 ${submitting ? 'opacity-50 pointer-events-none' : ''}`}
+                aria-busy={submitting}
+              >
+                {GOOGLE_CLIENT_ID && (
+                  <div ref={googleButtonRef} className="flex justify-center min-h-[40px]" />
+                )}
 
-            <button type="submit" className="login-btn w-full py-3" disabled={submitting}>
-              {submitting ? (
-                <span className="flex items-center gap-2 justify-center">
-                  <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  Signing in…
-                </span>
-              ) : (
-                'Sign in'
-              )}
-            </button>
-          </form>
+                {APPLE_CLIENT_ID && (
+                  <button
+                    type="button"
+                    onClick={handleApple}
+                    disabled={submitting}
+                    className="mx-auto flex h-10 w-full max-w-[400px] items-center justify-center gap-2
+                               rounded-full bg-black text-[15px] font-medium text-white transition-colors
+                               hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-black/40
+                               focus:ring-offset-2"
+                    style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif' }}
+                  >
+                    <svg viewBox="0 0 814 1000" className="h-4 w-4 fill-current" aria-hidden="true">
+                      <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105.6-57-155.5-127C46.7 790.7 0 663 0 541.8c0-194.4 126.4-297.5 250.8-297.5 66.1 0 121.2 43.4 162.7 43.4 39.5 0 101.1-46 176.3-46 28.5 0 130.9 2.6 198.3 99.2zm-234-181.5c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z" />
+                    </svg>
+                    Sign in with Apple
+                  </button>
+                )}
+              </div>
+            )}
+
+            {submitting && (
+              <p className="flex items-center justify-center gap-2 text-sm text-[#3a2a1f]/80">
+                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#b1542e]" />
+                Signing in…
+              </p>
+            )}
+          </div>
 
           {/* Guest access hint */}
           <div className="mt-6 pt-6 border-t border-[#3a2a1f]/15 text-center">
@@ -127,16 +161,6 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-
-        {/* Dev hint (remove in production) */}
-        {import.meta.env.DEV && (
-          <div className="mt-4 login-card p-4 text-xs text-[#3a2a1f]/80 space-y-1">
-            <p className="font-semibold text-[#3a2a1f]">Dev credentials</p>
-            <p>Admin: admin@hotel.com / Admin123!</p>
-            <p>Staff: staff@hotel.com / Staff123!</p>
-            <p>Guest: guest@hotel.com / Guest123!</p>
-          </div>
-        )}
       </div>
     </div>
   );

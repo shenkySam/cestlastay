@@ -21,7 +21,6 @@ const EMPTY_FORM = {
   lastName: '',
   email: '',
   phone: '',
-  password: '',
   role: UserRole.STAFF as UserRole,
   department: '',
   position: '',
@@ -207,6 +206,9 @@ export default function AdminStaffPage() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                They'll sign in with the Google or Apple account that uses this email.
+              </p>
             </div>
 
             <div>
@@ -216,17 +218,6 @@ export default function AdminStaffPage() {
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Temporary Password</label>
-              <input
-                className="input"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Min. 8 characters"
               />
             </div>
 
@@ -268,7 +259,7 @@ export default function AdminStaffPage() {
             <div className="flex gap-3 pt-2">
               <button
                 className="btn-primary flex-1"
-                disabled={saving || !form.firstName || !form.email || form.password.length < 8}
+                disabled={saving || !form.firstName || !form.email}
                 onClick={handleCreate}
               >
                 {saving ? 'Creating...' : 'Create Account'}

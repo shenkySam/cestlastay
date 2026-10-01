@@ -148,7 +148,13 @@ enum EmailStatus {
 model User {
   id              String     @id @default(uuid())
   email           String     @unique
-  passwordHash    String     @map("password_hash")
+  // Sign-in is Google / Apple only. Each provider's stable subject ID is linked
+  // on first sign-in (matched by verified email), then used for later sign-ins.
+  googleId        String?    @unique @map("google_id")
+  appleId         String?    @unique @map("apple_id")
+  // Legacy: password login was removed. Nothing reads or writes this; kept
+  // nullable so a rollback is possible — drop in a follow-up migration.
+  passwordHash    String?    @map("password_hash")
   firstName       String     @map("first_name")
   lastName        String     @map("last_name")
   phone           String?

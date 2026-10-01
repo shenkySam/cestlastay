@@ -5,11 +5,12 @@
  * by NAME, so these names mirror apps/guest/src/lib/content.ts.
  *
  * Idempotent: skips any category that already exists (never clobbers edits).
- * Run with the API up:  node apps/api/prisma/seed-stays.mjs
+ * Sign-in is Google / Apple only, so pass an admin access token: sign in to the
+ * web app as an admin, then copy localStorage.accessToken from DevTools.
+ * Run with the API up:  ADMIN_TOKEN=<token> node apps/api/prisma/seed-stays.mjs
  */
 const API = process.env.API_URL || 'http://localhost:3000/api/v1';
-const EMAIL = process.env.ADMIN_EMAIL || 'admin@hotel.com';
-const PASSWORD = process.env.ADMIN_PASSWORD || 'Admin123!';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 const stays = [
   {
@@ -50,17 +51,11 @@ const parse = async (res) => {
 };
 
 (async () => {
-  const loginRes = await fetch(`${API}/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
-  if (!loginRes.ok) {
-    console.error('Login failed:', loginRes.status, await parse(loginRes));
+  if (!ADMIN_TOKEN) {
+    console.error('Set ADMIN_TOKEN to an admin access token (see header comment).');
     process.exit(1);
   }
-  const { accessToken } = await parse(loginRes);
-  const auth = { 'content-type': 'application/json', authorization: `Bearer ${accessToken}` };
+  const auth = { 'content-type': 'application/json', authorization: `Bearer ${ADMIN_TOKEN}` };
 
   const existing = await parse(await fetch(`${API}/rooms/categories`, { headers: auth }));
   const have = new Set((existing || []).map((c) => c.name.trim().toLowerCase()));

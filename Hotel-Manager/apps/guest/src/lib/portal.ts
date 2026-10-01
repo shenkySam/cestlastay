@@ -6,6 +6,6 @@ const base = import.meta.env.VITE_PORTAL_URL || 'http://localhost:5173';
 /**
  * Customer entry point — the Hotel-Manager Guest Portal. Customers sign in with
  * their booking number + last name; the portal also links onward to the staff
- * email/password login (/login).
+ * Google / Apple sign-in (/login).
  */
 export const guestPortalUrl = `${base}/guest-portal`;

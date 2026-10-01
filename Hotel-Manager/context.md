@@ -129,13 +129,16 @@ npx ts-node prisma/seed.ts                    # re-run seed (uses upsert, safe t
 
 ### Seed Data
 
-| Role | Email | Password | Notes |
-|------|-------|----------|-------|
-| Admin | admin@hotel.com | Admin123! | Full access |
-| Staff (Front Desk) | staff@hotel.com | Staff123! | employeeId: EMP001 |
-| Staff (Housekeeping) | housekeeping@hotel.com | Staff123! | employeeId: EMP002 |
-| System | system@hotel.com | — | `createdById` for public/online bookings (`POST /bookings/public`) |
-| Guest | guest@hotel.com | Guest123! | Sample guest profile (portal login uses booking #, not this) |
+Sign-in is **Google / Apple only** (no passwords), matched by email — seed with
+`SEED_ADMIN_EMAIL=<your Google/Apple email>` to get a usable admin login.
+
+| Role | Email | Notes |
+|------|-------|-------|
+| Admin | `$SEED_ADMIN_EMAIL` (default admin@hotel.com) | Full access |
+| Staff (Front Desk) | staff@hotel.com | employeeId: EMP001 |
+| Staff (Housekeeping) | housekeeping@hotel.com | employeeId: EMP002 |
+| System | system@hotel.com | `createdById` for public/online bookings (`POST /bookings/public`); can never sign in |
+| Guest | guest@hotel.com | Sample guest profile (portal login uses booking # + last name) |
 
 | Room # | Category | Floor | Status |
 |--------|----------|-------|--------|

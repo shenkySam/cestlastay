@@ -12,12 +12,18 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| POST | `/auth/register` | [PUBLIC] | Create user account |
-| POST | `/auth/login` | [PUBLIC] | Login → returns `accessToken` + `refreshToken` |
+| POST | `/auth/google` | [PUBLIC] | Body `{ idToken }` (Google Identity Services credential) → returns `user` + `accessToken` + `refreshToken` |
+| POST | `/auth/apple` | [PUBLIC] | Body `{ idToken }` (Sign in with Apple JS `authorization.id_token`) → same response as `/auth/google` |
 | POST | `/auth/guest-portal` | [PUBLIC] | Guest access via booking number + lastName (case-insensitive) → 24h token, no refresh. **Only while the booking is `CHECKED_IN`**; otherwise 404 `Booking not found or not checked in yet` |
 | POST | `/auth/refresh` | [PUBLIC] | Exchange refresh token for new access token |
 | GET | `/auth/me` | Any staff/admin | Returns current user profile. **Does NOT work for guest tokens** |
 | POST | `/auth/logout` | Any | Stateless logout |
+
+### Sign-in (Google / Apple only)
+- There is **no email + password login** and **no self-signup**. An admin creates the user (`POST /users`, by email); the person then signs in with the Google or Apple account for that email.
+- The API verifies the ID token's signature (provider JWKS), issuer, audience (`GOOGLE_CLIENT_ID` / `APPLE_CLIENT_ID`) and expiry.
+- First sign-in per provider: matched to a user by **verified** email (case-insensitive), then the provider's `sub` is stored in `users.google_id` / `users.apple_id`. Later sign-ins match on that ID.
+- `401` when: no user has that email, the email is unverified or an Apple "Hide My Email" relay address, the email's user is already linked to a different Google/Apple account, the user isn't `ACTIVE`, or it's the `system@hotel.com` account. `503` when that provider's client ID isn't configured.
 
 ### Guest portal token
 - `sub` in JWT = `guestId` (Guest table), not a userId

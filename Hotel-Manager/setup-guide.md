@@ -241,7 +241,7 @@ Open **Dashboard > Connection Details** and copy **two** strings into `.env`:
 
 Both end with `?sslmode=require`. Prisma uses `DATABASE_URL` at runtime and `DIRECT_URL` for migrations (configured in `apps/api/prisma/schema.prisma`).
 
-> Auth is handled by the API itself (JWT + bcrypt) — there is no separate managed-auth provider to configure.
+> Auth is handled by the API itself: staff sign in with Google / Apple (the API verifies the ID token), then it issues its own JWTs. The only provider setup is the Google (and optionally Apple) client ID — see step 3 below.
 
 ---
 
@@ -275,21 +275,24 @@ npx prisma db seed
 ```
 
 This will create (upsert-safe, so it's repeatable):
-- 1 Admin user (`admin@hotel.com` / `Admin123!`)
-- 2 Staff users (Front Desk `staff@hotel.com`, Housekeeping `housekeeping@hotel.com` — both `Staff123!`)
+- 1 Admin user (`$SEED_ADMIN_EMAIL`, default `admin@hotel.com`)
+- 2 Staff users (Front Desk `staff@hotel.com`, Housekeeping `housekeeping@hotel.com`)
 - 1 System user (`system@hotel.com`) — used as `createdById` for public/online bookings
 - 1 sample Guest profile (`guest@hotel.com`)
 - 3 Room categories (Standard Single, Deluxe Double, Executive Suite)
 - 7 Rooms (101, 102, 201, 202, 203, 301, 302)
 - 1 Sample booking `BKG-20260501-0001` (+ its invoice)
 
-**Test Credentials:**
+**Signing in:** there are no passwords. Staff and admins sign in with **Google or
+Apple**, matched by email, so seed with your own Google/Apple address as the admin:
+```bash
+SEED_ADMIN_EMAIL=you@gmail.com npx prisma db seed
 ```
-Admin:        admin@hotel.com        / Admin123!
-Staff:        staff@hotel.com        / Staff123!
-Housekeeping: housekeeping@hotel.com / Staff123!
-```
-> Guests do not log in with email/password — the guest portal authenticates with
+Then set `GOOGLE_CLIENT_ID` (API) and `VITE_GOOGLE_CLIENT_ID` (web) to a Google OAuth
+Web client ID that lists `http://localhost:5173` as an authorized JavaScript origin.
+Apple sign-in can't be tested on localhost (Apple rejects it as a return URL).
+Add other staff from **Admin → Staff** using their Google/Apple email.
+> Guests do not sign in with Google/Apple — the guest portal authenticates with
 > **booking number + last name** (try `BKG-20260501-0001` / `Smith`).
 
 ### 4. View Database (Optional)
@@ -434,13 +437,8 @@ Should see login page.
 
 ### 4. Test Login
 
-Use test credentials:
-```
-Email: admin@hotel.com
-Password: Admin123!
-```
-
-Should redirect to admin dashboard.
+Click **Sign in with Google** and pick the account whose email you seeded as
+`SEED_ADMIN_EMAIL`. Should redirect to admin dashboard.
 
 ---
 

@@ -1,17 +1,25 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
-import { UserRole } from '@hms/shared';
 import { PrismaService } from '../../prisma/prisma.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import { SYSTEM_USER_EMAIL } from '../../common/system-user';
 import { GuestPortalDto } from './dto/guest-portal.dto';
+import { OAuthProvider, OAuthVerifierService } from './oauth-verifier.service';
+
+const PROVIDER_LABEL: Record<OAuthProvider, string> = { google: 'Google', apple: 'Apple' };
+
+const LOGIN_USER_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  role: true,
+  status: true,
+  googleId: true,
+  appleId: true,
+  staff: { select: { id: true, employeeId: true } },
+  guest: { select: { id: true } },
+} as const;
 
 @Injectable()
 export class AuthService {
@@ -19,66 +27,63 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly oauth: OAuthVerifierService,
   ) {}
 
-  async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) throw new ConflictException('Email already in use');
+  /**
+   * Sign in with a Google / Apple ID token. There is no self-signup: the user
+   * must already exist (an admin adds them by email). The first sign-in with a
+   * provider links its stable subject ID to the account by verified email;
+   * later sign-ins match on that ID.
+   */
+  async oauthLogin(provider: OAuthProvider, idToken: string) {
+    const identity = await this.oauth.verify(provider, idToken);
+    const label = PROVIDER_LABEL[provider];
+    const bySubject = provider === 'google'
+      ? { googleId: identity.subject }
+      : { appleId: identity.subject };
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    let user = await this.prisma.user.findUnique({ where: bySubject, select: LOGIN_USER_SELECT });
 
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        phone: dto.phone,
-        role: UserRole.GUEST,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        createdAt: true,
-      },
-    });
+    if (!user) {
+      if (!identity.email || !identity.emailVerified) {
+        throw new UnauthorizedException(`Your ${label} account has no verified email address`);
+      }
+      if (identity.email.endsWith('@privaterelay.appleid.com')) {
+        throw new UnauthorizedException(
+          "Apple hid your email, so we can't match it to your account. In your Apple ID settings, " +
+            "stop using Sign in with Apple for C'est La Stay, then sign in again and choose \"Share My Email\".",
+        );
+      }
 
-    const tokens = this.signTokens(user.id, user.email, user.role);
-    return { user, ...tokens };
-  }
+      user = await this.prisma.user.findFirst({
+        where: { email: { equals: identity.email, mode: 'insensitive' } },
+        select: LOGIN_USER_SELECT,
+      });
+      if (!user) {
+        throw new UnauthorizedException(
+          `No account found for ${identity.email}. Ask an administrator to add you.`,
+        );
+      }
+      // Same email, but already linked to a different Google / Apple account
+      const linkedId = provider === 'google' ? user.googleId : user.appleId;
+      if (linkedId && linkedId !== identity.subject) {
+        throw new UnauthorizedException(
+          `This account is linked to a different ${label} account. Ask an administrator for help.`,
+        );
+      }
+    }
 
-  async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-      select: {
-        id: true,
-        email: true,
-        passwordHash: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        staff: { select: { id: true, employeeId: true } },
-        guest: { select: { id: true } },
-      },
-    });
-
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    if (user.status !== 'ACTIVE') throw new UnauthorizedException('Account is not active');
-
-    const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!passwordValid) throw new UnauthorizedException('Invalid credentials');
+    if (user.status !== 'ACTIVE' || user.email.toLowerCase() === SYSTEM_USER_EMAIL) {
+      throw new UnauthorizedException('Account is not active');
+    }
 
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+      data: { ...bySubject, emailVerified: true, lastLoginAt: new Date() },
     });
 
-    const { passwordHash: _, ...safeUser } = user;
+    const { googleId: _g, appleId: _a, ...safeUser } = user;
     const tokens = this.signTokens(user.id, user.email, user.role);
     return { user: safeUser, ...tokens };
   }
