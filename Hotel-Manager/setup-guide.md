@@ -165,8 +165,25 @@ NODE_ENV="development"
 PORT=3000
 FRONTEND_URL="http://localhost:5173"
 
-# CORS origins (comma-separated for multiple)
-CORS_ORIGINS="http://localhost:5173,http://localhost:3000"
+# CORS origins (comma-separated) — applies to HTTP and the Socket.IO handshake.
+# Leave empty locally: it falls back to FRONTEND_URL + localhost:5173 + localhost:5174.
+CORS_ORIGINS=""
+
+# Invoice tax (percentage, e.g. 10 = 10%)
+TAX_RATE=10
+
+
+# ===========================================
+# RESEND — inbound stay@ forwarding (Optional)
+# ===========================================
+RESEND_API_KEY=""
+RESEND_WEBHOOK_SECRET=""
+# Comma-separated list of inboxes that receive stay@ mail
+RESEND_FORWARD_TO=""
+RESEND_FORWARD_FROM="C'est La Stay Inbox <stay@cestlastay.com>"
+
+# Leave empty locally — the API logs "Inbound email forwarding disabled" and
+# POST /webhooks/resend rejects every call (401). See "Resend Configuration" below.
 
 
 # ===========================================
@@ -338,21 +355,23 @@ stripe listen --forward-to localhost:3000/api/v1/payments/webhook
 5. Copy API key (starts with `SG.`)
 6. Add to `.env` as `SENDGRID_API_KEY`
 
-### 3. Create Email Templates
+### 3. Email Templates (no SendGrid setup needed)
 
-1. Go to: https://app.sendgrid.com/dynamic_templates
-2. Create templates for:
-   - Booking Confirmation
-   - Check-In Reminder
-   - Loyalty Discount
+The API renders its own HTML. `apps/api/src/modules/crm/email-templates.ts` has `bookingConfirmationTemplate`, `checkInReminderTemplate` and `postStayDiscountTemplate`, so **no SendGrid dynamic templates are needed**. The `SENDGRID_TEMPLATE_*` keys in `.env.example` are unused leftovers.
 
-**Template Variables:**
-- `{{guestName}}` - Guest first name
-- `{{bookingNumber}}` - Booking number
-- `{{checkInDate}}` - Check-in date
-- `{{roomType}}` - Room category
-- `{{discountCode}}` - Loyalty discount code
-- `{{portalLink}}` - Guest portal link
+Without a valid `SENDGRID_API_KEY` the API runs in **stub mode**: emails are logged to `email_logs` and the console (`[STUB EMAIL] …`) but not sent.
+
+---
+
+## Resend Configuration (inbound `stay@` mail — optional)
+
+Only needed if you are working on the `stay@cestlastay.com` forwarding (`POST /api/v1/webhooks/resend`). Outbound transactional mail uses SendGrid, above.
+
+1. Resend Dashboard → **API Keys** → create a key → `RESEND_API_KEY`.
+2. Resend Dashboard → **Webhooks** → add an endpoint for the event `email.received` → copy the signing secret (`whsec_…`) → `RESEND_WEBHOOK_SECRET`.
+3. Set `RESEND_FORWARD_TO` to a comma-separated list of inboxes.
+
+For local testing, expose the API with a tunnel (e.g. `ngrok http 3000`) and point the webhook at `https://<tunnel>/api/v1/webhooks/resend`. The signature check rejects requests older than 5 minutes, so replaying an old payload by hand returns 401. Production setup (domain MX record, live webhook URL) is in `DEPLOYMENT.md` §6.
 
 ---
 

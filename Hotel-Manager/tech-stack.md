@@ -29,7 +29,7 @@ This document outlines the technology choices for the Hotel Management System an
 apps/
   ├── api/          # NestJS backend (REST + Socket.IO)
   ├── web/          # React admin/staff/guest portal
-  └── guest/        # React "C'est La Stay" public landing (three.js/GSAP)
+  └── guest/        # "C'est La Stay" public landing — static HTML + plain JS (three.js via CDN)
 packages/
   └── shared/       # Shared TypeScript types, enums, constants
 ```
@@ -135,15 +135,17 @@ packages/
 - **Angular:** Too heavy, steeper learning curve
 - **Svelte:** Less mature ecosystem
 
-**Styling:** Tailwind CSS (+ PostCSS/Autoprefixer) in both `web` and `guest`. Icons via `lucide-react`, toasts via `react-hot-toast` (web).
+**Styling:** Tailwind CSS (+ PostCSS/Autoprefixer) in `web`. Icons via `lucide-react`, toasts via `react-hot-toast` (web).
 
 ### Guest landing (`apps/guest`)
 
-The public `C'est La Stay` site is also React + Vite + Tailwind, plus a motion/3D layer:
-- **three.js** — lazy-loaded WebGL scenes (faceted "Matrimandir" sphere, particle backgrounds, cloth sim), kept out of the initial chunk
-- **GSAP** + **Lenis** — scroll-driven animation and smooth scrolling
-- **Embla Carousel** — room/gallery carousels
-- **date-fns** — date handling for the booking widget
+The live public `C'est La Stay` site is **not** a React app. It is a hand-written static `index.html` with its CSS inline, plus plain ES-module/classic scripts in `public/`. Vite serves it in dev and copies it to `dist/` on build; nothing in it is bundled.
+- **three.js 0.160** loaded from unpkg through an `importmap` in `index.html`: the faceted "Matrimandir" sphere (`sphere.js`) and the scroll-driven particle field (`scene-earthen.js`: hero depth plane → frame → dome → terrain)
+- **2D canvas** fireflies (`particles.js`), with no WebGL needed
+- **Vanilla JS** (`site.js`) for the booking modal, live prices, availability and newsletter. The API base is chosen by hostname at runtime
+- **sharp** (dev only), used by `scripts/optimize-images.mjs` to pre-generate AVIF/WebP variants
+
+`apps/guest/src/` still holds an earlier React + Tailwind version of the landing (GSAP + Lenis, Embla Carousel, date-fns, bundled `three`). Those `package.json` dependencies exist for it, but `index.html` doesn't load it, so it doesn't ship.
 
 ---
 
@@ -175,6 +177,8 @@ The public `C'est La Stay` site is also React + Vite + Tailwind, plus a motion/3
 - Live booking notifications
 - Service request alerts
 - Housekeeping task updates
+
+**Security model:** the JWT is verified in the Socket.IO handshake (the same rules as HTTP). Rooms come from the verified token, never from client input, and hotel-wide events go only to a staff room. Details: `websocket-events.md`.
 
 ---
 
@@ -208,13 +212,20 @@ The public `C'est La Stay` site is also React + Vite + Tailwind, plus a motion/3
 
 ## Email & SMS
 
-### SendGrid + Twilio
+### SendGrid + Resend + Twilio
 
-**Decision:** SendGrid for emails, Twilio for SMS
+**Decision:** SendGrid for outbound transactional email, Resend for inbound `stay@` mail, Twilio for SMS
+
+| Direction | Provider | Status |
+|-----------|----------|--------|
+| Outbound (booking confirmation, check-in reminder, loyalty) | **SendGrid** (`@sendgrid/mail`) | Live. HTML is rendered in code (`crm/email-templates.ts`), not SendGrid dynamic templates. Stub mode without an API key |
+| Inbound (`stay@cestlastay.com` → team inboxes) | **Resend** (REST API via native `fetch`, Svix-signed webhook, no SDK) | Live. See `api-endpoints.md` → *Inbound Email* |
+| SMS | **Twilio** | The dependency and env keys exist, but nothing in `apps/api/src` uses them yet |
+
+The Resend integration adds no npm dependency: it uses native `fetch` for the API and `crypto` for the Svix HMAC check.
 
 **Why SendGrid?**
 - **Free tier:** 100 emails/day forever
-- **Dynamic templates:** Visual template editor
 - **Tracking:** Open rate, click rate, bounce handling
 - **Deliverability:** Strong reputation, SPF/DKIM setup
 - **API-friendly:** Simple REST API and Node.js SDK

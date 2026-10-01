@@ -6,7 +6,7 @@ This monorepo deploys as **three independent services** that connect at runtime 
 |-----|------|----------|-----|
 | **API** (`@hms/api`) | `apps/api` | **Railway** | Long-running NestJS server: Socket.IO websockets + `@Cron` jobs + Prisma. Needs an always-on process. |
 | **Admin / portal** (`@hms/web`) | `apps/web` | **Vercel** | Static React/Vite SPA. |
-| **Landing** (`@hms/guest`) | `apps/guest` | **Vercel** | Static React/Vite SPA (the C'est La Stay landing). Its **Login** button → the admin URL. |
+| **Landing** (`@hms/guest`) | `apps/guest` | **Vercel** | Static C'est La Stay landing: hand-written `index.html` + plain scripts in `public/` (`site.js`, `earthen-init.js`, …), built/copied by Vite. Its **Login** button → the admin URL. |
 
 > The repo root (`cestlastay`) has no app in it. **Every service must point at a subdirectory** —
 > that is why the first Railway deploy failed. Config files in this repo:
@@ -26,9 +26,11 @@ Push to GitHub first (Railway & Vercel deploy from the repo).
 Required env for the public booking + newsletter to work:
 
 - **Railway (API):** `CORS_ORIGINS="https://cestlastay.com,https://www.cestlastay.com,https://app.cestlastay.com"`
-- **Vercel (guest):** `VITE_ENABLE_BOOKING_API=true`, `VITE_API_URL=https://cestlastay-production.up.railway.app/api/v1`, `VITE_PORTAL_URL=https://app.cestlastay.com`
+- **Vercel (guest):** nothing. The live landing does **not** read `VITE_*` vars. `public/site.js` hardcodes the API base: `http://localhost:3000/api/v1` on localhost, otherwise `https://cestlastay-production.up.railway.app/api/v1`. The prod **Login** URL (`https://app.cestlastay.com/guest-portal`) is in `index.html`, swapped to `localhost:5173` in dev. If the Railway domain changes, edit `site.js`. The `VITE_*` vars in `apps/guest/.env.example` only feed the unused React app under `apps/guest/src/`.
 
-`VITE_*` are inlined at build time — redeploy the guest project after changing them. `CORS_ORIGINS` is read at API boot — redeploy/restart the API after changing it.
+`CORS_ORIGINS` is read at API boot — redeploy/restart the API after changing it.
+
+**Email (`stay@cestlastay.com`):** inbound mail is received by **Resend** and forwarded to the team by the API (see [§6](#6-inbound-email--stay-forwarding-resend)). Outbound transactional mail (booking confirmation, reminders) still goes through **SendGrid**. The BIMI sender logo is served from the landing at `https://cestlastay.com/bimi-logo.svg` ([§7](#7-bimi-sender-logo)).
 
 ---
 
@@ -48,9 +50,12 @@ Required env for the public booking + newsletter to work:
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | payments |
    | `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME` | email (optional) |
    | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | SMS (optional) |
+   | `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `RESEND_FORWARD_TO` | inbound `stay@` forwarding (optional; disabled with a startup warning if any is missing). `RESEND_FORWARD_TO` is a comma-separated list of inboxes. See §6 |
+   | `RESEND_FORWARD_FROM` | optional, defaults to `C'est La Stay Inbox <stay@cestlastay.com>` |
    | `NODE_ENV` = `production` | |
    | `TAX_RATE` = `10` | |
-   | `CORS_ORIGINS` | set **after** the Vercel URLs exist (step 4) |
+   | `FRONTEND_URL` = `https://app.cestlastay.com` | admin/portal origin: used for the guest-portal link in emails and as the CORS fallback when `CORS_ORIGINS` is unset |
+   | `CORS_ORIGINS` | set **after** the Vercel URLs exist (step 4). Applies to both HTTP and the Socket.IO handshake |
 
    > `PORT` is injected by Railway automatically — do **not** set it. The app reads `process.env.PORT`.
 4. Deploy. The container runs `prisma migrate deploy` then `node apps/api/dist/src/main.js`.
@@ -73,10 +78,7 @@ Required env for the public booking + newsletter to work:
 
 1. **New Project → import the same repo**.
 2. **Root Directory = `Hotel-Manager/apps/guest`**.
-3. **Environment Variables**:
-   - `VITE_API_URL` = `<railway-api-domain>/api/v1`
-   - `VITE_PORTAL_URL` = `<vercel-admin-url>` (the **Login** button links here)
-   - `VITE_ENABLE_BOOKING_API` = `true` only once you want the landing's booking form to call the API
+3. **Environment Variables**: none needed. The API base and the Login URL are hardcoded in `public/site.js` / `index.html` (see "Live values" above). Vercel still runs `vite build`, which copies `index.html` and `public/` into `dist/`.
 4. Deploy → note the URL (e.g. `https://cestlastay.com` once the domain is attached).
 
 ---
@@ -86,7 +88,7 @@ Required env for the public booking + newsletter to work:
 Because the URLs reference each other, do it in this order:
 
 1. Deploy **API** (Railway) → copy its domain.
-2. Set `VITE_API_URL` in **both** Vercel projects → deploy **admin**, then **landing** → copy both URLs.
+2. Set `VITE_API_URL` / `VITE_SOCKET_URL` in the **admin** Vercel project (and update the hardcoded API base in `apps/guest/public/site.js` if the Railway domain is new) → deploy **admin**, then **landing** → copy both URLs.
 3. Back on **Railway**, set `CORS_ORIGINS` to both Vercel URLs (comma-separated, no trailing slash):
    `CORS_ORIGINS="https://app.cestlastay.com,https://cestlastay.com"`
 4. **Redeploy the API** so the new CORS list takes effect.
@@ -97,7 +99,28 @@ Because the URLs reference each other, do it in this order:
 
 - `GET <railway-api-domain>/api/v1/...` responds (not 502); Railway logs show migrations + websocket gateway up.
 - Admin loads; `/login` works with no CORS errors in the browser console.
-- Landing loads; **Login** navigates to the admin URL; Socket.IO connects; if `VITE_ENABLE_BOOKING_API=true`, a booking request succeeds cross-origin (no CORS error).
+- Landing loads; stay prices come from the API; **Login** navigates to the admin URL; a booking request and a newsletter signup succeed cross-origin (no CORS error).
+- After logging into admin, Socket.IO connects (the landing itself opens no socket). A handshake rejected as `UNAUTHORIZED` in the console means `JWT_SECRET` differs from the one the token was signed with, or is unset.
+
+---
+
+## 6) Inbound email — `stay@` forwarding (Resend)
+
+`stay@cestlastay.com` has no mailbox. Resend receives the mail and the API forwards it to the team (`POST /api/v1/webhooks/resend`; behaviour in `api-endpoints.md` → *Inbound Email*).
+
+1. **Resend → Domains:** add `cestlastay.com`, enable **receiving**, and add the MX record Resend gives you at the DNS host.
+2. **Resend → Webhooks:** create an endpoint `https://cestlastay-production.up.railway.app/api/v1/webhooks/resend` for the event **`email.received`**. Copy its signing secret (`whsec_…`).
+3. **Resend → API Keys:** create a key that can send from `cestlastay.com`.
+4. **Railway variables:** `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET` (the `whsec_…` value), `RESEND_FORWARD_TO` (comma-separated team inboxes), and optionally `RESEND_FORWARD_FROM`. Restart the API.
+5. **Verify:** mail `stay@cestlastay.com` from an outside account. It should arrive in each inbox as `[stay@] <subject>`, and **Reply** should go to the original sender. Railway logs show `Forwarded inbound email …`. A 401 in Resend's webhook log means the secret doesn't match.
+
+Resend retries failed webhooks; forwards are sent with an idempotency key per email, so a retry never duplicates mail.
+
+## 7) BIMI sender logo
+
+`apps/guest/public/bimi-logo.svg` is served at `https://cestlastay.com/bimi-logo.svg` and referenced by the `default._bimi` DNS TXT record (`v=BIMI1; l=https://cestlastay.com/bimi-logo.svg`). It must stay **SVG Tiny PS**: no arcs, no width/height on the root, a `<title>`, under 32 KB. Re-validate it after any edit. BIMI only shows in inboxes when the domain's DMARC policy is `quarantine` or `reject`.
+
+---
 
 ## Notes / future hardening
 - The API Docker image installs the full workspace for simplicity. To slim it later, use a filtered install or `pnpm deploy`.
