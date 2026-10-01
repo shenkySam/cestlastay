@@ -70,13 +70,14 @@ export default function StaffServiceQueuePage() {
       const { data } = await api.get('/services', {
         params: filterStatus ? { status: filterStatus } : {},
       });
-      // Active tickets (PENDING/IN_PROGRESS) first, then newest-first within each group.
+      // Active tickets (PENDING/IN_PROGRESS) first, then by priority descending, then oldest first.
       setRequests(
         [...data].sort((a: ServiceRequest, b: ServiceRequest) => {
           const aActive = ACTIVE_STATUSES.includes(a.status) ? 0 : 1;
           const bActive = ACTIVE_STATUSES.includes(b.status) ? 0 : 1;
           if (aActive !== bActive) return aActive - bActive;
-          return new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime();
+          if (b.priority !== a.priority) return b.priority - a.priority;
+          return new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime();
         }),
       );
     } finally {
@@ -85,8 +86,12 @@ export default function StaffServiceQueuePage() {
   }
 
   async function loadStaff() {
-    const { data } = await api.get('/users/staff-list');
-    setStaffList(data);
+    try {
+      const { data } = await api.get('/users/staff-list');
+      setStaffList(data);
+    } catch {
+      // errors shown by interceptor; assign dropdown degrades to empty
+    }
   }
 
   async function updateStatus(sr: ServiceRequest, status: ServiceStatus) {
