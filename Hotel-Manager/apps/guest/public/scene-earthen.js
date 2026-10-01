@@ -2,7 +2,8 @@ import * as THREE from 'three';
 
 // Earthen scroll scene — a warm particle field that moves through four
 // ORGANISED shapes as you scroll, smoothly (eased), keyed to real sections:
-//   0. CLOUD  — gently floating embers (top / hero)
+//   0. PLANE  — an ordered x/-z ground plane of motes receding to a horizon,
+//               drifting toward the viewer with a soft swell (top / hero)
 //   1. FRAME  — an organised border framing the Philosophy quote (centre clear)
 //   2. DOME   — a dense, organised lat/long lattice behind the Matrimandir sphere
 //   3. TERRAIN— Alpha's travelling wave terrain, fully formed at the bottom
@@ -26,6 +27,11 @@ export function initScene(mount, opts = {}) {
   let w = window.innerWidth, h = window.innerHeight;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(62, w / h, 0.1, 100);
+  // Cream fog (matches --cream) so the hero plane dissolves into the page at
+  // its horizon — gives the depth falloff and hides row wrap-around. Only
+  // active in the PLANE state; pushed out of range for the other shapes.
+  const CREAM = 0xf4efe5;
+  scene.fog = new THREE.Fog(CREAM, 9, 40);
   camera.position.set(0, 0, 7);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -53,7 +59,16 @@ export function initScene(mount, opts = {}) {
   const DISC_R = isMobile ? 3.6 : 4.6;
   const TILT = 1.02; // ~58° — so the concentric rings read in perspective
 
-  const initial = new Float32Array(COUNT * 3); // cloud
+  // Hero ground plane (x / -z): ordered rows receding from just under the
+  // camera to a fog-hidden horizon. Rows drift toward the viewer and wrap
+  // off-screen (below the frustum at the near end, inside fog at the far end).
+  const PLANE_Y = -2.4;          // horizon lands ~mid-viewport
+  const PLANE_W = isMobile ? 26 : 44;
+  const Z_FAR = -36, Z_NEAR = 6.5;
+  const DEPTH = Z_NEAR - Z_FAR;
+  const planeX = new Float32Array(COUNT);
+  const planeZ = new Float32Array(COUNT);
+  let drift = 0, lastT = 0;
   const frame = new Float32Array(COUNT * 3);    // organised frame
   const ripple = new Float32Array(COUNT * 3);    // concentric ripple disc (lx, lz, radius)
   const phase = new Float32Array(COUNT);
@@ -83,9 +98,6 @@ export function initScene(mount, opts = {}) {
 
   for (let i = 0; i < COUNT; i++) {
     const i3 = i * 3;
-    initial[i3] = (Math.random() - 0.5) * 16;
-    initial[i3 + 1] = (Math.random() - 0.5) * 10;
-    initial[i3 + 2] = (Math.random() - 0.5) * 6;
     phase[i] = Math.random() * Math.PI * 2;
 
     // organised frame: even along perimeter, in LAYERS concentric rings
@@ -109,10 +121,12 @@ export function initScene(mount, opts = {}) {
     const col = i % COLS, row = Math.floor(i / COLS);
     gridX[i] = (col / (COLS - 1) - 0.5) * GRID_W;
     gridZ[i] = (row / (ROWS - 1) - 0.5) * GRID_D;
+    planeX[i] = (col / (COLS - 1) - 0.5) * PLANE_W;
+    planeZ[i] = Z_FAR + (row / ROWS) * DEPTH;
 
-    positions[i3] = initial[i3];
-    positions[i3 + 1] = initial[i3 + 1];
-    positions[i3 + 2] = initial[i3 + 2];
+    positions[i3] = planeX[i];
+    positions[i3 + 1] = PLANE_Y;
+    positions[i3 + 2] = planeZ[i];
     c.set(pick());
     colors[i3] = c.r; colors[i3 + 1] = c.g; colors[i3 + 2] = c.b;
   }
@@ -160,10 +174,13 @@ export function initScene(mount, opts = {}) {
 
   const a = [0, 0, 0], b = [0, 0, 0];
   function coord(id, i, i3, t, out) {
-    if (id === 0) { // cloud (with gentle drift)
-      out[0] = initial[i3] + Math.sin(t * 0.3 + phase[i]) * 0.5;
-      out[1] = initial[i3 + 1] + Math.cos(t * 0.25 + phase[i]) * 0.5;
-      out[2] = initial[i3 + 2];
+    if (id === 0) { // ground plane flowing toward the viewer, with a soft swell
+      let z = planeZ[i] + drift;
+      z = Z_FAR + (((z - Z_FAR) % DEPTH) + DEPTH) % DEPTH;
+      const x = planeX[i];
+      out[0] = x;
+      out[1] = PLANE_Y + Math.sin(x * 0.32 + t * 0.55) * Math.cos(z * 0.22 - t * 0.4) * 0.22;
+      out[2] = z;
     } else if (id === 1) { out[0] = frame[i3]; out[1] = frame[i3 + 1]; out[2] = frame[i3 + 2]; }
     else if (id === 2) {
       const lx = ripple[i3], lz = ripple[i3 + 1], rad = ripple[i3 + 2];
@@ -191,6 +208,15 @@ export function initScene(mount, opts = {}) {
     else if (prog <= Fm) { idA = 1; idB = 2; k = (prog - Fp) / (Fm - Fp); }
     else { idA = 2; idB = 3; k = (prog - Fm) / (1 - Fm); recede = ease(k); }
     k = ease(k);
+
+    // Plane drift: full speed at rest on the hero, eases to a stop as the
+    // field morphs into the frame so wrapping rows never jump mid-transition.
+    const dt = Math.min(0.05, Math.max(0, t - lastT));
+    lastT = t;
+    if (idA === 0) drift += dt * 0.9 * Math.max(0, 1 - k * 8);
+    const fogK = idA === 0 ? k : 1;
+    scene.fog.near = lerp(9, 300, fogK);
+    scene.fog.far = lerp(40, 600, fogK);
 
     // Center the ripple disc on the sphere's live on-screen position (inverse
     // of the camera projection at the disc plane z=DZ). One layout read/frame.
