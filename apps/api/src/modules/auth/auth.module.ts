@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, hours, minutes } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { OAuthVerifierService } from './oauth-verifier.service';
@@ -24,6 +25,13 @@ import { RolesGuard } from './guards/roles.guard';
         signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '15m') },
       }),
     }),
+    // Sign-in rate limits. ThrottlerGuard is applied per route in AuthController
+    // (not globally), which overrides or skips these defaults. Counters live in
+    // memory: fine for one API instance; more replicas need a shared (Redis) store.
+    ThrottlerModule.forRoot([
+      { name: 'minute', ttl: minutes(1), limit: 10 },
+      { name: 'hour', ttl: hours(1), limit: 20 },
+    ]),
   ],
   controllers: [AuthController],
   providers: [

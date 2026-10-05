@@ -12,12 +12,16 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| POST | `/auth/google` | [PUBLIC] | Body `{ idToken }` (Google Identity Services credential) → returns `user` + `accessToken` + `refreshToken` |
-| POST | `/auth/apple` | [PUBLIC] | Body `{ idToken }` (Sign in with Apple JS `authorization.id_token`) → same response as `/auth/google` |
-| POST | `/auth/guest-portal` | [PUBLIC] | Guest access via booking number + lastName (case-insensitive) → 24h token, no refresh. **Only while the booking is `CHECKED_IN`**; otherwise 404 `Booking not found or not checked in yet` |
+| POST | `/auth/google` | [PUBLIC] | Staff sign-in. Body `{ idToken }` (Google Identity Services credential) → returns `user` + `accessToken` + `refreshToken` |
+| POST | `/auth/apple` | [PUBLIC] | Staff sign-in. Body `{ idToken }` (Sign in with Apple JS `authorization.id_token`) → same response as `/auth/google` |
+| POST | `/auth/guest-portal` | [PUBLIC] | Guest sign-in with booking number + lastName (case-insensitive) → `{ accessToken, booking }`, 24h token, no refresh. Only for an [active stay](#guest-sign-in); otherwise 404 `No current or upcoming stay found for that booking number and last name` |
+| POST | `/auth/guest/google` | [PUBLIC] | Guest sign-in with Google. Body `{ idToken }` → same response as `/auth/guest-portal`. Matches the verified Google email to the guest email on an active-stay booking; 404 `We couldn't find a current or upcoming stay booked under {email}. Try your booking number and last name.`; 401 for an invalid token or unverified email |
+| GET | `/auth/guest/me` | GUEST | `{ booking }` for the token's booking (same shape as at sign-in) — the web app refreshes the stored booking with it on load, e.g. after check-in |
 | POST | `/auth/refresh` | [PUBLIC] | Exchange refresh token for new access token |
-| GET | `/auth/me` | Any staff/admin | Returns current user profile. **Does NOT work for guest tokens** |
+| GET | `/auth/me` | Any staff/admin | Returns current user profile. Not for guest tokens (returns an empty body) — use `/auth/guest/me` |
 | POST | `/auth/logout` | Any | Stateless logout |
+
+**Rate limits** (per client IP, `429` when exceeded; only these routes are throttled): `/auth/guest-portal` 5/min and 20/hour · `/auth/google`, `/auth/apple`, `/auth/guest/google` 10/min · `/auth/refresh` 30/min. Counters are in memory (one API instance). The API trusts one proxy hop (`trust proxy`) so the IP is the visitor's, not Railway's proxy.
 
 ### Sign-in (Google / Apple only)
 - There is **no email + password login** and **no self-signup**. An admin creates the user (`POST /users`, by email); the person then signs in with the Google or Apple account for that email.
@@ -25,9 +29,15 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 - First sign-in per provider: matched to a user by **verified** email (case-insensitive), then the provider's `sub` is stored in `users.google_id` / `users.apple_id`. Later sign-ins match on that ID.
 - `401` when: no user has that email, the email is unverified or an Apple "Hide My Email" relay address, the email's user is already linked to a different Google/Apple account, the user isn't `ACTIVE`, or it's the `system@hotel.com` account. `503` when that provider's client ID isn't configured.
 
-### Guest portal token
-- `sub` in JWT = `guestId` (Guest table), not a userId
-- Only valid for guest-facing endpoints. `/auth/me` will 401 with this token.
+### Guest sign-in
+- **Active stay** = booking `CHECKED_IN`, or `CONFIRMED` with `checkOutDate` today or later. `PENDING`, cancelled, checked-out and past bookings can't sign in. Guests can therefore sign in before arrival (e.g. from the booking-confirmation email).
+- Google: guest emails aren't unique, so the API matches **bookings** whose guest email equals the verified Google email, and picks the most recent `CHECKED_IN` one, else the soonest upcoming `CONFIRMED` one.
+- Before arrival (`CONFIRMED`) a guest can view the booking and bill, but `POST /services` returns 403 `Requests open once you've checked in` and `POST /ratings` returns 403.
+
+### Guest token
+- `sub` in JWT = `guestId` (Guest table), not a userId; `bookingId` = the booking it's scoped to
+- Each request loads that booking and requires `booking.guestId === sub`; the principal carries `guest`, `bookingId` and `bookingStatus`
+- Only valid for guest-facing endpoints
 
 ---
 
@@ -133,7 +143,7 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 |--------|------|--------|-------------|
 | GET | `/services` | ADMIN, STAFF, GUEST | List requests — `?status=&type=&guestId=` (guests pass their own `guestId`) |
 | GET | `/services/:id` | ADMIN, STAFF | Get single request |
-| POST | `/services` | Any authenticated | Create request — notifies all staff in real-time. **For guests, `guestId`/`bookingId` are forced to the token's** (client-sent values ignored) |
+| POST | `/services` | Any authenticated | Create request — notifies all staff in real-time. **For guests, `guestId`/`bookingId` are forced to the token's** (client-sent values ignored), and the booking must be `CHECKED_IN` (403 otherwise) |
 | PATCH | `/services/:id` | ADMIN, STAFF | Update status, notes, assignedToId, priority, `estimatedCost` / `actualCost` (pricing — makes a COMPLETED ticket billable on the folio) |
 | POST | `/services/:id/rate` | GUEST | Guest rates a completed service request (`serviceRating` 1-5 + optional comment) |
 
@@ -346,7 +356,7 @@ All routes are **ADMIN-only** and accept an optional `?from=&to=` date range.
 
 | Method | Path | Access | Description |
 |--------|------|--------|-------------|
-| POST | `/ratings` | GUEST | Submit a post-stay review for a booking (one per booking) |
+| POST | `/ratings` | GUEST | Submit a review for the guest's own booking (one per booking); 403 while the booking is still `CONFIRMED` (before arrival) |
 | GET | `/ratings` | ADMIN | List all ratings with guest + booking |
 | GET | `/ratings/summary` | ADMIN | Average overall/room rating + distribution |
 | GET | `/ratings/booking/:bookingId` | Any authenticated | Get the rating for a booking (null if not yet rated) |
@@ -385,8 +395,9 @@ If `RESEND_API_KEY` or `RESEND_FORWARD_TO` is unset, the event is acknowledged w
 |--------|------|
 | 400 | Validation failure, bad dates, check-out before check-in |
 | 401 | Missing/invalid/expired JWT; bad webhook signature |
-| 403 | Valid JWT but insufficient role |
-| 404 | Resource not found (silenced in frontend toast); guest-portal login for a booking that isn't `CHECKED_IN` |
+| 403 | Valid JWT but insufficient role; a guest service request or rating before check-in |
+| 404 | Resource not found (silenced in frontend toast); guest sign-in with no current or upcoming stay |
+| 429 | Too many sign-in attempts from one IP (see [rate limits](#authentication)) |
 | 409 | Double booking conflict; folio already exists for the booking; unique number allocation exhausted after retries |
 | 500 | Unexpected server error |
 

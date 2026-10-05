@@ -42,12 +42,14 @@ apps/api/
 │   └── modules/
 │       ├── auth/
 │       │   ├── auth.module.ts          # Registers JwtAuthGuard + RolesGuard as APP_GUARD (global);
-│       │   │                           #   JwtModule is global so the WS gateway can verify handshake tokens
-│       │   ├── auth.controller.ts      # /auth/google, /apple, /guest-portal, /refresh, /me, /logout
-│       │   ├── auth.service.ts         # JWT signing, Google/Apple sign-in, guest portal access
+│       │   │                           #   JwtModule is global so the WS gateway can verify handshake tokens;
+│       │   │                           #   ThrottlerModule (sign-in rate limits, in memory)
+│       │   ├── auth.controller.ts      # /auth/google, /apple, /guest-portal, /guest/google, /guest/me, /refresh, /me, /logout
+│       │   │                           #   (ThrottlerGuard on the sign-in routes only)
+│       │   ├── auth.service.ts         # JWT signing, Google/Apple staff sign-in, guest sign-in (booking # or Google)
 │       │   ├── oauth-verifier.service.ts # Verifies Google/Apple ID tokens (JWKS, issuer, audience)
 │       │   ├── strategies/
-│       │   │   └── jwt.strategy.ts     # Validates JWT, looks up user in DB
+│       │   │   └── jwt.strategy.ts     # Validates JWT, looks up user in DB (guest tokens: the booking + its guest)
 │       │   ├── guards/
 │       │   │   ├── jwt-auth.guard.ts
 │       │   │   └── roles.guard.ts      # Allows through if no @Roles decorator
@@ -56,8 +58,7 @@ apps/api/
 │       │   │   ├── current-user.decorator.ts
 │       │   │   └── public.decorator.ts
 │       │   └── dto/
-│       │       ├── register.dto.ts
-│       │       ├── login.dto.ts
+│       │       ├── oauth-login.dto.ts  # { idToken } — staff Google/Apple and guest Google sign-in
 │       │       └── guest-portal.dto.ts
 │       │
 │       ├── users/
@@ -219,7 +220,13 @@ apps/web/src/
 │   ├── ComingSoonPage.tsx          # Placeholder for unbuilt phases
 │   │
 │   ├── auth/
-│   │   └── LoginPage.tsx           # Staff + admin login
+│   │   ├── LoginPage.tsx           # The only sign-in page: Guest | Staff switch (?as=), CSS 3D card,
+│   │   │                           #   one shared Google button (mode read at click time), Apple on Staff only
+│   │   └── login/
+│   │       ├── ModeSwitch.tsx      # Segmented Guest | Staff tabs (arrow keys)
+│   │       ├── GuestForm.tsx       # Booking number + last name
+│   │       ├── ShowcasePanel.tsx   # Photo panel + glass caption: per-mode feature highlights, 6s autoplay
+│   │       └── useTilt.ts          # Pointer tilt via CSS variables (rAF, no re-renders) + useMediaQuery
 │   │
 │   ├── admin/
 │   │   ├── DashboardPage.tsx       # Live stats (rooms, check-ins, recent bookings)
@@ -245,8 +252,7 @@ apps/web/src/
 │   │   └── GuestsPage.tsx          # Guest list with inline edit + booking history
 │   │
 │   └── guest/
-│       ├── GuestPortalPage.tsx     # Login via booking number + last name
-│       ├── GuestHomePage.tsx       # Quick-action hub
+│       ├── GuestHomePage.tsx       # Quick-action hub; pre-arrival view ("Your upcoming stay") while CONFIRMED
 │       ├── ServiceRequestPage.tsx  # Submit + track service requests (Services tab)
 │       └── BillPage.tsx            # Phase 4 — read-only bill (appears once staff issue it) + inline Stripe Elements payment
 │
@@ -257,8 +263,7 @@ apps/web/src/
 │   ├── layouts/
 │   │   ├── AdminLayout.tsx         # Sidebar + notification header
 │   │   ├── StaffLayout.tsx         # Sidebar + notification header
-│   │   ├── GuestLayout.tsx         # Tab navigation
-│   │   ├── AuthBackground.tsx      # Animated backdrop for the login screen
+│   │   ├── GuestLayout.tsx         # Tab navigation (Services hidden before arrival)
 │   │   └── Sidebar.tsx
 │   ├── routing/
 │   │   └── ProtectedRoute.tsx      # Role-based route guard
@@ -266,13 +271,16 @@ apps/web/src/
 │       └── NotificationDropdown.tsx
 │
 ├── contexts/
-│   ├── AuthContext.tsx             # login, guestLogin, logout, user state
-│   │                               # Boot: guests restore from localStorage.guestUser (not /auth/me)
+│   ├── AuthContext.tsx             # login, guestLogin, guestGoogleLogin, logout, user state
+│   │                               # Boot: guests restore from localStorage.guestUser, then refresh via /auth/guest/me
 │   ├── SocketContext.tsx           # Socket.IO connection for any logged-in user (server puts guests in no rooms)
 │   └── NotificationContext.tsx    # Fetch + real-time notifications (skipped for guests)
 │
 └── lib/
     ├── api.ts                      # Axios instance — auto-attaches JWT, silent refresh, toast errors
+    │                               #   (sign-in calls skip refresh/toast so LoginPage shows errors inline)
+    ├── oauth.ts                    # Google Identity Services button + Sign in with Apple popup
+    ├── roleHome.ts                 # ROLE_HOME — landing route per role (guest → /guest/home)
     ├── rooms.ts                    # roomNumbersLabel() — "#201, #202 +1" for multi-room bookings
     └── socket.ts                   # Socket.IO client factory — token re-read per connect, re-arms after auth rejection
 ```
@@ -307,7 +315,7 @@ packages/shared/src/
 ```
 apps/guest/
 ├── index.html                      # The whole page: markup, styles, SEO/schema/GA, importmap (three@0.160 from unpkg).
-│                                   #   Login link → https://app.cestlastay.com/guest-portal; stay@cestlastay.com in contact + footer
+│                                   #   Login link → https://app.cestlastay.com/login?as=guest; stay@cestlastay.com in contact + footer
 ├── public/
 │   ├── site.js                     # Interactivity: booking modal → POST /bookings/public, availability → GET /rooms/availability,
 │   │                               #   live stay prices ← GET /rooms/categories, newsletter → POST /crm/subscribe.

@@ -51,8 +51,9 @@ export function bookingConfirmationTemplate(d: BookingEmailData) {
       <tr><td style="padding:6px 0; color:#6b7280;">Check-out</td><td style="padding:6px 0;">${format(new Date(d.checkOutDate), 'EEE, dd MMM yyyy')}</td></tr>
       <tr><td style="padding:6px 0; color:#6b7280;">Total</td><td style="padding:6px 0;"><strong>$${Number(d.totalAmount).toFixed(2)}</strong></td></tr>
     </table>
-    <p>Access your guest portal to view your bill, request services, or check out:</p>
+    <p>Access your guest portal to see your booking now, and to view your bill and request services during your stay:</p>
     <p><a href="${d.portalUrl}" style="display:inline-block; background:#1e40af; color:#fff; text-decoration:none; padding:10px 18px; border-radius:6px; font-weight:500;">Open guest portal</a></p>
+    <p style="font-size:13px; color:#6b7280;">Sign in with Google using this email address, or with your booking number and last name.</p>
     <p style="margin-top:24px;">We look forward to hosting you.</p>
   `);
   return { subject, html };
@@ -67,8 +68,9 @@ export function checkInReminderTemplate(d: BookingEmailData) {
       <tr><td style="padding:6px 0; color:#6b7280;">Booking #</td><td style="padding:6px 0; font-family:monospace;"><strong>${d.bookingNumber}</strong></td></tr>
       <tr><td style="padding:6px 0; color:#6b7280;">Room</td><td style="padding:6px 0;">${d.roomCategory} (#${d.roomNumber})</td></tr>
     </table>
-    <p>Need anything before you arrive? Use the guest portal to message us.</p>
+    <p>Need anything before you arrive? Write to us at <a href="mailto:stay@cestlastay.com" style="color:#1e40af;">stay@cestlastay.com</a>.</p>
     <p><a href="${d.portalUrl}" style="display:inline-block; background:#1e40af; color:#fff; text-decoration:none; padding:10px 18px; border-radius:6px; font-weight:500;">Open guest portal</a></p>
+    <p style="font-size:13px; color:#6b7280;">Sign in with Google using this email address, or with your booking number and last name.</p>
   `);
   return { subject, html };
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -19,9 +20,16 @@ export class RatingsController {
   /** Guest submits a stay + room rating for their booking */
   @Post()
   @Roles(UserRole.GUEST)
-  create(@CurrentUser() user: any, @Body() dto: CreateRatingDto) {
-    // For guests, user.sub is guestId (not userId) per the auth strategy
-    return this.service.create(user.sub, dto);
+  create(
+    @CurrentUser() user: { guest?: { id: string }; bookingStatus?: string },
+    @Body() dto: CreateRatingDto,
+  ) {
+    if (!user.guest?.id) throw new ForbiddenException();
+    if (user.bookingStatus === 'CONFIRMED') {
+      throw new ForbiddenException('You can rate your stay once it has started');
+    }
+    // The guest principal from JwtStrategy carries the guests-table ID in guest.id
+    return this.service.create(user.guest.id, dto);
   }
 
   /** Admin: list all ratings with pagination */

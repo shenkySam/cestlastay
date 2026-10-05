@@ -32,7 +32,7 @@ The check mirrors `JwtStrategy.validate()` so socket access matches HTTP access:
 1. The token is read from `handshake.auth.token` (a leading `Bearer ` is stripped), then the `Authorization: Bearer …` header, then `?token=` in the query string.
 2. It is verified with `JWT_SECRET`. If `JWT_SECRET` is unset, the gateway logs an error at startup and every handshake is rejected.
 3. **Staff/admin tokens:** `sub` must be an existing user with `status = ACTIVE`.
-4. **Guest-portal tokens** (`role: GUEST`): must carry a `bookingId`, and `sub` must be an existing guest.
+4. **Guest tokens** (`role: GUEST`): must carry a `bookingId`, and that booking must belong to the guest in `sub`.
 
 On connect, ADMIN and STAFF sockets automatically join two rooms: `staff` (hotel-wide events) and `user:<userId>` (their own notifications). **Guest sockets join no rooms**: their `sub` is a guestId, so `user:<id>` would be the wrong room, and hotel-wide events are staff business. A guest can connect but receives nothing.
 

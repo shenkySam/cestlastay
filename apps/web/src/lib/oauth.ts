@@ -1,6 +1,7 @@
 // Browser side of Google / Apple sign-in. Each provider's SDK runs the consent
 // popup and hands back an ID token (JWT); the API verifies it at
-// POST /auth/google or /auth/apple and returns our own access/refresh tokens.
+// POST /auth/google or /auth/apple (staff, returns access/refresh tokens) or
+// POST /auth/guest/google (guests, returns a booking-scoped guest token).
 
 export type OAuthProvider = 'google' | 'apple';
 
@@ -59,8 +60,11 @@ function loadScript(src: string): Promise<void> {
 }
 
 /**
- * Renders Google's own "Sign in with Google" button into `parent` (Google
+ * Renders Google's own "Continue with Google" button into `parent` (Google
  * requires its button, served in an iframe). `onCredential` gets the ID token.
+ * GIS keeps one global callback, so render a single button per page and decide
+ * what to do with the token inside `onCredential`. The width is read from
+ * `parent.clientWidth` once, so `parent` must be laid out (not display:none).
  */
 export async function renderGoogleButton(
   parent: HTMLElement,
@@ -79,8 +83,8 @@ export async function renderGoogleButton(
     type: 'standard',
     theme: 'outline',
     size: 'large',
-    text: 'signin_with',
-    shape: 'pill',
+    text: 'continue_with',
+    shape: 'rectangular',
     logo_alignment: 'center',
     // Google caps the button at 400px; it can't be sized with CSS
     width: Math.min(400, Math.max(200, parent.clientWidth)),

@@ -19,6 +19,7 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 | Multi-room bookings | `booking_rooms` join table, `roomIds[]` in staff wizard + OTA entry | ✅ Merged (PR #28) |
 | Security/concurrency P0s | WS handshake auth + staff-scoped broadcasts; retry on BKG/INV number collisions; guest portal CHECKED_IN-only | ✅ Merged (PR #30, #31) |
 | Inbound email | `stay@cestlastay.com` → team inboxes via Resend webhook; BIMI logo | ✅ Merged (PR #32–#34) |
+| Unified login | One `/login` for guests + staff (Guest \| Staff switch, CSS 3D card), guest Google sign-in, pre-arrival guest portal, sign-in rate limits | 🚧 `feat/unified-login` |
 
 ---
 
@@ -138,7 +139,7 @@ Sign-in is **Google / Apple only** (no passwords), matched by email — seed wit
 | Staff (Front Desk) | staff@hotel.com | employeeId: EMP001 |
 | Staff (Housekeeping) | housekeeping@hotel.com | employeeId: EMP002 |
 | System | system@hotel.com | `createdById` for public/online bookings (`POST /bookings/public`); can never sign in |
-| Guest | guest@hotel.com | Sample guest profile (portal login uses booking # + last name) |
+| Guest | guest@hotel.com | Sample guest profile (guest sign-in: Google with the booking email, or booking # + last name) |
 
 | Room # | Category | Floor | Status |
 |--------|----------|-------|--------|
@@ -151,7 +152,7 @@ Sign-in is **Google / Apple only** (no passwords), matched by email — seed wit
 | 302 | Executive Suite ($300) | 3 | MAINTENANCE |
 
 **Sample booking:** `BKG-20260501-0001` — Guest: John Smith, Room 201, May 1–5 2026, status CONFIRMED
-**Guest Portal test:** bookingNumber=`BKG-20260501-0001`, lastName=`Smith`
+**Guest sign-in test:** bookingNumber=`BKG-20260501-0001`, lastName=`Smith` — the seed booking's dates are past, so check it in (or make a future booking with `POST /bookings/public`) first
 
 ---
 
@@ -162,8 +163,9 @@ Sign-in is **Google / Apple only** (no passwords), matched by email — seed wit
 React Router v6 nested routes with `Outlet`.
 
 ```
-/login              → LoginPage (public)
-/guest-portal       → GuestPortalPage (public — booking number + last name)
+/login              → LoginPage (public) — Guest | Staff switch via ?as=guest|staff
+                      (else last mode used on this device, else guest)
+/guest-portal       → redirect to /login?as=guest (old links in emails / bookmarks)
 
 /admin              → ProtectedRoute(ADMIN) → AdminLayout
   /admin/           → AdminDashboardPage ✅
@@ -216,12 +218,14 @@ if (isRole(UserRole.ADMIN)) { ... }
 
 ### Guest auth — important differences
 
-- Guests use `guestLogin(bookingNumber, lastName)` → `POST /auth/guest-portal`
-- Login only works while the booking is **`CHECKED_IN`**. Before check-in or after check-out the API returns 404 `Booking not found or not checked in yet`. The seed's sample booking is `CONFIRMED`, so check it in first to test the portal
+- Guests sign in on `/login` (Guest side) with `guestLogin(bookingNumber, lastName)` → `POST /auth/guest-portal`, or `guestGoogleLogin(idToken)` → `POST /auth/guest/google` (booking matched by the verified Google email). Apple is staff-only
+- Sign-in works for an **active stay**: `CHECKED_IN`, or `CONFIRMED` with check-out today or later. Otherwise 404
+- Pre-arrival (`user.booking.status === 'CONFIRMED'`): guest home shows "Your upcoming stay", the Services tab and "Rate your stay" are hidden, and the API refuses service requests and ratings (403)
 - Gets a 24h token, no refresh token
 - Token has `sub = guestId` (not a userId) — `GET /auth/me` does NOT work for guests
-- On boot, guest session is restored from `localStorage.guestUser` (set at login), NOT from `/auth/me`
-- On logout, redirects to `/guest-portal` not `/login`
+- On boot, guest session is restored from `localStorage.guestUser` (set at login), then refreshed from `GET /auth/guest/me` (picks up check-in)
+- On logout, redirects to `/login?as=guest` (staff: `/login?as=staff`)
+- The login page renders **one** Google button for both modes (GIS keeps a single global callback); the callback reads the current mode
 - `NotificationContext` skips all API calls for guests (`user.role === GUEST`)
 
 ### Staff assignment dropdowns (services + housekeeping)

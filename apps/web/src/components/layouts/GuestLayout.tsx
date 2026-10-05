@@ -10,6 +10,9 @@ const NAV = [
 
 export function GuestLayout() {
   const { user, logout } = useAuth();
+  // Before arrival there's nothing to request yet — hide the Services tab
+  const preArrival = user?.booking?.status === 'CONFIRMED';
+  const nav = preArrival ? NAV.filter((item) => item.href !== '/guest/services') : NAV;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -34,7 +37,7 @@ export function GuestLayout() {
       {/* Bottom nav for mobile / top tab bar for desktop */}
       <nav className="bg-white border-b border-gray-200 px-4">
         <div className="max-w-2xl mx-auto flex gap-1">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <NavLink
               key={item.href}
               to={item.href}

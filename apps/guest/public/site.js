@@ -289,11 +289,11 @@
     });
   }
 
-  // Login link points at the cestlastay guest portal (prod URL in the HTML);
+  // Login link opens guest sign-in on the cestlastay app (prod URL in the HTML);
   // swap to the local portal origin during dev, matching the API base split above.
   if (isLocal) {
     const login = $('[data-login]');
-    if (login) login.setAttribute('href', 'http://localhost:5173/guest-portal');
+    if (login) login.setAttribute('href', 'http://localhost:5173/login?as=guest');
   }
 
   loadCategories();

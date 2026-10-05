@@ -27,9 +27,10 @@ api.interceptors.response.use(
   async (error) => {
     const original = error.config;
 
-    // Sign-in calls: LoginPage shows the error inline. A 401 here means "no
-    // such account", not an expired session — don't refresh/redirect or toast.
-    if (/^\/auth\/(google|apple)$/.test(original?.url ?? '')) {
+    // Sign-in calls: LoginPage shows the error inline (including 429 "too many
+    // attempts"). A 401/404 here means "no such account / booking", not an
+    // expired session — don't refresh/redirect or toast.
+    if (/^\/auth\/(google|apple|guest-portal|guest\/google)$/.test(original?.url ?? '')) {
       return Promise.reject(error);
     }
 
