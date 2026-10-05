@@ -289,7 +289,7 @@
     });
   }
 
-  // Login link points at the Hotel-Manager guest portal (prod URL in the HTML);
+  // Login link points at the cestlastay guest portal (prod URL in the HTML);
   // swap to the local portal origin during dev, matching the API base split above.
   if (isLocal) {
     const login = $('[data-login]');

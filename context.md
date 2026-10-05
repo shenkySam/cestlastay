@@ -25,7 +25,7 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 ## Monorepo Structure
 
 ```
-Hotel-Manager/
+cestlastay/
 ├── apps/
 │   ├── api/          # NestJS backend — port 3000 (REST + Socket.IO)
 │   ├── web/          # React + Vite admin/staff/guest portal — port 5173

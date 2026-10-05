@@ -3,15 +3,47 @@
 **/.claude/
 
 # Dependencies
-node_modules/
+node_modules
+.pnpm-store
 
-# Build output
-dist/
-build/
+# Build outputs
+dist
+build
+.next
+out
 
-# Env
+# Environment variables
 .env
 .env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Prisma
+prisma/migrations/*/migration.sql
+
+# Test coverage
+coverage
+
+# Turbo cache
+.turbo
+
+# Local scratch backups (pre-redesign copies)
+_old*
 
 # Scratch / working notes
+fault-audit-*.md
 marketing-*.md

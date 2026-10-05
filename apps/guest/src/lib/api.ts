@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /**
- * Axios instance for the (future) public endpoints on the Hotel-Manager API.
+ * Axios instance for the (future) public endpoints on the cestlastay API.
  * Mirrors the internal app's client shape, minus the JWT/refresh interceptors —
  * the landing page only ever calls public, unauthenticated routes.
  *

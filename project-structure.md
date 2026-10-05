@@ -7,7 +7,7 @@ Actual folder hierarchy as built. Only files that exist are listed.
 ## Root
 
 ```
-Hotel-Manager/
+cestlastay/
 ├── apps/
 │   ├── api/              # NestJS backend — port 3000 (REST + Socket.IO)
 │   ├── web/              # React + Vite admin/staff/guest portal — port 5173

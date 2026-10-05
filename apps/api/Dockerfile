@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 # ----------------------------------------------------------------------------
-# Hotel-Manager API (NestJS) — built from the pnpm workspace ROOT.
-# The build context must be the workspace root (Hotel-Manager/), because the
-# API depends on packages/shared via `workspace:*`. On Railway: set the service
-# Root Directory = "Hotel-Manager" so this Dockerfile (apps/api/Dockerfile) and
+# cestlastay API (NestJS) — built from the pnpm workspace ROOT.
+# The build context must be the workspace root (the repo root), because the
+# API depends on packages/shared via `workspace:*`. On Railway: leave the
+# service Root Directory empty so this Dockerfile (apps/api/Dockerfile) and
 # railway.json are found and the context is the whole workspace.
 # ----------------------------------------------------------------------------
 FROM node:20-slim AS base
