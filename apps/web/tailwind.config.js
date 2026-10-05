@@ -7,6 +7,9 @@ export default {
         // Caveat (handwriting) — brand/display font for titles & headings only.
         // Body text keeps Tailwind's default sans-serif.
         display: ['Caveat', 'ui-sans-serif', 'system-ui', 'cursive'],
+        // "Earthen" guest-site type, used on the sign-in page to match apps/guest
+        cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+        jost: ['Jost', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         // Ocean — primary brand (the logo's waves).
@@ -64,13 +67,11 @@ export default {
           800: '#5c3e24',
           900: '#4e3621',
         },
-      },
-      keyframes: {
-        authfade: { '0%, 40%': { opacity: '0' }, '60%, 100%': { opacity: '1' } },
-      },
-      animation: {
-        // long, gentle, ping-pong crossfade between the two login photos
-        authfade: 'authfade 9s ease-in-out infinite alternate',
+        // Earthen — the guest site's palette, used on the sign-in page.
+        cream: '#f4efe5',
+        ink: '#3a2a1f',
+        clay: { DEFAULT: '#b1542e', dark: '#8a3f20' },
+        gold: '#c9a23a',
       },
     },
   },

@@ -77,15 +77,15 @@ export class NotificationsGateway
       secret: this.config.get<string>('JWT_SECRET'),
     });
 
-    // Guest portal tokens carry sub = guestId (guests table), not a userId.
+    // Guest tokens carry sub = guestId (guests table), scoped to one booking.
     if (payload.role === 'GUEST') {
       if (!payload.bookingId) throw new Error('guest token without bookingId');
-      const guest = await this.prisma.guest.findUnique({
-        where: { id: payload.sub },
-        select: { id: true },
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: payload.bookingId },
+        select: { guestId: true },
       });
-      if (!guest) throw new Error('unknown guest');
-      return { id: guest.id, role: 'GUEST', isStaff: false, bookingId: payload.bookingId };
+      if (!booking || booking.guestId !== payload.sub) throw new Error('unknown guest booking');
+      return { id: booking.guestId, role: 'GUEST', isStaff: false, bookingId: payload.bookingId };
     }
 
     const user = await this.prisma.user.findUnique({

@@ -8,9 +8,8 @@ import { StaffLayout } from '@/components/layouts/StaffLayout';
 import { GuestLayout } from '@/components/layouts/GuestLayout';
 import { UserRole } from '@shared/index';
 
-// Auth & Guest portal
+// Sign-in (guests and staff)
 import LoginPage from '@/pages/auth/LoginPage';
-import GuestPortalPage from '@/pages/guest/GuestPortalPage';
 
 // Admin pages
 import AdminDashboardPage from '@/pages/admin/DashboardPage';
@@ -48,7 +47,8 @@ export default function App() {
             <Routes>
               {/* Public */}
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/guest-portal" element={<GuestPortalPage />} />
+              {/* Old guest sign-in URL — still in sent emails and bookmarks */}
+              <Route path="/guest-portal" element={<Navigate to="/login?as=guest" replace />} />
 
               {/* Admin routes */}
               <Route

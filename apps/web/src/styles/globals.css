@@ -18,7 +18,7 @@
 }
 
 @layer components {
-  /* Tropical sunset hero — shared by the auth/guest entry screens.
+  /* Tropical sunset hero — the guest portal header.
      Deep orange at top-left (where white headings sit) → amber glow bottom-right.
      Tune these stops to dial the sunset warmer/deeper. */
   .bg-sunset {
@@ -62,46 +62,6 @@
     @apply bg-white rounded-xl shadow-sm border border-gray-200;
   }
 
-  /* Frosted-glass variants — used on the auth screens over the photo background. */
-  .card-glass {
-    @apply rounded-2xl border border-white/20 bg-white/10 backdrop-blur-xl shadow-2xl;
-  }
-
-  .input-glass {
-    @apply block w-full px-3 py-2 rounded-lg text-sm text-white bg-white/10
-           border border-white/25 placeholder-white/50
-           focus:outline-none focus:ring-2 focus:ring-white/60 focus:border-white/60 transition-colors;
-  }
-
-  /* ── Login screen — "earthen luxury" guest-site theme (scoped to LoginPage) ──
-     Warm cream/clay palette + Cormorant Garamond headings + Jost UI to match
-     apps/guest. Kept as dedicated classes so the shared auth/guest-portal glass
-     styles above stay untouched. */
-  .login-card {
-    @apply relative rounded-3xl border border-white/40 bg-white/20 backdrop-blur-xl shadow-2xl;
-  }
-  /* Top-edge glass shine */
-  .login-card::before {
-    content: '';
-    @apply pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-3xl;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0));
-  }
-
-  .login-input {
-    @apply block w-full px-4 py-3 rounded-2xl text-sm text-[#3a2a1f] bg-white/25
-           border border-white/40 placeholder-[#3a2a1f]/40 backdrop-blur-sm
-           transition-colors focus:outline-none focus:bg-white/90
-           focus:border-[#b1542e] focus:ring-2 focus:ring-[#b1542e]/40;
-  }
-
-  .login-btn {
-    @apply inline-flex items-center justify-center rounded-full bg-[#b1542e] px-6
-           text-sm font-medium tracking-wide text-white shadow-md transition-all
-           hover:-translate-y-0.5 hover:bg-[#8a3f20] hover:shadow-lg active:translate-y-0
-           focus:outline-none focus:ring-2 focus:ring-[#b1542e]/50 focus:ring-offset-2
-           disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
@@ -112,4 +72,372 @@
   .badge-blue   { @apply badge bg-blue-100 text-blue-800; }
   .badge-gray   { @apply badge bg-gray-100 text-gray-800; }
   .badge-purple { @apply badge bg-purple-100 text-purple-800; }
+}
+
+/* ── Sign-in page (/login) — CSS 3D, "earthen" guest-site palette ──────────
+   Layer order: backdrop (perspective grid floor + orbs)
+     → .login-fade (entrance opacity) → .login-rise (entrance transform)
+     → .login-card (perspective + pointer tilt, root of the 3D context)
+     → .login-slab (thickness) + .login-card__body (form | showcase).
+   useTilt writes --rx/--ry (degrees, unitless), --mx/--my (pointer position)
+   and --sheen on .login-card, outside React renders.
+   Rules that keep the 3D intact:
+   - overflow:hidden, opacity<1, filter and backdrop-filter flatten
+     preserve-3d, so they only go on leaves (.login-photo, .login-caption) or
+     on wrappers outside the 3D chain (.login-fade).
+   - The page must look finished with every variable at its default — rAF
+     doesn't run in hidden tabs.
+   - Never display:none the Google button: GIS sizes it from clientWidth.
+   - Hit-testing: with perspective inherited from an ancestor, or with the form
+     coplanar with the card, Chrome mis-targets clicks once the card tilts.
+     So the perspective lives in the card's own transform and the form column
+     sits 0.5px in front of the body. */
+
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background-color: theme('colors.cream');
+  color: theme('colors.ink');
+}
+
+.login-backdrop {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 45% at 50% 46%, theme('colors.gold / 14%'), transparent 70%);
+}
+
+/* Floor plane receding to a horizon just below the middle of the screen */
+.login-floor {
+  position: absolute;
+  inset: 0;
+  perspective: 700px;
+  perspective-origin: 50% 46%;
+}
+.login-floor__plane {
+  position: absolute;
+  top: 46%;
+  left: -60%;
+  right: -60%;
+  height: 70%;
+  transform-origin: 50% 0;
+  transform: rotateX(62deg);
+  background-image:
+    linear-gradient(to right, theme('colors.ink / 12%') 1px, transparent 1px),
+    linear-gradient(to bottom, theme('colors.ink / 12%') 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: center 0;
+  -webkit-mask-image: radial-gradient(ellipse 50% 100% at 50% 100%, #000 20%, transparent 72%);
+  mask-image: radial-gradient(ellipse 50% 100% at 50% 100%, #000 20%, transparent 72%);
+  animation: login-grid-drift 5s linear infinite;
+}
+
+.login-orb {
+  position: absolute;
+  width: 46vmax;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  filter: blur(24px);
+  animation: login-orb-float 22s ease-in-out infinite alternate;
+}
+.login-orb--clay {
+  top: -18vmax;
+  left: -14vmax;
+  background: radial-gradient(circle, theme('colors.clay.DEFAULT / 34%'), transparent 62%);
+}
+.login-orb--gold {
+  right: -16vmax;
+  bottom: -22vmax;
+  background: radial-gradient(circle, theme('colors.gold / 38%'), transparent 62%);
+  animation-duration: 27s;
+  animation-delay: -8s;
+}
+.login-orb--ember {
+  top: 8%;
+  right: 12%;
+  width: 26vmax;
+  background: radial-gradient(circle, theme('colors.clay.dark / 22%'), transparent 62%);
+  animation-duration: 31s;
+  animation-delay: -15s;
+}
+
+.login-fade {
+  position: relative;
+  animation: login-fade 0.7s ease-out both;
+}
+
+.login-stage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.login-rise {
+  width: min(1080px, 100%);
+  /* backwards: no transform is left behind once the entrance has finished */
+  animation: login-rise 0.9s cubic-bezier(0.2, 0.75, 0.25, 1) backwards;
+}
+
+.login-card {
+  --rx: 0;
+  --ry: 0;
+  --mx: 50%;
+  --my: 0%;
+  --sheen: 0;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: perspective(1600px) rotateX(calc(var(--rx) * 1deg)) rotateY(calc(var(--ry) * 1deg));
+  transition: transform 0.35s cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+/* Second layer behind the card: shows as an edge (thickness) when it tilts */
+.login-slab {
+  display: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  transform: translateZ(-24px);
+  background: linear-gradient(160deg, theme('colors.sand.200'), theme('colors.sand.400'));
+  box-shadow: 0 50px 90px -30px theme('colors.ink / 55%');
+}
+
+.login-card__body {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: 24px;
+  background-color: theme('colors.sand.50');
+  border: 1px solid theme('colors.ink / 8%');
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 30px 60px -28px theme('colors.ink / 45%');
+  transform-style: preserve-3d;
+}
+
+/* Specular highlight that follows the pointer (invisible at rest). It sits
+   between the body (z 0) and the form (z 0.5px) so it never washes out text. */
+.login-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transform: translateZ(0.25px);
+  background: radial-gradient(560px circle at var(--mx) var(--my), rgb(255 255 255 / 0.7), transparent 42%);
+  opacity: var(--sheen);
+  transition: opacity 0.5s ease;
+}
+
+/* Left column: the flipper inherits this perspective. translateZ keeps it off
+   the card's plane so clicks still land on the form while the card tilts. */
+.login-form {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px 20px;
+  perspective: 1400px;
+  transform: translateZ(0.5px);
+}
+
+.login-flipper {
+  display: grid;
+  transform-style: preserve-3d;
+  transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+}
+.login-flipper[data-side='staff'] {
+  transform: rotateY(180deg);
+}
+/* Both faces share one grid cell, so the flipper is as tall as the taller face */
+.login-face {
+  grid-area: 1 / 1;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.login-face--staff {
+  transform: rotateY(180deg);
+}
+
+/* Right column (a banner above the form on small screens) */
+.login-showcase {
+  position: relative;
+  order: -1;
+  height: 180px;
+  margin: 10px 10px 0;
+}
+.login-photo {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Own stacking context: the slide / scrim z-indexes stay under the caption */
+  isolation: isolate;
+  border-radius: 16px;
+  background-color: theme('colors.ink');
+  box-shadow: 0 28px 50px -24px theme('colors.ink / 60%');
+}
+/* Bottom scrim so the caption reads on any photo */
+.login-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(to top, theme('colors.ink / 55%'), transparent 55%);
+}
+/* Photo moves against the tilt (parallax); the inset leaves room to move */
+.login-photo__layer {
+  position: absolute;
+  inset: -3%;
+  transform: translate3d(calc(var(--ry) * -1.5px), calc(var(--rx) * 1.5px), 0);
+  transition: transform 0.35s cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+.login-photo__sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx) var(--my), rgb(255 255 255 / 0.22), transparent 50%);
+  opacity: var(--sheen);
+  transition: opacity 0.5s ease;
+}
+.login-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+.login-slide.is-previous {
+  opacity: 1;
+}
+.login-slide.is-current {
+  z-index: 1;
+  animation: login-fade 0.8s ease both;
+}
+.login-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.login-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  color: theme('colors.cream');
+  background-color: theme('colors.ink / 40%');
+  border: 1px solid rgb(255 255 255 / 0.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  backdrop-filter: blur(12px) saturate(1.2);
+}
+.login-caption__text {
+  animation: login-caption-in 0.6s cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@media (min-width: 640px) {
+  .login-stage {
+    padding: 40px 24px;
+  }
+  .login-form {
+    padding: 32px 40px 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .login-slab {
+    display: block;
+  }
+  .login-card__body {
+    grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+    min-height: 640px;
+    padding: 14px;
+    border-radius: 28px;
+  }
+  .login-form {
+    padding: 26px 40px 10px 34px;
+  }
+  /* At 50px in front, perspective projects the panel ~10px taller at top and
+     bottom and ~18px further right (it's right of the card's centre); these
+     margins keep an even frame around it when the card is at rest. */
+  .login-showcase {
+    order: 0;
+    height: auto;
+    margin: 10px 18px 10px 0;
+    transform: translateZ(50px);
+    transform-style: preserve-3d;
+  }
+  .login-photo {
+    border-radius: 20px;
+  }
+  /* 50px (panel) + 40px = 90px in front of the card */
+  .login-caption {
+    left: 28px;
+    right: 28px;
+    bottom: 28px;
+    padding: 20px 22px 16px;
+    border-radius: 18px;
+    transform: translateZ(40px);
+    box-shadow: 0 24px 40px -20px rgb(0 0 0 / 0.45);
+  }
+}
+
+/* Reduced motion or a touch-only pointer: no drift, no tilt, no rise;
+   the flip becomes a crossfade. (useTilt and autoplay also check this.) */
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .login-floor__plane,
+  .login-orb,
+  .login-rise,
+  .login-slide.is-current,
+  .login-caption__text {
+    animation: none;
+  }
+  .login-slide.is-current {
+    opacity: 1;
+  }
+  .login-card,
+  .login-photo__layer {
+    transform: none;
+    transition: none;
+  }
+  .login-flipper,
+  .login-flipper[data-side='staff'],
+  .login-face--staff {
+    transform: none;
+    transition: none;
+  }
+  .login-face {
+    -webkit-backface-visibility: visible;
+    backface-visibility: visible;
+    transition: opacity 0.25s ease, visibility 0.25s;
+  }
+  .login-flipper[data-side='guest'] .login-face--staff,
+  .login-flipper[data-side='staff'] .login-face--guest {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+@keyframes login-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes login-rise {
+  from { transform: perspective(1600px) translateZ(-120px) rotateX(12deg); }
+  to { transform: perspective(1600px) translateZ(0) rotateX(0deg); }
+}
+@keyframes login-grid-drift {
+  from { background-position: center 0; }
+  to { background-position: center 56px; }
+}
+@keyframes login-orb-float {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(4vmax, 3vmax, 0) scale(1.08); }
+}
+@keyframes login-caption-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }

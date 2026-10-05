@@ -1,6 +1,8 @@
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
+import { startOfToday } from 'date-fns';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SYSTEM_USER_EMAIL } from '../../common/system-user';
 import { GuestPortalDto } from './dto/guest-portal.dto';
@@ -20,6 +22,29 @@ const LOGIN_USER_SELECT = {
   staff: { select: { id: true, employeeId: true } },
   guest: { select: { id: true } },
 } as const;
+
+/** Booking fields the guest pages render (summary, rooms, dates, status). */
+const GUEST_BOOKING_INCLUDE = {
+  guest: { select: { id: true, firstName: true, lastName: true, email: true } },
+  rooms: {
+    include: {
+      room: { select: { roomNumber: true, category: { select: { name: true } } } },
+    },
+  },
+} satisfies Prisma.BookingInclude;
+
+type GuestBooking = Prisma.BookingGetPayload<{ include: typeof GUEST_BOOKING_INCLUDE }>;
+
+/**
+ * Bookings a guest may sign in to: the stay in progress, or a confirmed one
+ * that hasn't ended yet (so the guest can see it before arrival).
+ */
+const activeStay = (): Prisma.BookingWhereInput => ({
+  OR: [
+    { status: 'CHECKED_IN' },
+    { status: 'CONFIRMED', checkOutDate: { gte: startOfToday() } },
+  ],
+});
 
 @Injectable()
 export class AuthService {
@@ -93,28 +118,72 @@ export class AuthService {
       where: {
         bookingNumber: dto.bookingNumber,
         guest: { lastName: { equals: dto.lastName, mode: 'insensitive' } },
-        // Portal access only while the guest is actually staying (checked in)
-        status: 'CHECKED_IN',
+        ...activeStay(),
       },
-      include: {
-        guest: { select: { id: true, firstName: true, lastName: true, email: true } },
-        rooms: {
-          include: {
-            room: { select: { roomNumber: true, category: { select: { name: true } } } },
-          },
-        },
-      },
+      include: GUEST_BOOKING_INCLUDE,
     });
 
-    if (!booking) throw new NotFoundException('Booking not found or not checked in yet');
+    if (!booking) {
+      throw new NotFoundException(
+        'No current or upcoming stay found for that booking number and last name',
+      );
+    }
 
-    // Issue a short-lived guest portal token
-    const token = this.jwt.sign(
+    return this.issueGuestSession(booking);
+  }
+
+  /**
+   * Guest sign-in with Google: the verified Google email is matched against the
+   * email on the booking. Guest emails aren't unique (repeat guests, staff
+   * typos), so this matches bookings rather than guest records.
+   */
+  async guestGoogleLogin(idToken: string) {
+    const identity = await this.oauth.verify('google', idToken);
+    if (!identity.email || !identity.emailVerified) {
+      throw new UnauthorizedException('Your Google account has no verified email address');
+    }
+
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        guest: { email: { equals: identity.email, mode: 'insensitive' } },
+        ...activeStay(),
+      },
+      include: GUEST_BOOKING_INCLUDE,
+      orderBy: { checkInDate: 'asc' },
+    });
+
+    // Prefer the stay in progress (latest check-in), else the next arrival
+    const booking =
+      bookings.filter((b) => b.status === 'CHECKED_IN').pop() ??
+      bookings.find((b) => b.status === 'CONFIRMED');
+
+    if (!booking) {
+      throw new NotFoundException(
+        `We couldn't find a current or upcoming stay booked under ${identity.email}. ` +
+          'Try your booking number and last name.',
+      );
+    }
+
+    return this.issueGuestSession(booking);
+  }
+
+  /** Fresh booking for a signed-in guest, so the portal picks up check-in etc. */
+  async guestSession(bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: GUEST_BOOKING_INCLUDE,
+    });
+    if (!booking) throw new UnauthorizedException();
+    return { booking };
+  }
+
+  /** Short-lived guest token: sub = guestId (guests table), scoped to one booking. */
+  private issueGuestSession(booking: GuestBooking) {
+    const accessToken = this.jwt.sign(
       { sub: booking.guestId, bookingId: booking.id, role: 'GUEST' },
       { expiresIn: '24h', secret: this.config.get('JWT_SECRET') },
     );
-
-    return { accessToken: token, booking };
+    return { accessToken, booking };
   }
 
   async getMe(userId: string) {

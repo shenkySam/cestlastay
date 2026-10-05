@@ -12,6 +12,7 @@ type AuthedUser = {
   role: string;
   guest?: { id: string } | null;
   bookingId?: string;
+  bookingStatus?: string;
 };
 
 @Controller('services')
@@ -45,6 +46,10 @@ export class ServicesController {
     // Guests can only create requests for themselves and their own booking.
     if (user.role === UserRole.GUEST) {
       if (!user.guest?.id || !user.bookingId) throw new ForbiddenException();
+      // Guests can sign in before arrival, but service requests need a room.
+      if (user.bookingStatus !== 'CHECKED_IN') {
+        throw new ForbiddenException("Requests open once you've checked in");
+      }
       dto.guestId = user.guest.id;
       dto.bookingId = user.bookingId;
     }

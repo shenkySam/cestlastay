@@ -292,8 +292,11 @@ Then set `GOOGLE_CLIENT_ID` (API) and `VITE_GOOGLE_CLIENT_ID` (web) to a Google 
 Web client ID that lists `http://localhost:5173` as an authorized JavaScript origin.
 Apple sign-in can't be tested on localhost (Apple rejects it as a return URL).
 Add other staff from **Admin → Staff** using their Google/Apple email.
-> Guests do not sign in with Google/Apple — the guest portal authenticates with
-> **booking number + last name** (try `BKG-20260501-0001` / `Smith`).
+> Guests sign in on the same `/login` page (Guest side) with **Google** — matched to
+> the email on their booking — or **booking number + last name**. Apple is staff-only.
+> It works for a booking that is checked in, or confirmed and not yet over: the seed
+> booking (`BKG-20260501-0001` / `Smith`) has past dates, so check it in first or make a
+> future booking from the landing page.
 
 ### 4. View Database (Optional)
 

@@ -43,7 +43,7 @@ export class CrmService {
       checkInDate: booking.checkInDate,
       checkOutDate: booking.checkOutDate,
       totalAmount: Number(booking.totalAmount),
-      portalUrl: this.frontendUrl() + '/guest-portal',
+      portalUrl: this.frontendUrl() + '/login?as=guest',
     });
 
     return this.email.send({
@@ -71,7 +71,7 @@ export class CrmService {
       checkInDate: booking.checkInDate,
       checkOutDate: booking.checkOutDate,
       totalAmount: Number(booking.totalAmount),
-      portalUrl: this.frontendUrl() + '/guest-portal',
+      portalUrl: this.frontendUrl() + '/login?as=guest',
     });
 
     return this.email.send({

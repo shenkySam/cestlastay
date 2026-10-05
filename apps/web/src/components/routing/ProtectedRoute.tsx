@@ -1,13 +1,8 @@
 import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { UserRole } from '@shared/index';
 import { useAuth } from '@/contexts/AuthContext';
-
-const ROLE_HOME: Record<UserRole, string> = {
-  [UserRole.ADMIN]: '/admin',
-  [UserRole.STAFF]: '/staff',
-  [UserRole.GUEST]: '/guest-portal',
-};
+import { ROLE_HOME } from '@/lib/roleHome';
 
 interface Props {
   children: ReactNode;
@@ -16,6 +11,7 @@ interface Props {
 
 export function ProtectedRoute({ children, allowedRoles }: Props) {
   const { user, loading } = useAuth();
+  const { pathname } = useLocation();
 
   if (loading) {
     return (
@@ -25,7 +21,11 @@ export function ProtectedRoute({ children, allowedRoles }: Props) {
     );
   }
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    // Open the sign-in page on the matching side of the Guest / Staff switch
+    const as = pathname.startsWith('/guest') ? 'guest' : 'staff';
+    return <Navigate to={`/login?as=${as}`} replace />;
+  }
 
   if (!allowedRoles.includes(user.role)) {
     return <Navigate to={ROLE_HOME[user.role]} replace />;

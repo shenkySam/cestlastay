@@ -4,8 +4,8 @@
 const base = import.meta.env.VITE_PORTAL_URL || 'http://localhost:5173';
 
 /**
- * Customer entry point — the cestlastay Guest Portal. Customers sign in with
- * their booking number + last name; the portal also links onward to the staff
- * Google / Apple sign-in (/login).
+ * Customer entry point — guest sign-in on the cestlastay app. Guests sign in
+ * with Google (the email they booked with) or booking number + last name; the
+ * same page has a Staff side for Google / Apple staff sign-in.
  */
-export const guestPortalUrl = `${base}/guest-portal`;
+export const guestPortalUrl = `${base}/login?as=guest`;

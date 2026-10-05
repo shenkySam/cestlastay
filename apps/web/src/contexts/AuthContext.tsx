@@ -1,12 +1,64 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { IUser, UserRole } from '@shared/index';
+import { IUser, UserRole, UserStatus } from '@shared/index';
 import api from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
 import type { OAuthProvider } from '@/lib/oauth';
 
+/** Booking summary kept for a signed-in guest (rooms, dates, status). */
+export interface GuestBookingSummary {
+  id: string;
+  bookingNumber: string;
+  /** CONFIRMED before arrival, CHECKED_IN during the stay */
+  status?: string;
+  checkInDate: string;
+  checkOutDate: string;
+  rooms: { roomNumber: string; categoryName: string }[];
+}
+
 interface AuthUser extends Omit<IUser, 'createdAt' | 'updatedAt' | 'emailVerified' | 'lastLoginAt'> {
   staff?: { id: string; employeeId: string; department: string; position: string } | null;
   guest?: { id: string; loyaltyPoints: number } | null;
+  /** Guests only: the booking their token is scoped to */
+  bookingId?: string;
+  booking?: GuestBookingSummary;
+}
+
+/** Booking as returned by POST /auth/guest-portal, /auth/guest/google and GET /auth/guest/me */
+interface ApiGuestBooking {
+  id: string;
+  bookingNumber: string;
+  status: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guest: { id: string; firstName: string; lastName: string; email: string | null };
+  rooms?: { room?: { roomNumber?: string; category?: { name?: string } } }[];
+}
+
+function toGuestUser(booking: ApiGuestBooking): AuthUser {
+  return {
+    id: booking.guest.id ?? '',
+    email: booking.guest.email ?? '',
+    firstName: booking.guest.firstName,
+    lastName: booking.guest.lastName,
+    role: UserRole.GUEST,
+    status: UserStatus.ACTIVE,
+    guest: { id: booking.guest.id, loyaltyPoints: 0 },
+    staff: null,
+    // Store bookingId so BillPage can retrieve the invoice
+    bookingId: booking.id,
+    // Booking summary (rooms + dates + status) so the guest pages can render it offline
+    booking: {
+      id: booking.id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      checkInDate: booking.checkInDate,
+      checkOutDate: booking.checkOutDate,
+      rooms: (booking.rooms ?? []).map((r) => ({
+        roomNumber: r.room?.roomNumber ?? '',
+        categoryName: r.room?.category?.name ?? '',
+      })),
+    },
+  };
 }
 
 interface AuthContextValue {
@@ -16,6 +68,8 @@ interface AuthContextValue {
   /** Exchange a Google / Apple ID token for our session (there is no password login). */
   login: (provider: OAuthProvider, idToken: string) => Promise<void>;
   guestLogin: (bookingNumber: string, lastName: string) => Promise<void>;
+  /** Guest sign-in with a Google ID token, matched to a booking by email. */
+  guestGoogleLogin: (idToken: string) => Promise<void>;
   logout: () => void;
   isRole: (...roles: UserRole[]) => boolean;
 }
@@ -38,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setAccessToken(null);
     disconnectSocket();
-    window.location.href = isGuest ? '/guest-portal' : '/login';
+    window.location.href = isGuest ? '/login?as=guest' : '/login?as=staff';
   }, []);
 
   // Boot: restore session from localStorage
@@ -49,17 +103,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isGuest = localStorage.getItem('isGuest') === 'true';
 
     if (isGuest) {
-      // Guest tokens have sub=guestId (not a userId) so GET /auth/me would 401.
-      // We stored the guest user object in localStorage at login time — restore it.
+      // Guest tokens have sub=guestId (not a userId) so GET /auth/me doesn't
+      // apply. Restore the guest stored at sign-in right away, then refresh the
+      // booking (e.g. a pre-arrival guest who has since been checked in).
       const stored = localStorage.getItem('guestUser');
       if (stored) {
         try { setUser(JSON.parse(stored)); setAccessToken(token); }
         catch { logout(); }
       } else {
-        // No stored user data — can't restore session, send back to guest portal
+        // No stored user data — can't restore session, send back to sign-in
         logout();
       }
       setLoading(false);
+      if (stored) {
+        api.get('/auth/guest/me')
+          .then(({ data }) => {
+            const guestUser = toGuestUser(data.booking);
+            localStorage.setItem('guestUser', JSON.stringify(guestUser));
+            setUser(guestUser);
+          })
+          // An expired token 401s and the api client logs out; otherwise keep the stored copy
+          .catch(() => {});
+      }
       return;
     }
 
@@ -83,32 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   };
 
-  const guestLogin = async (bookingNumber: string, lastName: string) => {
-    const { data } = await api.post('/auth/guest-portal', { bookingNumber, lastName });
-    const guestUser: AuthUser = {
-      id: data.booking.guest.id ?? '',
-      email: data.booking.guest.email ?? '',
-      firstName: data.booking.guest.firstName,
-      lastName: data.booking.guest.lastName,
-      role: UserRole.GUEST,
-      status: 'ACTIVE' as const,
-      emailVerified: false,
-      guest: { id: data.booking.guest.id, loyaltyPoints: 0 },
-      staff: null,
-      // Store bookingId so BillPage can retrieve the invoice
-      bookingId: data.booking.id,
-      // Booking summary (rooms + dates) so the guest home can render it offline
-      booking: {
-        id: data.booking.id,
-        bookingNumber: data.booking.bookingNumber,
-        checkInDate: data.booking.checkInDate,
-        checkOutDate: data.booking.checkOutDate,
-        rooms: (data.booking.rooms ?? []).map((r: any) => ({
-          roomNumber: r.room?.roomNumber ?? '',
-          categoryName: r.room?.category?.name ?? '',
-        })),
-      },
-    } as AuthUser & { bookingId: string };
+  const startGuestSession = (data: { accessToken: string; booking: ApiGuestBooking }) => {
+    const guestUser = toGuestUser(data.booking);
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('isGuest', 'true');
     localStorage.setItem('guestUser', JSON.stringify(guestUser));
@@ -116,10 +157,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(guestUser);
   };
 
+  const guestLogin = async (bookingNumber: string, lastName: string) => {
+    const { data } = await api.post('/auth/guest-portal', { bookingNumber, lastName });
+    startGuestSession(data);
+  };
+
+  const guestGoogleLogin = async (idToken: string) => {
+    const { data } = await api.post('/auth/guest/google', { idToken });
+    startGuestSession(data);
+  };
+
   const isRole = (...roles: UserRole[]) => !!user && roles.includes(user.role);
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, loading, login, guestLogin, logout, isRole }}>
+    <AuthContext.Provider
+      value={{ user, accessToken, loading, login, guestLogin, guestGoogleLogin, logout, isRole }}
+    >
       {children}
     </AuthContext.Provider>
   );

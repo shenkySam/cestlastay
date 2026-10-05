@@ -26,7 +26,7 @@ Push to GitHub first (Railway & Vercel deploy from the repo).
 Required env for the public booking + newsletter to work:
 
 - **Railway (API):** `CORS_ORIGINS="https://cestlastay.com,https://www.cestlastay.com,https://app.cestlastay.com"`
-- **Vercel (guest):** nothing. The live landing does **not** read `VITE_*` vars. `public/site.js` hardcodes the API base: `http://localhost:3000/api/v1` on localhost, otherwise `https://cestlastay-production.up.railway.app/api/v1`. The prod **Login** URL (`https://app.cestlastay.com/guest-portal`) is in `index.html`, swapped to `localhost:5173` in dev. If the Railway domain changes, edit `site.js`. The `VITE_*` vars in `apps/guest/.env.example` only feed the unused React app under `apps/guest/src/`.
+- **Vercel (guest):** nothing. The live landing does **not** read `VITE_*` vars. `public/site.js` hardcodes the API base: `http://localhost:3000/api/v1` on localhost, otherwise `https://cestlastay-production.up.railway.app/api/v1`. The prod **Login** URL (`https://app.cestlastay.com/login?as=guest`) is in `index.html`, swapped to `localhost:5173` in dev. If the Railway domain changes, edit `site.js`. The `VITE_*` vars in `apps/guest/.env.example` only feed the unused React app under `apps/guest/src/`.
 
 `CORS_ORIGINS` is read at API boot — redeploy/restart the API after changing it.
 
@@ -47,7 +47,7 @@ Required env for the public booking + newsletter to work:
    | `DIRECT_URL` | Neon **direct** connection — used by `prisma migrate deploy` |
    | `JWT_SECRET`, `JWT_REFRESH_SECRET` | random ≥32-char strings |
    | `JWT_EXPIRES_IN` (`15m`), `JWT_REFRESH_EXPIRES_IN` (`7d`) | optional, have defaults |
-   | `GOOGLE_CLIENT_ID` | Google OAuth **Web** client ID — sign-in is Google/Apple only. Add the admin web app origin under *Authorized JavaScript origins* |
+   | `GOOGLE_CLIENT_ID` | Google OAuth **Web** client ID — staff sign in with Google/Apple only, and guests can use Google too. Add the admin web app origin under *Authorized JavaScript origins*. The OAuth consent screen must be **In production** (not *Testing*), or only listed test users — not guests — can sign in; the basic scopes (openid, email, profile) don't need Google verification |
    | `APPLE_CLIENT_ID` | Apple **Services ID** (Sign in with Apple). Register the admin web app domain + return URL `https://<admin-domain>/login` |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | payments |
    | `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME` | email (optional) |
@@ -56,7 +56,7 @@ Required env for the public booking + newsletter to work:
    | `RESEND_FORWARD_FROM` | optional, defaults to `C'est La Stay Inbox <stay@cestlastay.com>` |
    | `NODE_ENV` = `production` | |
    | `TAX_RATE` = `10` | |
-   | `FRONTEND_URL` = `https://app.cestlastay.com` | admin/portal origin: used for the guest-portal link in emails and as the CORS fallback when `CORS_ORIGINS` is unset |
+   | `FRONTEND_URL` = `https://app.cestlastay.com` | admin/portal origin: used for the guest sign-in link in emails (`/login?as=guest`) and as the CORS fallback when `CORS_ORIGINS` is unset |
    | `CORS_ORIGINS` | set **after** the Vercel URLs exist (step 4). Applies to both HTTP and the Socket.IO handshake |
 
    > `PORT` is injected by Railway automatically — do **not** set it. The app reads `process.env.PORT`.
@@ -128,3 +128,4 @@ Resend retries failed webhooks; forwards are sent with an idempotency key per em
 ## Notes / future hardening
 - The API Docker image installs the full workspace for simplicity. To slim it later, use a filtered install or `pnpm deploy`.
 - `prisma migrate deploy` runs on every container start (idempotent). With multiple replicas, move migrations to a release step.
+- Sign-in rate limits (`@nestjs/throttler`, per client IP) keep their counters in memory, which is right for the single API instance. With more than one replica each would count separately — switch the throttler to a shared Redis store first. The API sets `trust proxy` to 1 hop for Railway's proxy; if another proxy/CDN is put in front, raise it or every visitor will share one IP.

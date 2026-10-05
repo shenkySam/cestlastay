@@ -25,20 +25,26 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    // Guest portal tokens carry sub = guestId (guests table), not a userId.
-    // Look them up against the guests table and return a guest-shaped principal.
+    // Guest tokens carry sub = guestId (guests table), not a userId, and are
+    // scoped to one booking. Load that booking (with its guest) and return a
+    // guest-shaped principal; bookingStatus gates pre-arrival actions.
     if (payload.role === 'GUEST') {
       if (!payload.bookingId) throw new UnauthorizedException();
-      const guest = await this.prisma.guest.findUnique({
-        where: { id: payload.sub },
-        select: { id: true, firstName: true, lastName: true, email: true },
+      const booking = await this.prisma.booking.findUnique({
+        where: { id: payload.bookingId },
+        select: {
+          guestId: true,
+          status: true,
+          guest: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
       });
-      if (!guest) throw new UnauthorizedException();
+      if (!booking || booking.guestId !== payload.sub) throw new UnauthorizedException();
       return {
-        id: guest.id,
+        id: booking.guest.id,
         role: 'GUEST',
-        guest,
+        guest: booking.guest,
         bookingId: payload.bookingId,
+        bookingStatus: booking.status,
       };
     }
 

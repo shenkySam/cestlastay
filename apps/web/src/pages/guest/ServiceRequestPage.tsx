@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -100,10 +101,12 @@ export default function GuestServiceRequestPage() {
   const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
   const guestId = (user as any)?.guest?.id;
+  // Signed in before arrival — the API refuses requests until check-in
+  const preArrival = user?.booking?.status === 'CONFIRMED';
 
   useEffect(() => {
-    if (guestId) loadRequests();
-  }, [guestId]);
+    if (guestId && !preArrival) loadRequests();
+  }, [guestId, preArrival]);
 
   async function loadRequests() {
     setLoading(true);
@@ -150,6 +153,24 @@ export default function GuestServiceRequestPage() {
     } finally {
       setRatingSubmitting(false);
     }
+  }
+
+  if (preArrival) {
+    return (
+      <div className="card p-8 text-center space-y-2">
+        <p className="text-3xl">🛎</p>
+        <h2 className="text-xl font-semibold text-gray-900">Requests open once you've checked in</h2>
+        <p className="text-sm text-gray-500">
+          Need something before you arrive? Write to{' '}
+          <a href="mailto:stay@cestlastay.com" className="font-medium text-primary-600 hover:underline">
+            stay@cestlastay.com
+          </a>
+        </p>
+        <Link to="/guest/home" className="inline-block pt-2 text-sm font-medium text-primary-600 hover:underline">
+          Back to my booking
+        </Link>
+      </div>
+    );
   }
 
   return (

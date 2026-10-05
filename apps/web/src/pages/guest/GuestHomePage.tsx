@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { differenceInCalendarDays } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -8,13 +9,6 @@ const ACTIONS = [
   { label: 'Requests & Complaints', icon: '🛎', href: '/guest/services' },
   { label: 'View My Bill',          icon: '💳', href: '/guest/bill' },
 ];
-
-interface StoredBooking {
-  bookingNumber: string;
-  checkInDate: string;
-  checkOutDate: string;
-  rooms: { roomNumber: string; categoryName: string }[];
-}
 
 function StarPicker({
   value,
@@ -53,8 +47,13 @@ export default function GuestHomePage() {
   const [submitting, setSubmitting] = useState(false);
   const [alreadyRated, setAlreadyRated] = useState(false);
 
-  const bookingId = (user as any)?.bookingId;
-  const booking: StoredBooking | undefined = (user as any)?.booking;
+  const bookingId = user?.bookingId;
+  const booking = user?.booking;
+  // Signed in before arrival (booking confirmed, not yet checked in)
+  const preArrival = booking?.status === 'CONFIRMED';
+  const daysToCheckIn = booking
+    ? differenceInCalendarDays(new Date(booking.checkInDate), new Date())
+    : 0;
   const stayNights = booking
     ? Math.max(
         1,
@@ -69,12 +68,12 @@ export default function GuestHomePage() {
 
   // Check if the guest has already submitted a rating for this booking
   useEffect(() => {
-    if (!bookingId) return;
+    if (!bookingId || preArrival) return;
     api
       .get(`/ratings/booking/${bookingId}`)
       .then(({ data }) => { if (data) setAlreadyRated(true); })
       .catch(() => {});
-  }, [bookingId]);
+  }, [bookingId, preArrival]);
 
   async function submitRating() {
     if (!overallRating || !roomRating || !bookingId) return;
@@ -91,14 +90,30 @@ export default function GuestHomePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">
-          Welcome, {user?.firstName}!
-        </h2>
-        <p className="text-gray-500 text-sm mt-1">
-          How can we make your stay more comfortable?
-        </p>
-      </div>
+      {preArrival ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Your upcoming stay</h2>
+            <p className="text-gray-500 text-sm mt-1">
+              We look forward to welcoming you, {user?.firstName}.
+            </p>
+          </div>
+          <span className="badge-blue">
+            {daysToCheckIn > 0
+              ? `Check-in in ${daysToCheckIn} day${daysToCheckIn !== 1 ? 's' : ''}`
+              : 'Arriving today'}
+          </span>
+        </div>
+      ) : (
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Welcome, {user?.firstName}!
+          </h2>
+          <p className="text-gray-500 text-sm mt-1">
+            How can we make your stay more comfortable?
+          </p>
+        </div>
+      )}
 
       {/* Booking summary */}
       {booking && (
@@ -137,8 +152,20 @@ export default function GuestHomePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        {ACTIONS.map((action) => (
+      {preArrival && (
+        <div className="card p-4 text-sm text-gray-600">
+          <p className="font-medium text-gray-900">Requests open once you've checked in.</p>
+          <p className="mt-1">
+            Need something before you arrive? Write to{' '}
+            <a href="mailto:stay@cestlastay.com" className="font-medium text-primary-600 hover:underline">
+              stay@cestlastay.com
+            </a>
+          </p>
+        </div>
+      )}
+
+      <div className={`grid gap-3 ${preArrival ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        {ACTIONS.filter((action) => !preArrival || action.href !== '/guest/services').map((action) => (
           <Link
             key={action.label}
             to={action.href}
@@ -150,28 +177,30 @@ export default function GuestHomePage() {
         ))}
       </div>
 
-      {/* Rate Your Stay card */}
-      <div className="card p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">⭐</span>
-          <div>
-            <p className="font-medium text-gray-900">Rate Your Stay</p>
-            <p className="text-xs text-gray-500">Help us improve with your honest feedback</p>
+      {/* Rate Your Stay card — once the stay has started */}
+      {!preArrival && (
+        <div className="card p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">⭐</span>
+            <div>
+              <p className="font-medium text-gray-900">Rate Your Stay</p>
+              <p className="text-xs text-gray-500">Help us improve with your honest feedback</p>
+            </div>
           </div>
+          {alreadyRated ? (
+            <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
+              ✓ You've already submitted your rating. Thank you!
+            </p>
+          ) : (
+            <button
+              className="btn-primary w-full"
+              onClick={() => setShowRating(true)}
+            >
+              Leave a Rating
+            </button>
+          )}
         </div>
-        {alreadyRated ? (
-          <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
-            ✓ You've already submitted your rating. Thank you!
-          </p>
-        ) : (
-          <button
-            className="btn-primary w-full"
-            onClick={() => setShowRating(true)}
-          >
-            Leave a Rating
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Rating modal */}
       {showRating && (
