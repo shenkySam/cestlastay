@@ -9,7 +9,7 @@ import type {
 /**
  * Booking wiring — gated behind VITE_ENABLE_BOOKING_API.
  *
- * The typed functions below mirror the real Hotel-Manager API contract so that
+ * The typed functions below mirror the real cestlastay API contract so that
  * flipping the flag on (once the public endpoints + CORS exist) requires no
  * rewrite. Until then, `submitReservation` short-circuits to an elegant local
  * confirmation and performs no network request.

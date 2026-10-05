@@ -1,5 +1,5 @@
 /**
- * Local mirror of the relevant shapes from the Hotel-Manager monorepo's
+ * Local mirror of the relevant shapes from the cestlastay monorepo's
  * `@hms/shared` package (packages/shared/src/types/{room,booking}.types.ts).
  *
  * This landing page is a standalone codebase, so it cannot import the

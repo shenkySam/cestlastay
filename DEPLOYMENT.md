@@ -36,8 +36,8 @@ Required env for the public booking + newsletter to work:
 
 ## 1) Railway — API
 
-1. Open the failing service → **Settings → Source** → set **Root Directory = `Hotel-Manager`**, Save.
-   - Railway then finds `Hotel-Manager/railway.json`, which builds `apps/api/Dockerfile` (whole workspace as context).
+1. Open the failing service → **Settings → Source** → leave **Root Directory** empty (repo root), Save.
+   - Railway then finds `railway.json` at the repo root, which builds `apps/api/Dockerfile` (whole workspace as context).
 2. **Settings → Networking → Generate Domain** (gives e.g. `https://hms-api-production.up.railway.app`).
 3. **Variables** — add (values from your Neon/Stripe/etc. dashboards; see `apps/api/.env.example`):
 
@@ -68,7 +68,7 @@ Required env for the public booking + newsletter to work:
 ## 2) Vercel — Admin (`@hms/web`)
 
 1. **New Project → import the repo**.
-2. **Root Directory = `Hotel-Manager/apps/web`** (build/install/output come from `apps/web/vercel.json`).
+2. **Root Directory = `apps/web`** (build/install/output come from `apps/web/vercel.json`).
 3. **Environment Variables**:
    - `VITE_API_URL` = `<railway-api-domain>/api/v1`  (e.g. `https://hms-api-production.up.railway.app/api/v1` — **include** `/api/v1`)
    - `VITE_SOCKET_URL` = `<railway-api-domain>`  (bare origin, **no** `/api/v1` — Socket.IO connects to the root)
@@ -80,7 +80,7 @@ Required env for the public booking + newsletter to work:
 ## 3) Vercel — Landing (`@hms/guest`)
 
 1. **New Project → import the same repo**.
-2. **Root Directory = `Hotel-Manager/apps/guest`**.
+2. **Root Directory = `apps/guest`**.
 3. **Environment Variables**: none needed. The API base and the Login URL are hardcoded in `public/site.js` / `index.html` (see "Live values" above). Vercel still runs `vite build`, which copies `index.html` and `public/` into `dist/`.
 4. Deploy → note the URL (e.g. `https://cestlastay.com` once the domain is attached).
 
