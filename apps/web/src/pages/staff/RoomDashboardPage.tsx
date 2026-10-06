@@ -34,12 +34,13 @@ export default function StaffRoomDashboardPage() {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('room:status-changed', (updatedRoom: IRoom) => {
+    const onRoomStatus = (updatedRoom: IRoom) => {
       setRooms((prev) =>
         prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)),
       );
-    });
-    return () => { socket.off('room:status-changed'); };
+    };
+    socket.on('room:status-changed', onRoomStatus);
+    return () => { socket.off('room:status-changed', onRoomStatus); };
   }, [socket]);
 
   async function load() {

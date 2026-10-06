@@ -74,6 +74,110 @@
   .badge-purple { @apply badge bg-purple-100 text-purple-800; }
 }
 
+/* ── Admin console ("Lagoon") ─────────────────────────────────────────────
+   Everything below is scoped under .admin-shell (AdminLayout's root), so the
+   staff and guest portals keep the classes above untouched. Zinc neutrals,
+   one desaturated lagoon accent, Geist + Geist Mono, pill buttons.
+   Component overrides use :where(.admin-shell) .x — same specificity as the
+   base .x rule (so they win by source order) and as utilities (which come
+   later, so `pl-10` or `hover:bg-rose-50` on the element still wins).
+   Fonts and table defaults keep .admin-shell specificity on purpose: they
+   must beat the base Caveat headings and leftover gray table utilities. */
+@layer components {
+  .admin-shell {
+    @apply font-geist text-zinc-900 antialiased;
+    background-color: #f9fafb;
+  }
+
+  /* Base h1–h3 are Caveat app-wide; the admin uses Geist. Sizes are left alone. */
+  .admin-shell :is(h1, h2, h3) {
+    @apply font-geist tracking-tight;
+  }
+
+  .admin-shell :is(.font-mono, code, kbd) {
+    @apply font-geist-mono;
+  }
+
+  :where(.admin-shell) .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500;
+  }
+
+  :where(.admin-shell) .card {
+    @apply rounded-[2rem] border border-zinc-200/60 bg-white shadow-diffuse;
+  }
+
+  :where(.admin-shell) :is(.btn-primary, .btn-secondary, .btn-accent, .btn-danger, .btn-ghost) {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium
+           transition-[background-color,border-color,color,transform] duration-300
+           ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98]
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-lagoon-500/40 focus-visible:ring-offset-2
+           focus:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  :where(.admin-shell) .btn-primary {
+    @apply bg-zinc-900 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] hover:bg-zinc-800 focus:ring-lagoon-500/40;
+  }
+  :where(.admin-shell) .btn-secondary {
+    @apply border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 focus:ring-lagoon-500/40;
+  }
+  :where(.admin-shell) .btn-accent {
+    @apply bg-lagoon-600 text-white hover:bg-lagoon-700 focus:ring-lagoon-500/40;
+  }
+  :where(.admin-shell) .btn-danger {
+    @apply bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500/40;
+  }
+  :where(.admin-shell) .btn-ghost {
+    @apply bg-transparent px-3 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900;
+  }
+  /* Square icon-only button — always pair with aria-label */
+  :where(.admin-shell) .btn-icon {
+    @apply inline-flex size-9 items-center justify-center rounded-full text-zinc-500
+           transition-[background-color,color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+           hover:bg-zinc-100 hover:text-zinc-900 active:scale-[0.96]
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-lagoon-500/40;
+  }
+
+  :where(.admin-shell) .input {
+    @apply rounded-xl border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400
+           shadow-[inset_0_1px_2px_rgb(24_24_27/0.04)]
+           focus:border-lagoon-400 focus:ring-4 focus:ring-lagoon-500/10;
+  }
+  :where(.admin-shell) .badge {
+    @apply gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset;
+  }
+  :where(.admin-shell) .badge-green  { @apply bg-emerald-50 text-emerald-700 ring-emerald-600/15; }
+  :where(.admin-shell) .badge-red    { @apply bg-rose-50 text-rose-700 ring-rose-600/15; }
+  :where(.admin-shell) .badge-yellow { @apply bg-amber-50 text-amber-800 ring-amber-600/20; }
+  :where(.admin-shell) .badge-blue   { @apply bg-lagoon-50 text-lagoon-800 ring-lagoon-600/20; }
+  :where(.admin-shell) .badge-gray   { @apply bg-zinc-100 text-zinc-700 ring-zinc-500/15; }
+  :where(.admin-shell) .badge-purple { @apply bg-zinc-900 text-white ring-zinc-900; }
+
+  /* Tables: quiet headers, hairline rows */
+  .admin-shell thead {
+    @apply border-zinc-100 bg-transparent;
+  }
+  .admin-shell th {
+    @apply text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500;
+  }
+  .admin-shell tbody {
+    @apply divide-zinc-100;
+  }
+  .admin-shell tbody tr {
+    @apply transition-colors duration-200;
+  }
+  .admin-shell tbody tr:hover {
+    @apply bg-zinc-50/70;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer,
+  .animate-breathe,
+  .animate-marquee,
+  .animate-caret {
+    animation: none;
+  }
+}
+
 /* ── Sign-in page (/login) — CSS 3D, "earthen" guest-site palette ──────────
    Layer order: backdrop (perspective grid floor + orbs)
      → .login-fade (entrance opacity) → .login-rise (entrance transform)

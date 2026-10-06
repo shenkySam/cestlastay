@@ -1,7 +1,24 @@
-import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import clsx from 'clsx';
 import toast from 'react-hot-toast';
+import { ImagesIcon, PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon, UsersIcon } from '@phosphor-icons/react';
+import api from '@/lib/api';
 import { IRoomCategory, RoomType } from '@shared/index';
+import {
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  PageHeader,
+  Panel,
+  Skeleton,
+  humanize,
+  riseItem,
+  stagger,
+} from '@/components/admin/ui';
 
 /**
  * Stays / Pricing — admin management of room categories. These are what the
@@ -36,12 +53,36 @@ const toList = (s: string) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
+/**
+ * Zig-zag rhythm on xl (6 columns): wide + narrow, then narrow + wide.
+ * Two columns on md, one below. A lone last card takes the full row.
+ */
+function cardLayout(i: number, total: number): { span: string; wide: boolean } {
+  if (total % 2 === 1 && i === total - 1) return { span: 'md:col-span-2 xl:col-span-6', wide: true };
+  const evenRow = Math.floor(i / 2) % 2 === 0;
+  const first = i % 2 === 0;
+  return evenRow === first ? { span: 'xl:col-span-4', wide: true } : { span: 'xl:col-span-2', wide: false };
+}
+
+const FIELD_LABEL = 'text-sm font-medium text-zinc-700';
+const FIELD_HELP = 'text-xs text-zinc-500';
+
 export default function AdminStaysPage() {
   const [categories, setCategories] = useState<IRoomCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  // Enter now submits the form, so guard against a second request in flight
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<IRoomCategory | null>(null);
   const [form, setForm] = useState<CategoryForm>(EMPTY);
+  const [pendingDelete, setPendingDelete] = useState<IRoomCategory | null>(null);
+
+  // Keeps the dialog title stable while it animates out after `pendingDelete` clears.
+  const lastPending = useRef<IRoomCategory | null>(null);
+  if (pendingDelete) lastPending.current = pendingDelete;
+  const deleteTarget = pendingDelete ?? lastPending.current;
 
   useEffect(() => {
     load();
@@ -49,9 +90,12 @@ export default function AdminStaysPage() {
 
   async function load() {
     setLoading(true);
+    setError(false);
     try {
       const { data } = await api.get('/rooms/categories');
       setCategories(data);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -91,6 +135,9 @@ export default function AdminStaysPage() {
       amenities: toList(form.amenities),
       images: toList(form.images),
     };
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       if (editing) {
         await api.patch(`/rooms/categories/${editing.id}`, payload);
@@ -103,11 +150,24 @@ export default function AdminStaysPage() {
       load();
     } catch {
       // errors shown by interceptor
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
-  async function handleDelete(cat: IRoomCategory) {
-    if (!confirm(`Delete stay "${cat.name}"? (only possible if no rooms use it)`)) return;
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    handleSave();
+  }
+
+  function handleDelete(cat: IRoomCategory) {
+    setPendingDelete(cat);
+  }
+
+  async function confirmDelete() {
+    const cat = pendingDelete;
+    if (!cat) return;
     try {
       await api.delete(`/rooms/categories/${cat.id}`);
       toast.success('Stay deleted');
@@ -115,153 +175,277 @@ export default function AdminStaysPage() {
     } catch {
       // errors shown by interceptor (409 if rooms still reference it)
     }
+    setPendingDelete(null);
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Stays &amp; Pricing</h2>
-          <p className="text-gray-500 text-sm mt-1">
-            {categories.length} stays · shown on cestlastay.com
-          </p>
-        </div>
-        <button className="btn-primary" onClick={openCreate}>+ Add Stay</button>
-      </div>
+  const initialLoad = loading && categories.length === 0;
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categories.map((cat) => (
-            <div key={cat.id} className="card p-5 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{cat.name}</h3>
-                  <span className="badge badge-gray mt-1">{cat.type}</span>
-                </div>
-                <span className="font-semibold text-gray-800 whitespace-nowrap">
-                  ₹{Number(cat.basePrice).toLocaleString('en-IN')}
-                  <span className="text-gray-400 text-xs"> /night</span>
-                </span>
-              </div>
-              {cat.description && (
-                <p className="text-sm text-gray-600 line-clamp-3">{cat.description}</p>
-              )}
-              <p className="text-xs text-gray-400">Max occupancy: {cat.maxOccupancy}</p>
-              <div className="flex gap-2 pt-1">
-                <button className="btn-secondary text-xs py-1 px-2 flex-1" onClick={() => openEdit(cat)}>
-                  Edit
-                </button>
-                <button className="btn-danger text-xs py-1 px-2 flex-1" onClick={() => handleDelete(cat)}>
-                  Delete
-                </button>
-              </div>
-            </div>
+  return (
+    <div className="space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Operations"
+        title="Stays & pricing"
+        description={
+          initialLoad || error ? (
+            'Room categories, shown as stays on cestlastay.com.'
+          ) : (
+            <>
+              <span className="font-mono tabular-nums text-zinc-700">{categories.length}</span>{' '}
+              {categories.length === 1 ? 'stay' : 'stays'} · shown on cestlastay.com
+            </>
+          )
+        }
+        actions={
+          <button type="button" className="btn-primary" onClick={openCreate}>
+            <PlusIcon size={16} weight="regular" aria-hidden />
+            Add stay
+          </button>
+        }
+      />
+
+      {initialLoad ? (
+        <div role="status" aria-label="Loading stays" className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className={clsx('h-64 rounded-[2rem]', cardLayout(i, 4).span)} />
           ))}
         </div>
+      ) : error ? (
+        <ErrorState title="Couldn't load stays" onRetry={load} />
+      ) : categories.length === 0 ? (
+        <Panel variants={riseItem} initial="hidden" animate="show">
+          <EmptyState
+            icon={TagIcon}
+            title="No stays yet"
+            description="Stays are the room categories guests see on cestlastay.com. Add one, then assign rooms to it on the Rooms page."
+            action={
+              <button type="button" className="btn-primary" onClick={openCreate}>
+                <PlusIcon size={16} weight="regular" aria-hidden />
+                Add stay
+              </button>
+            }
+          />
+        </Panel>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          aria-busy={loading}
+          className={clsx(
+            'grid gap-4 transition-opacity duration-300 md:grid-cols-2 xl:grid-cols-6',
+            loading && 'opacity-60',
+          )}
+        >
+          {categories.map((cat, i) => {
+            const { span, wide } = cardLayout(i, categories.length);
+            const amenities = cat.amenities ?? [];
+            const shownAmenities = amenities.slice(0, wide ? 8 : 4);
+            const moreAmenities = amenities.length - shownAmenities.length;
+            const imageCount = (cat.images ?? []).length;
+
+            return (
+              <Panel key={cat.id} variants={riseItem} className={span} bodyClassName="gap-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <span className="badge badge-gray">{humanize(cat.type)}</span>
+                    <h3 className="mt-3 text-base font-semibold tracking-tight text-zinc-950">{cat.name}</h3>
+                  </div>
+                  <p className="shrink-0 text-right">
+                    <span
+                      className={clsx(
+                        'block font-mono font-medium leading-none tracking-tight tabular-nums text-zinc-950',
+                        wide ? 'text-2xl' : 'text-xl',
+                      )}
+                    >
+                      ₹{Number(cat.basePrice).toLocaleString('en-IN')}
+                    </span>
+                    <span className="mt-1.5 block text-xs text-zinc-400">per night</span>
+                  </p>
+                </div>
+
+                {cat.description && (
+                  <p className={clsx('line-clamp-3 text-sm leading-relaxed text-zinc-600', wide && 'max-w-[62ch]')}>
+                    {cat.description}
+                  </p>
+                )}
+
+                {shownAmenities.length > 0 && (
+                  <ul className="flex flex-wrap gap-1.5" aria-label="Amenities">
+                    {shownAmenities.map((a, idx) => (
+                      <li
+                        key={`${a}-${idx}`}
+                        className="rounded-full bg-zinc-50 px-2.5 py-1 text-xs text-zinc-600 ring-1 ring-inset ring-zinc-200/70"
+                      >
+                        {a}
+                      </li>
+                    ))}
+                    {moreAmenities > 0 && (
+                      <li className="rounded-full px-2 py-1 font-mono text-xs tabular-nums text-zinc-400">
+                        +{moreAmenities}
+                      </li>
+                    )}
+                  </ul>
+                )}
+
+                <div className="mt-auto flex items-center justify-between gap-3 border-t border-zinc-100 pt-4">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <UsersIcon size={14} weight="regular" aria-hidden className="text-zinc-400" />
+                      Max occupancy <span className="font-mono tabular-nums text-zinc-700">{cat.maxOccupancy}</span>
+                    </span>
+                    {imageCount > 0 && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <ImagesIcon size={14} weight="regular" aria-hidden className="text-zinc-400" />
+                        <span className="font-mono tabular-nums text-zinc-700">{imageCount}</span>
+                        {imageCount === 1 ? 'image' : 'images'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="-mr-2 flex shrink-0 items-center">
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      aria-label={`Edit stay ${cat.name}`}
+                      onClick={() => openEdit(cat)}
+                    >
+                      <PencilSimpleIcon size={16} weight="regular" />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-icon hover:bg-rose-50 hover:text-rose-600"
+                      aria-label={`Delete stay ${cat.name}`}
+                      onClick={() => handleDelete(cat)}
+                    >
+                      <TrashIcon size={16} weight="regular" />
+                    </button>
+                  </div>
+                </div>
+              </Panel>
+            );
+          })}
+        </motion.div>
       )}
 
-      {categories.length === 0 && !loading && (
-        <div className="text-center py-12 text-gray-400 card">No stays yet.</div>
-      )}
-
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold">{editing ? 'Edit Stay' : 'Add Stay'}</h3>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                className="input"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Banyan Suite"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Must match the stay name on the landing page for live pricing to apply.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Price / night (₹)</label>
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? 'Edit stay' : 'Add stay'}
+        description="Name, description and price show on cestlastay.com."
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <label htmlFor="stay-name" className={FIELD_LABEL}>Name</label>
                 <input
+                  id="stay-name"
                   className="input"
-                  type="number"
-                  min={0}
-                  value={form.basePrice}
-                  onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) })}
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="e.g. Banyan Suite"
+                />
+                <p className={FIELD_HELP}>
+                  Must match the stay name on the landing page for live pricing to apply.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <label htmlFor="stay-price" className={FIELD_LABEL}>Price / night (₹)</label>
+                  <input
+                    id="stay-price"
+                    className="input font-mono tabular-nums"
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={form.basePrice}
+                    onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label htmlFor="stay-occupancy" className={FIELD_LABEL}>Max occupancy</label>
+                  <input
+                    id="stay-occupancy"
+                    className="input font-mono tabular-nums"
+                    type="number"
+                    min={1}
+                    value={form.maxOccupancy}
+                    onChange={(e) => setForm({ ...form, maxOccupancy: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="stay-type" className={FIELD_LABEL}>Type</label>
+                <select
+                  id="stay-type"
+                  className="input"
+                  value={form.type}
+                  onChange={(e) => setForm({ ...form, type: e.target.value as RoomType })}
+                >
+                  {Object.values(RoomType).map((t) => (
+                    <option key={t} value={t}>{humanize(t)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="stay-description" className={FIELD_LABEL}>Description</label>
+                <textarea
+                  id="stay-description"
+                  className="input"
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="A treetop room beneath century-old branches, with an open-air bath."
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max occupancy</label>
+
+              <div className="grid gap-2">
+                <label htmlFor="stay-amenities" className={FIELD_LABEL}>Amenities</label>
                 <input
+                  id="stay-amenities"
                   className="input"
-                  type="number"
-                  min={1}
-                  value={form.maxOccupancy}
-                  onChange={(e) => setForm({ ...form, maxOccupancy: Number(e.target.value) })}
+                  value={form.amenities}
+                  onChange={(e) => setForm({ ...form, amenities: e.target.value })}
+                  placeholder="WiFi, AC, Open-air bath"
                 />
+                <p className={FIELD_HELP}>Comma separated.</p>
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="stay-images" className={FIELD_LABEL}>Image URLs</label>
+                <input
+                  id="stay-images"
+                  className="input font-mono"
+                  value={form.images}
+                  onChange={(e) => setForm({ ...form, images: e.target.value })}
+                  placeholder="/banyan.png, ..."
+                />
+                <p className={FIELD_HELP}>Comma separated.</p>
               </div>
             </div>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Create stay'}
+            </button>
+          </ModalFooter>
+        </form>
+      </Modal>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <select
-                className="input"
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value as RoomType })}
-              >
-                {Object.values(RoomType).map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                className="input"
-                rows={3}
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="A treetop room beneath century-old branches, with an open-air bath."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amenities</label>
-              <input
-                className="input"
-                value={form.amenities}
-                onChange={(e) => setForm({ ...form, amenities: e.target.value })}
-                placeholder="WiFi, AC, Open-air bath (comma separated)"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Image URLs</label>
-              <input
-                className="input"
-                value={form.images}
-                onChange={(e) => setForm({ ...form, images: e.target.value })}
-                placeholder="/banyan.png, ... (comma separated)"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button className="btn-primary flex-1" onClick={handleSave}>
-                {editing ? 'Save Changes' : 'Create Stay'}
-              </button>
-              <button className="btn-secondary flex-1" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={`Delete “${deleteTarget?.name ?? ''}”?`}
+        description="A stay can only be deleted when no rooms use it. Move those rooms to another category first."
+        confirmLabel="Delete stay"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

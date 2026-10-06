@@ -10,6 +10,29 @@ export default {
         // "Earthen" guest-site type, used on the sign-in page to match apps/guest
         cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         jost: ['Jost', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        // Admin console ("Lagoon") — Geist for UI, Geist Mono for every number/ID
+        geist: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        'geist-mono': ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      boxShadow: {
+        // Zinc-tinted diffusion shadows for admin tiles (no glows)
+        diffuse: '0 20px 40px -15px rgb(24 24 27 / 0.06)',
+        'diffuse-lg': '0 32px 64px -24px rgb(24 24 27 / 0.12)',
+      },
+      keyframes: {
+        shimmer: { '100%': { transform: 'translateX(100%)' } },
+        breathe: {
+          '0%': { transform: 'scale(1)', opacity: '0.55' },
+          '70%, 100%': { transform: 'scale(2.4)', opacity: '0' },
+        },
+        marquee: { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(-50%)' } },
+        caret: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0' } },
+      },
+      animation: {
+        shimmer: 'shimmer 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite',
+        breathe: 'breathe 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite',
+        marquee: 'marquee 48s linear infinite',
+        caret: 'caret 1s steps(1) infinite',
       },
       colors: {
         // Ocean — primary brand (the logo's waves).
@@ -66,6 +89,20 @@ export default {
           700: '#6f4a28',
           800: '#5c3e24',
           900: '#4e3621',
+        },
+        // Lagoon — the admin console's single accent: the logo's ocean, desaturated (<80% sat).
+        lagoon: {
+          50: '#f0f9fa',
+          100: '#d9f0f2',
+          200: '#b5e1e6',
+          300: '#84cbd4',
+          400: '#4eacb9',
+          500: '#33909e',
+          600: '#2a7684',
+          700: '#27606c',
+          800: '#264f59',
+          900: '#23434c',
+          950: '#132b32',
         },
         // Earthen — the guest site's palette, used on the sign-in page.
         cream: '#f4efe5',
