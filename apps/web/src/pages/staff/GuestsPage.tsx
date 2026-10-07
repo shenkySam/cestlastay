@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import api from '@/lib/api';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import toast from 'react-hot-toast';
 import { IGuest, IBooking, BookingStatus } from '@shared/index';
 import { roomNumbersLabel } from '@/lib/rooms';
@@ -26,12 +27,14 @@ export default function StaffGuestsPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<IGuest>>({});
 
-  useEffect(() => { load(); }, [search]);
+  const query = useDebouncedValue(search);
+
+  useEffect(() => { load(); }, [query]);
 
   async function load() {
     setLoading(true);
     try {
-      const { data } = await api.get('/guests', { params: search ? { search } : {} });
+      const { data } = await api.get('/guests', { params: query ? { search: query } : {} });
       setGuests(data);
     } finally {
       setLoading(false);

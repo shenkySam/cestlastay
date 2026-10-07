@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import api from '@/lib/api';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import toast from 'react-hot-toast';
 import { IBooking, IGuest, IRoom, IRoomCategory, BookingStatus, BookingSource } from '@shared/index';
 import InvoiceEditor from '@/components/invoices/InvoiceEditor';
@@ -73,7 +74,9 @@ export default function StaffBookingsPage() {
   const [specialRequests, setSpecialRequests] = useState('');
   const [savingBooking, setSavingBooking] = useState(false);
 
-  useEffect(() => { load(); }, [filterStatus, search]);
+  const query = useDebouncedValue(search);
+
+  useEffect(() => { load(); }, [filterStatus, query]);
 
   async function load() {
     setLoading(true);
@@ -81,7 +84,7 @@ export default function StaffBookingsPage() {
       const { data } = await api.get('/bookings', {
         params: {
           ...(filterStatus && { status: filterStatus }),
-          ...(search && { search }),
+          ...(query && { search: query }),
         },
       });
       setBookings(data);

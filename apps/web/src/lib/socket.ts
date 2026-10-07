@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { clearApiCache } from './api';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
 
@@ -23,6 +24,12 @@ export function getSocket(fallbackToken?: string): Socket {
     reconnectionAttempts: 5,
     reconnectionDelay: 2000,
   });
+
+  // A live event means data changed somewhere, and after a reconnect we may
+  // have missed some: drop cached GETs so the next fetch is fresh. onAny runs
+  // before the per-event handlers, so a handler that refetches gets new data.
+  socket.onAny(() => clearApiCache());
+  socket.io.on('reconnect', () => clearApiCache());
 
   socket.on('connect_error', () => {
     // Transport failures keep socket.active === true and self-heal. A handshake
