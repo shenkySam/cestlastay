@@ -9,6 +9,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { forgetPrincipal } from '../auth/principal-cache';
 import { SYSTEM_USER_EMAIL } from '../../common/system-user';
 import {
   retryOnUniqueViolation,
@@ -76,8 +77,9 @@ export class UsersService {
   /**
    * Promote STAFF → ADMIN or demote ADMIN → STAFF. Promotion keeps the staff
    * profile (tasks and service requests reference it); demotion creates one if
-   * the user never had it. Access changes at once: every request reloads the
-   * role from the database (JwtStrategy), so no tokens need revoking.
+   * the user never had it. Access changes at once: their cached principal is
+   * dropped, so their next request reloads the role (JwtStrategy) and no tokens
+   * need revoking.
    */
   async changeRole(id: string, dto: UpdateUserRoleDto, actorId: string) {
     // Admins can't demote themselves, so the requester always remains an admin
@@ -141,6 +143,7 @@ export class UsersService {
       }
       throw err;
     }
+    forgetPrincipal(id);
 
     // The role change is committed: from here on, failures are logged rather than
     // returned, so the admin isn't told it failed when it didn't.
@@ -254,7 +257,7 @@ export class UsersService {
       throw new ForbiddenException('You can only update your own profile');
     }
 
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id },
       data: dto,
       select: {
@@ -269,20 +272,25 @@ export class UsersService {
         updatedAt: true,
       },
     });
+    forgetPrincipal(id);
+    return user;
   }
 
   async updateStatus(id: string, dto: UpdateUserStatusDto) {
     await this.findOne(id);
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id },
       data: { status: dto.status },
       select: { id: true, status: true, updatedAt: true },
     });
+    forgetPrincipal(id);
+    return user;
   }
 
   async remove(id: string) {
     await this.findOne(id);
     await this.prisma.user.delete({ where: { id } });
+    forgetPrincipal(id);
     return { message: 'User deleted successfully' };
   }
 }

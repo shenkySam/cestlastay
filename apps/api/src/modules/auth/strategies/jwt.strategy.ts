@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { cachePrincipal, getCachedPrincipal, principalVersion } from '../principal-cache';
 
 export interface JwtPayload {
   sub: string;
@@ -48,6 +49,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       };
     }
 
+    const cached = getCachedPrincipal(payload.sub);
+    if (cached) return cached;
+    const version = principalVersion(payload.sub);
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
@@ -66,6 +71,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException();
     }
 
+    cachePrincipal(user.id, user, version);
     return user;
   }
 }

@@ -1,5 +1,9 @@
 generator client {
   provider = "prisma-client-js"
+  // Load `include`d relations in the same SQL query (LATERAL joins) instead of
+  // one query per relation. The database is a long round trip from the API, so
+  // each query saved is felt on every page load.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

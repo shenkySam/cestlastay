@@ -17,6 +17,7 @@ import {
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
 import api from '@/lib/api';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { IBooking, BookingStatus } from '@shared/index';
 import InvoiceEditor from '@/components/invoices/InvoiceEditor';
 import { roomNumbersLabel } from '@/lib/rooms';
@@ -77,9 +78,11 @@ export default function AdminBookingsPage() {
   const [error, setError] = useState(false);
   const [folioBooking, setFolioBooking] = useState<IBooking | null>(null);
 
+  const query = useDebouncedValue(search);
+
   useEffect(() => {
     load();
-  }, [filterStatus, search]);
+  }, [filterStatus, query]);
 
   async function load() {
     setLoading(true);
@@ -88,7 +91,7 @@ export default function AdminBookingsPage() {
       const { data } = await api.get('/bookings', {
         params: {
           ...(filterStatus && { status: filterStatus }),
-          ...(search && { search }),
+          ...(query && { search: query }),
         },
       });
       setBookings(data);

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { MagnifyingGlassIcon, UsersIcon } from '@phosphor-icons/react';
 import api from '@/lib/api';
+import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { IGuest } from '@shared/index';
 import { format } from 'date-fns';
 import {
@@ -25,16 +26,18 @@ export default function AdminGuestsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  const query = useDebouncedValue(search);
+
   useEffect(() => {
     load();
-  }, [search]);
+  }, [query]);
 
   async function load() {
     setLoading(true);
     setError(false);
     try {
       const { data } = await api.get('/guests', {
-        params: search ? { search } : {},
+        params: query ? { search: query } : {},
       });
       setGuests(data);
     } catch {
