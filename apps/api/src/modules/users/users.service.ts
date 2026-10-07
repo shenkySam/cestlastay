@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -20,6 +21,8 @@ import { UserRole } from '@hms/shared';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
@@ -126,16 +129,6 @@ export class UsersService {
                 where: { role: 'ADMIN' as any, status: 'ACTIVE' as any },
               });
               if (admins === 0) throw new ConflictException('At least one active admin is required');
-
-              await tx.auditLog.create({
-                data: {
-                  userId: actorId,
-                  action: 'ROLE_CHANGED',
-                  entity: 'User',
-                  entityId: id,
-                  changes: { from: target.role, to: dto.role },
-                },
-              });
             },
             { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
           ),
@@ -149,13 +142,29 @@ export class UsersService {
       throw err;
     }
 
+    // The role change is committed: from here on, failures are logged rather than
+    // returned, so the admin isn't told it failed when it didn't.
+    await this.prisma.auditLog
+      .create({
+        data: {
+          userId: actorId,
+          action: 'ROLE_CHANGED',
+          entity: 'User',
+          entityId: id,
+          changes: { from: target.role, to: dto.role },
+        },
+      })
+      .catch((err) => this.logger.warn(`Audit log for role change of ${id} failed: ${err.message}`));
+
     // Their open tabs pick this up and reload the session (NotificationContext)
-    await this.notifications.notifyUser(id, {
-      type: 'SYSTEM',
-      title: 'Your access changed',
-      message: dto.role === UserRole.ADMIN ? 'You are now an admin.' : 'You are now a staff member.',
-      metadata: { kind: 'ROLE_CHANGED', role: dto.role },
-    });
+    await this.notifications
+      .notifyUser(id, {
+        type: 'SYSTEM',
+        title: 'Your access changed',
+        message: dto.role === UserRole.ADMIN ? 'You are now an admin.' : 'You are now a staff member.',
+        metadata: { kind: 'ROLE_CHANGED', role: dto.role },
+      })
+      .catch((err) => this.logger.warn(`Role change notification for ${id} failed: ${err.message}`));
 
     return this.findOne(id);
   }
