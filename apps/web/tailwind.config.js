@@ -18,6 +18,9 @@ export default {
         // Zinc-tinted diffusion shadows for admin tiles (no glows)
         diffuse: '0 20px 40px -15px rgb(24 24 27 / 0.06)',
         'diffuse-lg': '0 32px 64px -24px rgb(24 24 27 / 0.12)',
+        // Guest portal: ink-tinted in light mode, near-black in dark (--g-scrim)
+        guest: '0 1px 2px rgb(var(--g-scrim) / 0.05), 0 22px 44px -26px rgb(var(--g-scrim) / 0.3)',
+        'guest-lg': '0 2px 6px rgb(var(--g-scrim) / 0.06), 0 36px 64px -28px rgb(var(--g-scrim) / 0.42)',
       },
       keyframes: {
         shimmer: { '100%': { transform: 'translateX(100%)' } },
@@ -109,6 +112,22 @@ export default {
         ink: '#3a2a1f',
         clay: { DEFAULT: '#b1542e', dark: '#8a3f20' },
         gold: '#c9a23a',
+        // Guest portal — the same earthen palette as RGB channels in --g-*
+        // variables (globals.css), so it has a dark variant and keeps alpha
+        // modifiers (bg-guest-ink/5). One accent: clay.
+        guest: {
+          canvas: 'rgb(var(--g-canvas) / <alpha-value>)',
+          surface: 'rgb(var(--g-surface) / <alpha-value>)',
+          raised: 'rgb(var(--g-raised) / <alpha-value>)',
+          ink: 'rgb(var(--g-ink) / <alpha-value>)',
+          muted: 'rgb(var(--g-muted) / <alpha-value>)',
+          clay: 'rgb(var(--g-clay) / <alpha-value>)',
+          'on-clay': 'rgb(var(--g-on-clay) / <alpha-value>)',
+          gold: 'rgb(var(--g-gold) / <alpha-value>)',
+          palm: 'rgb(var(--g-palm) / <alpha-value>)',
+          danger: 'rgb(var(--g-danger) / <alpha-value>)',
+          scrim: 'rgb(var(--g-scrim) / <alpha-value>)',
+        },
       },
     },
   },

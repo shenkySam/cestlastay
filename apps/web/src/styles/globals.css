@@ -169,6 +169,115 @@
   }
 }
 
+/* ── Guest portal ("Earthen") ─────────────────────────────────────────────
+   The guest site's palette and type (cream, ink, clay; Cormorant Garamond +
+   Jost) carried into the signed-in portal, with a dark variant that follows
+   the system setting. Values are RGB channels so Tailwind's guest-* colours
+   take alpha modifiers. Every text pairing below passes WCAG AA on canvas and
+   surface in both modes (clay buttons take dark text in dark mode).
+   Component overrides follow the admin pattern, scoped under .guest-shell. */
+:root {
+  --g-canvas: 244 239 229;
+  --g-surface: 251 248 241;
+  --g-raised: 255 253 248;
+  --g-ink: 58 42 31;
+  --g-muted: 107 88 73;
+  /* The guest site's sunset-600; its 500 (#b1542e) is under 4.5:1 for small text on cream */
+  --g-clay: 154 69 39;
+  --g-on-clay: 251 248 241;
+  --g-gold: 130 96 36;
+  --g-palm: 58 108 29;
+  --g-danger: 168 44 30;
+  --g-scrim: 42 30 22;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --g-canvas: 22 17 13;
+    --g-surface: 32 25 20;
+    --g-raised: 42 33 27;
+    --g-ink: 242 234 221;
+    --g-muted: 184 168 150;
+    --g-clay: 224 128 88;
+    --g-on-clay: 26 19 15;
+    --g-gold: 214 178 102;
+    --g-palm: 150 200 110;
+    --g-danger: 240 134 111;
+    --g-scrim: 6 4 3;
+  }
+}
+
+@layer components {
+  .guest-shell {
+    @apply bg-guest-canvas font-jost text-guest-ink antialiased;
+    color-scheme: light;
+  }
+
+  /* Base h1–h3 are Caveat app-wide. Here they default to Jost; display
+     headings opt into Cormorant with font-cormorant (utilities still win). */
+  :where(.guest-shell) :is(h1, h2, h3) {
+    @apply font-jost;
+  }
+
+  :where(.guest-shell) .card {
+    @apply rounded-[1.75rem] border-guest-ink/[0.08] bg-guest-surface shadow-guest;
+  }
+
+  /* No ring on tap, a clay ring for keyboard focus. focus:ring-0 and
+     ring-offset-0 cancel the base classes' focus ring. */
+  :where(.guest-shell) :is(.btn-primary, .btn-secondary, .btn-accent, .btn-ghost) {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-[15px] font-medium
+           transition-[background-color,border-color,color,transform] duration-300
+           ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98]
+           focus:outline-none focus:ring-0 focus:ring-offset-0
+           focus-visible:ring-2 focus-visible:ring-guest-clay/50 focus-visible:ring-offset-2 focus-visible:ring-offset-guest-canvas
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  :where(.guest-shell) .btn-primary {
+    @apply bg-guest-ink text-guest-canvas shadow-[inset_0_1px_0_rgb(255_255_255/0.14)] hover:bg-guest-ink/90;
+  }
+  :where(.guest-shell) .btn-accent {
+    @apply bg-guest-clay text-guest-on-clay shadow-[inset_0_1px_0_rgb(255_255_255/0.18)] hover:bg-guest-clay/90;
+  }
+  :where(.guest-shell) .btn-secondary {
+    @apply border border-guest-ink/15 bg-guest-raised text-guest-ink hover:border-guest-ink/25 hover:bg-guest-ink/[0.04];
+  }
+  :where(.guest-shell) .btn-ghost {
+    @apply bg-transparent px-3 text-guest-muted hover:bg-guest-ink/[0.06] hover:text-guest-ink;
+  }
+
+  :where(.guest-shell) .input {
+    @apply rounded-2xl border-guest-ink/15 bg-guest-raised px-4 py-3 text-[15px] text-guest-ink placeholder-guest-muted
+           shadow-[inset_0_1px_2px_rgb(var(--g-scrim)/0.05)]
+           focus:border-guest-clay focus:ring-4 focus:ring-guest-clay/15;
+  }
+  :where(.guest-shell) .input[aria-invalid='true'] {
+    @apply border-guest-danger/60 focus:border-guest-danger focus:ring-guest-danger/15;
+  }
+
+  /* Frosted bar (web approximation of a glass material); solid when the
+     system asks for less transparency. */
+  .guest-glass {
+    background-color: rgb(var(--g-canvas) / 0.78);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .guest-shell {
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .guest-glass {
+    background-color: rgb(var(--g-canvas));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-shimmer,
   .animate-breathe,
