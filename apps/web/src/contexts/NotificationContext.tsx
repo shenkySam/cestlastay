@@ -42,14 +42,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     socket.emit('subscribe', { userId: user.id });
 
-    socket.on('notification:new', (n: INotification) => {
+    const onNotification = (n: INotification) => {
       setNotifications((prev) => [n, ...prev]);
       toast.success(n.title, { id: n.id });
-    });
+    };
+    socket.on('notification:new', onNotification);
 
     return () => {
       socket.emit('unsubscribe', { userId: user.id });
-      socket.off('notification:new');
+      // Remove only this listener — the admin dashboard listens on the same event
+      socket.off('notification:new', onNotification);
     };
   }, [socket, user]);
 

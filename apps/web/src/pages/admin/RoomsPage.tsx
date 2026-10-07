@@ -1,16 +1,50 @@
-import { useEffect, useState } from 'react';
-import api from '@/lib/api';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { IRoom, IRoomCategory, RoomStatus, RoomType } from '@shared/index';
+import { BedIcon, FunnelSimpleIcon, PencilSimpleIcon, PlusIcon, TrashIcon, WrenchIcon } from '@phosphor-icons/react';
+import api from '@/lib/api';
+import { IRoom, IRoomCategory, RoomStatus } from '@shared/index';
+import {
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  FilterPills,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  PageHeader,
+  Panel,
+  Skeleton,
+  StatusDot,
+  humanize,
+  riseItem,
+  stagger,
+} from '@/components/admin/ui';
+import type { SegmentOption, Tone } from '@/components/admin/ui';
 
-const STATUS_BADGE: Record<RoomStatus, string> = {
-  [RoomStatus.AVAILABLE]: 'badge-green',
-  [RoomStatus.OCCUPIED]: 'badge-red',
-  [RoomStatus.RESERVED]: 'badge-blue',
-  [RoomStatus.CLEANING]: 'badge-yellow',
-  [RoomStatus.MAINTENANCE]: 'badge-gray',
-  [RoomStatus.OUT_OF_ORDER]: 'badge-red',
+/** Status light per room state. Occupied and reserved share lagoon; only occupied breathes. */
+const STATUS_TONE: Record<RoomStatus, { tone: Tone; pulse: boolean }> = {
+  [RoomStatus.AVAILABLE]: { tone: 'emerald', pulse: false },
+  [RoomStatus.OCCUPIED]: { tone: 'lagoon', pulse: true },
+  [RoomStatus.RESERVED]: { tone: 'lagoon', pulse: false },
+  [RoomStatus.CLEANING]: { tone: 'amber', pulse: true },
+  [RoomStatus.MAINTENANCE]: { tone: 'rose', pulse: true },
+  [RoomStatus.OUT_OF_ORDER]: { tone: 'rose', pulse: true },
 };
+
+const STATUS_OPTIONS: SegmentOption<string>[] = [
+  { value: '', label: 'All' },
+  ...Object.values(RoomStatus).map((s) => ({
+    value: s,
+    label: (
+      <>
+        <StatusDot tone={STATUS_TONE[s].tone} pulse={false} />
+        {humanize(s)}
+      </>
+    ),
+  })),
+];
 
 const EMPTY_ROOM = { roomNumber: '', categoryId: '', floor: 1, maintenanceNotes: '' };
 
@@ -22,6 +56,16 @@ export default function AdminRoomsPage() {
   const [editing, setEditing] = useState<IRoom | null>(null);
   const [form, setForm] = useState(EMPTY_ROOM);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  // Enter now submits the form, so guard against a second request in flight
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [pendingDelete, setPendingDelete] = useState<IRoom | null>(null);
+
+  // Keeps the dialog title stable while it animates out after `pendingDelete` clears.
+  const lastPending = useRef<IRoom | null>(null);
+  if (pendingDelete) lastPending.current = pendingDelete;
+  const deleteTarget = pendingDelete ?? lastPending.current;
 
   useEffect(() => {
     load();
@@ -29,6 +73,7 @@ export default function AdminRoomsPage() {
 
   async function load() {
     setLoading(true);
+    setError(false);
     try {
       const [roomsRes, catsRes] = await Promise.all([
         api.get('/rooms', { params: filterStatus ? { status: filterStatus } : {} }),
@@ -36,6 +81,8 @@ export default function AdminRoomsPage() {
       ]);
       setRooms(roomsRes.data);
       setCategories(catsRes.data);
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -59,6 +106,9 @@ export default function AdminRoomsPage() {
   }
 
   async function handleSave() {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       if (editing) {
         await api.patch(`/rooms/${editing.id}`, {
@@ -75,11 +125,24 @@ export default function AdminRoomsPage() {
       load();
     } catch {
       // errors shown by interceptor
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   }
 
-  async function handleDelete(room: IRoom) {
-    if (!confirm(`Delete room ${room.roomNumber}?`)) return;
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    handleSave();
+  }
+
+  function handleDelete(room: IRoom) {
+    setPendingDelete(room);
+  }
+
+  async function confirmDelete() {
+    const room = pendingDelete;
+    if (!room) return;
     try {
       await api.delete(`/rooms/${room.id}`);
       toast.success('Room deleted');
@@ -87,141 +150,262 @@ export default function AdminRoomsPage() {
     } catch {
       // errors shown by interceptor
     }
+    setPendingDelete(null);
   }
 
+  // Server returns rooms ordered by floor, then room number.
+  const floors = Array.from(
+    rooms.reduce((map, room) => map.set(room.floor, [...(map.get(room.floor) ?? []), room]), new Map<number, IRoom[]>()),
+  ).sort(([a], [b]) => a - b);
+
+  const initialLoad = loading && rooms.length === 0;
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Room Management</h2>
-          <p className="text-gray-500 text-sm mt-1">{rooms.length} rooms total</p>
-        </div>
-        <button className="btn-primary" onClick={openCreate}>+ Add Room</button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {['', ...Object.values(RoomStatus)].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-              filterStatus === s
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {s || 'All'}
+    <div className="space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Operations"
+        title="Rooms"
+        description="Every room by floor. Set its category, floor and maintenance notes here."
+        actions={
+          <button type="button" className="btn-primary" onClick={openCreate}>
+            <PlusIcon size={16} weight="regular" aria-hidden />
+            Add room
           </button>
-        ))}
+        }
+      />
+
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <FilterPills
+          options={STATUS_OPTIONS}
+          value={filterStatus}
+          onChange={setFilterStatus}
+          layoutId="rooms-status"
+          aria-label="Filter rooms by status"
+          className="min-w-0"
+        />
+        {!initialLoad && !error && (
+          <p className="shrink-0 text-xs text-zinc-500">
+            <span className="font-mono tabular-nums text-zinc-900">{rooms.length}</span>{' '}
+            {rooms.length === 1 ? 'room' : 'rooms'}
+          </p>
+        )}
       </div>
 
-      {/* Room grid */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {rooms.map((room) => (
-            <div key={room.id} className="card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-bold text-gray-900">#{room.roomNumber}</span>
-                <span className={`badge ${STATUS_BADGE[room.status]}`}>{room.status}</span>
-              </div>
-              <div className="text-sm text-gray-600 space-y-0.5">
-                <p>{room.category?.name}</p>
-                <p className="text-gray-400">Floor {room.floor}</p>
-                <p className="font-medium text-gray-800">
-                  ${Number(room.category?.basePrice ?? 0).toFixed(0)}/night
-                </p>
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button
-                  className="btn-secondary text-xs py-1 px-2 flex-1"
-                  onClick={() => openEdit(room)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btn-danger text-xs py-1 px-2 flex-1"
-                  onClick={() => handleDelete(room)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {rooms.length === 0 && !loading && (
-        <div className="text-center py-12 text-gray-400 card">No rooms found.</div>
-      )}
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 className="text-lg font-semibold">{editing ? 'Edit Room' : 'Add Room'}</h3>
-
-            {!editing && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-                <input
-                  className="input"
-                  value={form.roomNumber}
-                  onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
-                  placeholder="e.g. 305"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select
-                className="input"
-                value={form.categoryId}
-                onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Floor</label>
-              <input
-                className="input"
-                type="number"
-                min={1}
-                value={form.floor}
-                onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Maintenance Notes</label>
-              <textarea
-                className="input"
-                rows={2}
-                value={form.maintenanceNotes}
-                onChange={(e) => setForm({ ...form, maintenanceNotes: e.target.value })}
-                placeholder="Optional"
-              />
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button className="btn-primary flex-1" onClick={handleSave}>
-                {editing ? 'Save Changes' : 'Create Room'}
-              </button>
-              <button className="btn-secondary flex-1" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-            </div>
+      {initialLoad ? (
+        <div role="status" aria-label="Loading rooms" className="space-y-3">
+          <Skeleton className="h-3 w-16 rounded-full" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 8 }, (_, i) => (
+              <Skeleton key={i} className="h-[13.5rem] rounded-[2rem]" />
+            ))}
           </div>
         </div>
+      ) : error ? (
+        <ErrorState title="Couldn't load rooms" onRetry={load} />
+      ) : rooms.length === 0 ? (
+        <Panel variants={riseItem} initial="hidden" animate="show">
+          {filterStatus ? (
+            <EmptyState
+              icon={FunnelSimpleIcon}
+              title="No rooms with this status"
+              description={`None are marked “${humanize(filterStatus)}” right now. Switch the filter back to All to see every room.`}
+              action={
+                <button type="button" className="btn-secondary" onClick={() => setFilterStatus('')}>
+                  Show all rooms
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon={BedIcon}
+              title="No rooms yet"
+              description="Add a room and assign it a stay category so it can be booked."
+              action={
+                <button type="button" className="btn-primary" onClick={openCreate}>
+                  <PlusIcon size={16} weight="regular" aria-hidden />
+                  Add room
+                </button>
+              }
+            />
+          )}
+        </Panel>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          aria-busy={loading}
+          className={clsx('space-y-8 transition-opacity duration-300', loading && 'opacity-60')}
+        >
+          {floors.map(([floor, list]) => (
+            <motion.div key={floor} variants={stagger} className="space-y-3">
+              <div className="flex items-center gap-3">
+                <h2 className="eyebrow">
+                  Floor <span className="font-mono">{floor}</span>
+                </h2>
+                <span aria-hidden className="h-px flex-1 bg-zinc-200/70" />
+                <span className="font-mono text-xs tabular-nums text-zinc-400">
+                  {list.length} {list.length === 1 ? 'room' : 'rooms'}
+                </span>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {list.map((room) => {
+                  const status = STATUS_TONE[room.status];
+                  return (
+                    <Panel key={room.id} variants={riseItem} flush bodyClassName="gap-5 p-6">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="flex items-center gap-2 pt-2 text-xs font-medium text-zinc-600">
+                          <StatusDot tone={status.tone} pulse={status.pulse} />
+                          {humanize(room.status)}
+                        </p>
+                        <div className="-mr-2 -mt-0.5 flex items-center">
+                          <button
+                            type="button"
+                            className="btn-icon"
+                            aria-label={`Edit room ${room.roomNumber}`}
+                            onClick={() => openEdit(room)}
+                          >
+                            <PencilSimpleIcon size={16} weight="regular" />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-icon hover:bg-rose-50 hover:text-rose-600"
+                            aria-label={`Delete room ${room.roomNumber}`}
+                            onClick={() => handleDelete(room)}
+                          >
+                            <TrashIcon size={16} weight="regular" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="min-w-0">
+                        <h3 className="font-mono text-3xl font-medium leading-none tracking-tight text-zinc-950">
+                          <span className="sr-only">Room </span>
+                          {room.roomNumber}
+                        </h3>
+                        <p className="mt-2 truncate text-sm text-zinc-600">{room.category?.name ?? '—'}</p>
+                      </div>
+
+                      {room.maintenanceNotes && (
+                        <p className="flex items-start gap-1.5 text-xs leading-relaxed text-zinc-500">
+                          <WrenchIcon size={14} weight="regular" aria-hidden className="mt-0.5 shrink-0 text-zinc-400" />
+                          <span className="line-clamp-2">{room.maintenanceNotes}</span>
+                        </p>
+                      )}
+
+                      <div className="mt-auto flex items-baseline justify-between gap-3 border-t border-zinc-100 pt-4 text-xs text-zinc-500">
+                        <span>
+                          Floor <span className="font-mono tabular-nums text-zinc-700">{room.floor}</span>
+                        </span>
+                        <span>
+                          <span className="font-mono text-sm font-medium tabular-nums text-zinc-900">
+                            ${Number(room.category?.basePrice ?? 0).toFixed(0)}
+                          </span>
+                          /night
+                        </span>
+                      </div>
+                    </Panel>
+                  );
+                })}
+              </div>
+            </motion.div>
+          ))}
+        </motion.div>
       )}
+
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title={editing ? `Edit room ${editing.roomNumber}` : 'Add room'}
+        description={editing ? undefined : "The room number can't be changed later."}
+      >
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody>
+            <div className="grid gap-4">
+              {!editing && (
+                <div className="grid gap-2">
+                  <label htmlFor="room-number" className="text-sm font-medium text-zinc-700">
+                    Room number
+                  </label>
+                  <input
+                    id="room-number"
+                    className="input font-mono"
+                    value={form.roomNumber}
+                    onChange={(e) => setForm({ ...form, roomNumber: e.target.value })}
+                    placeholder="e.g. 305"
+                  />
+                </div>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                <div className="grid gap-2">
+                  <label htmlFor="room-category" className="text-sm font-medium text-zinc-700">
+                    Category
+                  </label>
+                  <select
+                    id="room-category"
+                    className="input"
+                    value={form.categoryId}
+                    onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-2">
+                  <label htmlFor="room-floor" className="text-sm font-medium text-zinc-700">
+                    Floor
+                  </label>
+                  <input
+                    id="room-floor"
+                    className="input font-mono tabular-nums"
+                    type="number"
+                    min={1}
+                    value={form.floor}
+                    onChange={(e) => setForm({ ...form, floor: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <label htmlFor="room-notes" className="text-sm font-medium text-zinc-700">
+                  Maintenance notes
+                </label>
+                <textarea
+                  id="room-notes"
+                  className="input"
+                  rows={2}
+                  value={form.maintenanceNotes}
+                  onChange={(e) => setForm({ ...form, maintenanceNotes: e.target.value })}
+                  placeholder="Optional"
+                />
+                <p className="text-xs text-zinc-500">Shown on the room card. Leave empty if there's nothing to flag.</p>
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Create room'}
+            </button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={`Delete room ${deleteTarget?.roomNumber ?? ''}?`}
+        description="This permanently removes the room from your inventory."
+        confirmLabel="Delete room"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

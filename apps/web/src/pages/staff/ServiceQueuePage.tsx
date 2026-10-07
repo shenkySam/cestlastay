@@ -58,10 +58,12 @@ export default function StaffServiceQueuePage() {
 
   useEffect(() => {
     if (!socket) return;
-    socket.on('notification:new', (n: any) => {
+    const onNotification = (n: any) => {
       if (n.type === 'SERVICE_REQUEST') load();
-    });
-    return () => { socket.off('notification:new'); };
+    };
+    socket.on('notification:new', onNotification);
+    // Remove only this listener — NotificationContext listens on the same event
+    return () => { socket.off('notification:new', onNotification); };
   }, [socket]);
 
   async function load() {
