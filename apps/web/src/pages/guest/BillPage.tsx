@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
 import type { Appearance } from '@stripe/stripe-js';
+import jostWoff2 from '@fontsource-variable/jost/files/jost-latin-wght-normal.woff2?url';
 import {
   Elements,
   PaymentElement,
@@ -24,8 +25,14 @@ const stripePromise = loadStripe(
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder',
 );
 
-// The payment form lives in Stripe's iframe, so it gets the portal's tokens as literal values
-const STRIPE_FONTS = [{ cssSrc: 'https://fonts.googleapis.com/css2?family=Jost:wght@400;500&display=swap' }];
+// The payment form lives in Stripe's iframe, so it gets the portal's tokens as literal values.
+// Jost is our self-hosted copy (absolute URL: the iframe is on Stripe's origin; vercel.json
+// sends CORS for /assets/*.woff2). No Google Fonts request.
+const JOST_SRC = `url(${new URL(jostWoff2, window.location.origin).href})`;
+const STRIPE_FONTS = [
+  { family: 'Jost', src: JOST_SRC, weight: '400' },
+  { family: 'Jost', src: JOST_SRC, weight: '500' },
+];
 
 function stripeAppearance(dark: boolean): Appearance {
   return {

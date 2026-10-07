@@ -160,6 +160,7 @@
       if (!EMAIL_RE.test(email)) return fail('Please enter a valid email.');
       if (!checkIn || !checkOut) return fail('Please choose your arrival and departure dates.');
       if (new Date(checkOut) <= new Date(checkIn)) return fail('Departure must be after arrival.');
+      if (!$('#bkAdult').checked) return fail('Please confirm you’re 18 or older to book.');
 
       const categoryId = $('#bkStay').value || undefined;
       const payload = {

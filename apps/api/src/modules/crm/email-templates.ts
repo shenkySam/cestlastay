@@ -18,22 +18,29 @@ interface DiscountEmailData {
   code: string;
   discountLabel: string;
   validUntil: Date | string;
+  unsubscribeUrl: string;
 }
 
-const wrapper = (title: string, body: string) => `
+// Physical postal address, required in commercial email (CAN-SPAM). Shown on
+// every email; keep in sync with the Terms / Privacy pages on the landing.
+const POSTAL_ADDRESS = "C'est La Stay · 10 Auroville Road, Edayanchavadi, Auroville, Tamil Nadu 605101, India";
+
+/** Marketing emails pass `unsubscribeUrl`; transactional ones (booking, reminder) don't. */
+const wrapper = (title: string, body: string, opts: { unsubscribeUrl?: string } = {}) => `
 <!DOCTYPE html>
 <html>
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f4f4f5; padding:24px; margin:0;">
     <div style="max-width:560px; margin:0 auto; background:#fff; border-radius:8px; overflow:hidden; border:1px solid #e5e7eb;">
       <div style="background:#1e40af; color:#fff; padding:20px 24px;">
-        <h1 style="margin:0; font-size:18px;">🏨 Hotel Manager</h1>
+        <h1 style="margin:0; font-size:18px;">C'est La Stay</h1>
         <p style="margin:4px 0 0 0; font-size:13px; opacity:0.85;">${title}</p>
       </div>
       <div style="padding:24px; color:#1f2937; font-size:14px; line-height:1.55;">
         ${body}
       </div>
       <div style="background:#f9fafb; padding:16px 24px; font-size:12px; color:#6b7280; border-top:1px solid #e5e7eb;">
-        Hotel Manager · automated message — please do not reply.
+        ${POSTAL_ADDRESS}${opts.unsubscribeUrl ? `
+        <br>You're receiving this because you stayed with us. <a href="${opts.unsubscribeUrl.replace(/&/g, '&amp;')}" style="color:#6b7280;">Unsubscribe from offers</a>.` : ''}
       </div>
     </div>
   </body>
@@ -88,6 +95,6 @@ export function postStayDiscountTemplate(d: DiscountEmailData) {
       <p style="margin-top:8px; color:#6b7280; font-size:13px;">${d.discountLabel} · valid until ${format(new Date(d.validUntil), 'dd MMM yyyy')}</p>
     </div>
     <p>We can't wait to welcome you back.</p>
-  `);
+  `, { unsubscribeUrl: d.unsubscribeUrl });
   return { subject, html };
 }

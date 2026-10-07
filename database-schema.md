@@ -23,6 +23,7 @@ service_request (0..1) ─── (0..*) invoice_items
 bookings (1) ─── (0..1) rating (0..*) ─── (1) guests
 
 newsletter_subscribers — standalone (no relations)
+marketing_opt_outs — standalone (no relations)
 ```
 
 ---
@@ -430,6 +431,20 @@ Footer newsletter signups from the public landing (`POST /crm/subscribe`). Stand
 - on `created_at` (admin list is newest-first)
 
 Migration: `20260626120000_add_newsletter_subscriber`.
+
+---
+
+#### `marketing_opt_outs`
+Emails that unsubscribed from marketing: the post-stay offer email (`LOYALTY_DISCOUNT`) and the newsletter. Written by `POST /crm/unsubscribe` (the signed link in marketing email). Booking confirmations and check-in reminders are transactional and still go out. Standalone, no foreign keys.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `email` | VARCHAR | PK | Stored trimmed + lowercased |
+| `created_at` | TIMESTAMP | DEFAULT now() | Opt-out time |
+
+Unsubscribing also deletes the email's `newsletter_subscribers` row. Subscribing again (`POST /crm/subscribe`) deletes the opt-out, since it's fresh consent.
+
+Migration: `20261008000000_add_marketing_opt_outs`.
 
 ---
 

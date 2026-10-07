@@ -114,6 +114,7 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 | `payments` | invoiceId, amount, method, status, stripePaymentId | Stripe payment records |
 | `notifications` | userId, type, status (UNREAD/READ), title, message, link | userId → users.id (not guests.id) |
 | `email_logs` | recipientEmail, type, status, sendgridId | CRM email tracking |
+| `marketing_opt_outs` | email (PK, lowercased) | Unsubscribed from marketing (post-stay offer + newsletter); written by `POST /crm/unsubscribe` |
 | `loyalty_discounts` | code, discountType, discountValue, validFrom, validUntil | Post-stay discount codes |
 | `ratings` | bookingId (unique), guestId, overallRating, roomRating, comment | Post-stay reviews — one per booking |
 | `audit_logs` | userId (no FK), action, entity, entityId, changes | Immutable action log (no `updated_at`) |
@@ -316,6 +317,11 @@ RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=           # whsec_… from the Resend webhook
 RESEND_FORWARD_TO=               # comma-separated team inboxes
 RESEND_FORWARD_FROM="C'est La Stay Inbox <stay@cestlastay.com>"
+
+# Optional — signs unsubscribe links in marketing email (falls back to JWT_SECRET;
+# set it so rotating JWT_SECRET doesn't break links already sent). The one-click
+# List-Unsubscribe header uses RAILWAY_PUBLIC_DOMAIN, which Railway injects.
+UNSUBSCRIBE_SECRET=
 
 # apps/web/.env
 VITE_API_URL=http://localhost:3000/api/v1

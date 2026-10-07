@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>C'est La Stay</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Self-hosted fonts (no Google Fonts request) — see /fonts/fonts.css -->
+<link rel="preload" as="font" type="font/woff2" href="/fonts/jost-latin-wght-normal.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="/fonts/cormorant-garamond-latin-wght-normal.woff2" crossorigin>
+<link rel="stylesheet" href="/fonts/fonts.css">
 
 <!-- Preload the LCP hero image (responsive AVIF — see scripts/optimize-images.mjs) -->
 <link rel="preload" as="image" type="image/avif"
@@ -48,9 +49,10 @@
   gtag('config', 'G-RMSX00BFPQ');
 </script>
 
-<!-- three.js for the WebGL sphere + particle scene (loaded by /earthen-init.js) -->
+<!-- three.js for the WebGL sphere + particle scene (loaded by /earthen-init.js).
+     Self-hosted copy of three@0.160.0 under /vendor (no third-party CDN). -->
 <script type="importmap">
-{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+{"imports":{"three":"/vendor/three@0.160.0/build/three.module.min.js","three/addons/":"/vendor/three@0.160.0/examples/jsm/"}}
 </script>
 <style>
   :root{
@@ -282,6 +284,9 @@
   .mfield input,.mfield select,.mfield textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:3px;padding:11px 13px;font-family:'Jost',sans-serif;font-size:15px;color:var(--ink);outline:none}
   .mfield input:focus,.mfield select:focus,.mfield textarea:focus{border-color:var(--clay)}
   .mrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mcheck{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5;color:var(--ink-soft);margin:4px 0 2px;cursor:pointer}
+  .mcheck input{flex-shrink:0;width:16px;height:16px;margin-top:2px;accent-color:var(--clay)}
+  .mcheck a{color:var(--clay);border-bottom:1px solid currentColor}
   .modal .btn-solid{width:100%;margin-top:8px;padding:15px}
   .modal-msg{font-size:13px;margin-top:12px;min-height:18px}
   .modal-msg.err{color:#b3261e}
@@ -289,6 +294,7 @@
   .modal-done .tick{width:58px;height:58px;border-radius:50%;background:#e7efe3;color:#3f6b3f;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px}
   .news-msg{font-size:13px;margin-top:8px;color:#3f6b3f}
   .news-msg.err{color:#b3261e}
+  .news-note{font-size:12px;margin-top:10px;color:var(--ink-soft)}
 
   /* availability search results */
   .avail-msg{margin-top:18px;font-size:14px;color:var(--clay);min-height:18px}
@@ -531,6 +537,7 @@
           <button type="submit" aria-label="Subscribe">→</button>
         </form>
         <p class="news-msg" id="newsMsg" role="status"></p>
+        <p class="news-note">By subscribing you confirm you’re 18 or older. Unsubscribe anytime.</p>
       </div>
     </div>
     <div class="foot-bottom">
@@ -565,6 +572,7 @@
           <div class="mfield"><label for="bkStay">Stay</label><select id="bkStay"></select></div>
         </div>
         <div class="mfield"><label for="bkNotes">Special requests <span style="text-transform:none;letter-spacing:0">(optional)</span></label><textarea id="bkNotes" rows="2"></textarea></div>
+        <label class="mcheck" for="bkAdult"><input id="bkAdult" type="checkbox" required><span>I’m 18 or older and agree to the <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
         <p class="modal-msg" id="bkMsg" role="status"></p>
         <button class="btn btn-solid" type="submit" id="bkSubmit">Request to reserve</button>
       </form>

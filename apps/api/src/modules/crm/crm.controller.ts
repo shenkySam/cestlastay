@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -30,6 +32,16 @@ export class CrmController {
   @Roles(UserRole.ADMIN)
   listSubscribers() {
     return this.service.listSubscribers();
+  }
+
+  // Called by the web app's /unsubscribe page and by mail clients' RFC 8058
+  // one-click POSTs (body `List-Unsubscribe=One-Click`, ignored). The HMAC
+  // token in `t` is the auth.
+  @Post('unsubscribe')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  unsubscribe(@Query('e') email?: string, @Query('t') token?: string) {
+    return this.service.unsubscribe(email, token);
   }
 
   // ── Email logs ──────────────────────────────────────

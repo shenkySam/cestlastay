@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -90,6 +91,15 @@ export class CrmService {
     });
     if (!booking) return;
 
+    // Points are earned by the stay, whether or not the guest takes offers
+    await this.prisma.guest.update({
+      where: { id: booking.guestId },
+      data: { loyaltyPoints: { increment: 100 } },
+    });
+
+    // This email is marketing: none (and no code) for guests who unsubscribed
+    if (await this.isOptedOut(booking.guest.email)) return;
+
     // Generate a unique loyalty discount code for this guest
     const code = `LOYAL-${codeGen()}`;
     const discountValue = 10; // 10% off
@@ -114,12 +124,7 @@ export class CrmService {
       code: discount.code,
       discountLabel: `${discountValue}% off your next stay`,
       validUntil: discount.validUntil,
-    });
-
-    // Bump loyalty points for guest
-    await this.prisma.guest.update({
-      where: { id: booking.guestId },
-      data: { loyaltyPoints: { increment: 100 } },
+      unsubscribeUrl: this.unsubscribeUrl(booking.guest.email),
     });
 
     return this.email.send({
@@ -128,6 +133,7 @@ export class CrmService {
       type: 'LOYALTY_DISCOUNT',
       subject,
       html,
+      headers: this.oneClickUnsubscribeHeaders(booking.guest.email),
     });
   }
 
@@ -274,11 +280,15 @@ export class CrmService {
 
   async subscribe(dto: SubscribeDto) {
     const email = dto.email.trim().toLowerCase();
-    const subscriber = await this.prisma.newsletterSubscriber.upsert({
-      where: { email },
-      update: {},
-      create: { email, source: dto.source ?? 'guest-footer' },
-    });
+    const [subscriber] = await this.prisma.$transaction([
+      this.prisma.newsletterSubscriber.upsert({
+        where: { email },
+        update: {},
+        create: { email, source: dto.source ?? 'guest-footer' },
+      }),
+      // Subscribing again is fresh consent: lift an earlier opt-out
+      this.prisma.marketingOptOut.deleteMany({ where: { email } }),
+    ]);
     return { ok: true, id: subscriber.id };
   }
 
@@ -287,6 +297,75 @@ export class CrmService {
       orderBy: { createdAt: 'desc' },
       take: 500,
     });
+  }
+
+  // ── Unsubscribe ───────────────────────────────────────────────
+
+  /**
+   * Opt an email out of marketing (post-stay offers + newsletter). The token
+   * from the email's link is the only auth, so the endpoint is public.
+   */
+  async unsubscribe(email: string | undefined, token: string | undefined) {
+    const normalized = (email ?? '').trim().toLowerCase();
+    if (!normalized || !token || !this.isValidUnsubscribeToken(normalized, token)) {
+      throw new BadRequestException('This unsubscribe link is invalid.');
+    }
+    await this.prisma.$transaction([
+      this.prisma.marketingOptOut.upsert({
+        where: { email: normalized },
+        update: {},
+        create: { email: normalized },
+      }),
+      this.prisma.newsletterSubscriber.deleteMany({ where: { email: normalized } }),
+    ]);
+    return { ok: true, email: normalized };
+  }
+
+  private async isOptedOut(email: string) {
+    const row = await this.prisma.marketingOptOut.findUnique({
+      where: { email: email.trim().toLowerCase() },
+    });
+    return row !== null;
+  }
+
+  // HMAC of the email, so links can't be forged for other addresses. Falls back
+  // to JWT_SECRET; set UNSUBSCRIBE_SECRET to rotate that without breaking links.
+  private unsubscribeToken(email: string) {
+    const secret =
+      this.config.get<string>('UNSUBSCRIBE_SECRET') || this.config.getOrThrow<string>('JWT_SECRET');
+    return createHmac('sha256', secret)
+      .update(`unsubscribe:${email.trim().toLowerCase()}`)
+      .digest('base64url');
+  }
+
+  private isValidUnsubscribeToken(email: string, token: string) {
+    const expected = Buffer.from(this.unsubscribeToken(email));
+    const given = Buffer.from(token);
+    return expected.length === given.length && timingSafeEqual(expected, given);
+  }
+
+  private unsubscribeQuery(email: string) {
+    return new URLSearchParams({
+      e: email.trim().toLowerCase(),
+      t: this.unsubscribeToken(email),
+    }).toString();
+  }
+
+  // The footer link opens a confirmation page in the web app; a GET must not
+  // unsubscribe by itself, since mail scanners prefetch links.
+  private unsubscribeUrl(email: string) {
+    return `${this.frontendUrl()}/unsubscribe?${this.unsubscribeQuery(email)}`;
+  }
+
+  // RFC 8058 one-click unsubscribe: mail clients POST straight to the API.
+  // Needs the API's public host, which Railway injects; omitted elsewhere.
+  private oneClickUnsubscribeHeaders(email: string): Record<string, string> | undefined {
+    const domain = this.config.get<string>('RAILWAY_PUBLIC_DOMAIN');
+    if (!domain) return undefined;
+    return {
+      'List-Unsubscribe': `<https://${domain}/api/v1/crm/unsubscribe?${this.unsubscribeQuery(email)}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    };
   }
 
   // ── Helpers ───────────────────────────────────────────────────

@@ -53,7 +53,7 @@ Deployment steps and required env vars live in [DEPLOYMENT.md](DEPLOYMENT.md).
 |-----|-------|------|
 | `apps/api` | NestJS 10, Prisma 6, Socket.IO, JWT, Stripe, SendGrid, Resend | REST API + real-time gateway + cron jobs + inbound-mail webhook |
 | `apps/web` | React 18 + Vite, React Router, Tailwind | Admin / staff / guest-portal SPA (authenticated); one sign-in page at `/login` (`?as=guest\|staff`) |
-| `apps/guest` | Static `index.html` + vanilla JS in `public/` (three.js via CDN importmap); Vite only serves/copies it | Public marketing landing + self-service booking |
+| `apps/guest` | Static `index.html` + vanilla JS in `public/` (self-hosted three.js via importmap); Vite only serves/copies it | Public marketing landing + self-service booking |
 
 > `apps/guest/src/` holds an earlier React/Tailwind/GSAP version of the landing that isn't loaded by `index.html` and doesn't ship. Make landing changes in `index.html` and `public/*.js`.
 | `packages/shared` | TypeScript | Shared types, enums, constants |
