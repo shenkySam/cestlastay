@@ -29,7 +29,7 @@ This document outlines the technology choices for the Hotel Management System an
 apps/
   ├── api/          # NestJS backend (REST + Socket.IO)
   ├── web/          # React admin/staff/guest portal
-  └── guest/        # "C'est La Stay" public landing — static HTML + plain JS (three.js via CDN)
+  └── guest/        # "C'est La Stay" public landing — static HTML + plain JS (self-hosted three.js)
 packages/
   └── shared/       # Shared TypeScript types, enums, constants
 ```
@@ -140,7 +140,7 @@ packages/
 ### Guest landing (`apps/guest`)
 
 The live public `C'est La Stay` site is **not** a React app. It is a hand-written static `index.html` with its CSS inline, plus plain ES-module/classic scripts in `public/`. Vite serves it in dev and copies it to `dist/` on build; nothing in it is bundled.
-- **three.js 0.160** loaded from unpkg through an `importmap` in `index.html`: the faceted "Matrimandir" sphere (`sphere.js`) and the scroll-driven particle field (`scene-earthen.js`: hero depth plane → frame → dome → terrain)
+- **three.js 0.160**, self-hosted under `public/vendor/three@0.160.0/` (core + the OrbitControls and RoomEnvironment addons) and loaded through an `importmap` in `index.html`: the faceted "Matrimandir" sphere (`sphere.js`) and the scroll-driven particle field (`scene-earthen.js`: hero depth plane → frame → dome → terrain)
 - **2D canvas** fireflies (`particles.js`), with no WebGL needed
 - **Vanilla JS** (`site.js`) for the booking modal, live prices, availability and newsletter. The API base is chosen by hostname at runtime
 - **sharp** (dev only), used by `scripts/optimize-images.mjs` to pre-generate AVIF/WebP variants

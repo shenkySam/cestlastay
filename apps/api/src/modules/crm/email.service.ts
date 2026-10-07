@@ -18,6 +18,8 @@ interface SendEmailParams {
   type: EmailType;
   subject: string;
   html: string;
+  /** Extra MIME headers, e.g. List-Unsubscribe on marketing email */
+  headers?: Record<string, string>;
 }
 
 @Injectable()
@@ -70,6 +72,7 @@ export class EmailService {
         from: { email: this.fromEmail, name: this.fromName },
         subject: params.subject,
         html: params.html,
+        headers: params.headers,
       });
       const sgId = response.headers['x-message-id'] as string | undefined;
       await this.prisma.emailLog.update({

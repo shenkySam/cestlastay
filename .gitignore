@@ -11,6 +11,8 @@ dist
 build
 .next
 out
+# ...except vendored three.js on the landing (its upstream folder is named build/)
+!apps/guest/public/vendor/three@0.160.0/build/
 
 # Environment variables
 .env

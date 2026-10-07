@@ -314,7 +314,7 @@ packages/shared/src/
 
 ```
 apps/guest/
-├── index.html                      # The whole page: markup, styles, SEO/schema/GA, importmap (three@0.160 from unpkg).
+├── index.html                      # The whole page: markup, styles, SEO/schema/GA, importmap (three@0.160, self-hosted in public/vendor/).
 │                                   #   Login link → https://app.cestlastay.com/login?as=guest; stay@cestlastay.com in contact + footer
 ├── public/
 │   ├── site.js                     # Interactivity: booking modal → POST /bookings/public, availability → GET /rooms/availability,

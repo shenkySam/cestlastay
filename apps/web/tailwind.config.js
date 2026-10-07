@@ -4,15 +4,17 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        // Families are self-hosted via @fontsource-variable (imported in main.tsx),
+        // which registers them as "<Name> Variable".
         // Caveat (handwriting) — brand/display font for titles & headings only.
         // Body text keeps Tailwind's default sans-serif.
-        display: ['Caveat', 'ui-sans-serif', 'system-ui', 'cursive'],
+        display: ['"Caveat Variable"', 'Caveat', 'ui-sans-serif', 'system-ui', 'cursive'],
         // "Earthen" guest-site type, used on the sign-in page to match apps/guest
-        cormorant: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-        jost: ['Jost', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        cormorant: ['"Cormorant Garamond Variable"', '"Cormorant Garamond"', 'Georgia', 'serif'],
+        jost: ['"Jost Variable"', 'Jost', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         // Admin console ("Lagoon") — Geist for UI, Geist Mono for every number/ID
-        geist: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        'geist-mono': ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        geist: ['"Geist Variable"', 'Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        'geist-mono': ['"Geist Mono Variable"', '"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       boxShadow: {
         // Zinc-tinted diffusion shadows for admin tiles (no glows)

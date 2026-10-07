@@ -2,6 +2,12 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Toaster } from 'react-hot-toast';
 import App from './App';
+// Self-hosted fonts (bundled by Vite; no Google Fonts request)
+import '@fontsource-variable/caveat';
+import '@fontsource-variable/cormorant-garamond';
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import '@fontsource-variable/jost';
 import './styles/globals.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -578,3 +578,14 @@ model NewsletterSubscriber {
   @@index([createdAt])
   @@map("newsletter_subscribers")
 }
+
+// Emails that unsubscribed from marketing: the post-stay offer email and the
+// newsletter. Booking emails (confirmation, check-in reminder) are
+// transactional and still go out. Email is stored lowercased.
+model MarketingOptOut {
+  email String @id
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("marketing_opt_outs")
+}

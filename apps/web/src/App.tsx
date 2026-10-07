@@ -10,6 +10,7 @@ import { UserRole } from '@shared/index';
 
 // Sign-in (guests and staff)
 import LoginPage from '@/pages/auth/LoginPage';
+import UnsubscribePage from '@/pages/UnsubscribePage';
 
 // Admin pages
 import AdminDashboardPage from '@/pages/admin/DashboardPage';
@@ -49,6 +50,8 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               {/* Old guest sign-in URL — still in sent emails and bookmarks */}
               <Route path="/guest-portal" element={<Navigate to="/login?as=guest" replace />} />
+              {/* Unsubscribe link in marketing email */}
+              <Route path="/unsubscribe" element={<UnsubscribePage />} />
 
               {/* Admin routes */}
               <Route

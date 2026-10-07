@@ -300,8 +300,9 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 | POST | `/crm/discount-codes` | ADMIN | Create discount code (PERCENTAGE / FIXED) |
 | PATCH | `/crm/discount-codes/:id/toggle` | ADMIN | Activate / deactivate code |
 | DELETE | `/crm/discount-codes/:id` | ADMIN | Delete code |
-| POST | `/crm/subscribe` | [PUBLIC] | Newsletter signup from the guest site footer. Body `{ "email", "source"? }` (`source` defaults to `guest-footer`). Email is trimmed + lowercased and upserted, so re-subscribing is a no-op. Returns `{ ok: true, id }` |
+| POST | `/crm/subscribe` | [PUBLIC] | Newsletter signup from the guest site footer. Body `{ "email", "source"? }` (`source` defaults to `guest-footer`). Email is trimmed + lowercased and upserted, so re-subscribing is a no-op. Also lifts an earlier marketing opt-out. Returns `{ ok: true, id }` |
 | GET | `/crm/subscribers` | ADMIN | Newsletter subscribers, newest first (max 500) |
+| POST | `/crm/unsubscribe?e=<email>&t=<token>` | [PUBLIC] | Opt an email out of marketing (post-stay offers + newsletter). `t` is an HMAC of the email (`UNSUBSCRIBE_SECRET`, else `JWT_SECRET`). It comes from the link in marketing email (the web app's `/unsubscribe` page POSTs here) and from the `List-Unsubscribe` header (RFC 8058 one-click; the `List-Unsubscribe=One-Click` body is ignored). Returns `{ ok: true, email }`; a bad token returns 400 |
 
 **Automatic email triggers:**
 - `POST /bookings` → fires `BOOKING_CONFIRMATION`
