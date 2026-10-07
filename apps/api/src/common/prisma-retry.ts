@@ -32,6 +32,7 @@ export function violates(err: unknown, tokens: string[]): boolean {
 export const BOOKING_NUMBER_TARGET = ['booking_number', 'bookingnumber'];
 export const INVOICE_NUMBER_TARGET = ['invoice_number', 'invoicenumber'];
 export const INVOICE_BOOKING_TARGET = ['booking_id', 'bookingid'];
+export const EMPLOYEE_ID_TARGET = ['employee_id', 'employeeid'];
 
 const logger = new Logger('PrismaRetry');
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
-import { UpdateUserDto, UpdateUserStatusDto } from './dto/update-user.dto';
+import { UpdateUserDto, UpdateUserRoleDto, UpdateUserStatusDto } from './dto/update-user.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -61,6 +61,16 @@ export class UsersController {
   @Roles(UserRole.ADMIN)
   updateStatus(@Param('id') id: string, @Body() dto: UpdateUserStatusDto) {
     return this.usersService.updateStatus(id, dto);
+  }
+
+  @Patch(':id/role')
+  @Roles(UserRole.ADMIN)
+  changeRole(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserRoleDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.usersService.changeRole(id, dto, user.id);
   }
 
   @Delete(':id')

@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { motion } from 'framer-motion';
 import {
+  ArrowFatLineDownIcon,
+  ArrowFatLineUpIcon,
   IdentificationBadgeIcon,
   PauseCircleIcon,
   PlayCircleIcon,
@@ -13,6 +15,7 @@ import {
 import clsx from 'clsx';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { IUser, UserRole, UserStatus } from '@shared/index';
 import {
   Avatar,
@@ -68,6 +71,7 @@ const EMPTY_FORM = {
 };
 
 export default function AdminStaffPage() {
+  const { user: me } = useAuth();
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -76,6 +80,10 @@ export default function AdminStaffPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<IUser | null>(null);
+  const [pendingPromote, setPendingPromote] = useState<IUser | null>(null);
+  const [demoteTarget, setDemoteTarget] = useState<IUser | null>(null);
+  const [demoteForm, setDemoteForm] = useState({ department: '', position: '' });
+  const [demoting, setDemoting] = useState(false);
 
   useEffect(() => { load(); }, [filterRole]);
 
@@ -119,6 +127,35 @@ export default function AdminStaffPage() {
     }
   }
 
+  /** Resolves true on success; failures are toasted by the api interceptor. */
+  async function changeRole(user: IUser, role: UserRole, profile?: { department: string; position: string }) {
+    try {
+      await api.patch(`/users/${user.id}/role`, { role, ...profile });
+      toast.success(`${user.firstName} is now ${role === UserRole.ADMIN ? 'an admin' : 'staff'}`);
+      load();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function openDemote(user: IUser) {
+    const staff = (user as any).staff;
+    setDemoteForm({ department: staff?.department ?? '', position: staff?.position ?? '' });
+    setDemoteTarget(user);
+  }
+
+  async function onDemoteSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!demoteTarget || demoting) return;
+    setDemoting(true);
+    try {
+      if (await changeRole(demoteTarget, UserRole.STAFF, demoteForm)) setDemoteTarget(null);
+    } finally {
+      setDemoting(false);
+    }
+  }
+
   async function handleDelete(user: IUser) {
     try {
       await api.delete(`/users/${user.id}`);
@@ -149,7 +186,7 @@ export default function AdminStaffPage() {
       <PageHeader
         eyebrow="Team"
         title="Staff"
-        description="Add staff and admins, switch their access on or off, and see when they last signed in."
+        description="Add staff and admins, change their role, switch their access on or off, and see when they last signed in."
         actions={
           <button type="button" className="btn-primary" onClick={openCreate}>
             <PlusIcon size={16} weight="regular" />
@@ -235,6 +272,7 @@ export default function AdminStaffPage() {
                   const staff = (u as any).staff;
                   const status = STATUS_TONE[u.status] ?? { tone: 'zinc' as Tone, pulse: false };
                   const isActive = u.status === UserStatus.ACTIVE;
+                  const isAdmin = u.role === UserRole.ADMIN;
                   const name = `${u.firstName} ${u.lastName}`;
                   return (
                     <motion.tr key={u.id} variants={i < STAGGER_CAP ? fadeItem : undefined}>
@@ -276,6 +314,22 @@ export default function AdminStaffPage() {
                       </td>
                       <td className="py-3.5 pl-4 pr-6 md:pr-8">
                         <div className="flex items-center justify-end gap-1">
+                          {/* No self-change: the server refuses it so an admin can't lock themselves out */}
+                          {u.id !== me?.id && (
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              aria-label={isAdmin ? `Change ${name} to staff` : `Make ${name} an admin`}
+                              title={isAdmin ? 'Change to staff' : 'Make admin'}
+                              onClick={() => (isAdmin ? openDemote(u) : setPendingPromote(u))}
+                            >
+                              {isAdmin ? (
+                                <ArrowFatLineDownIcon size={18} weight="regular" />
+                              ) : (
+                                <ArrowFatLineUpIcon size={18} weight="regular" />
+                              )}
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="btn-icon"
@@ -415,6 +469,63 @@ export default function AdminStaffPage() {
             </button>
             <button type="submit" className="btn-primary" disabled={saving || !form.firstName || !form.email}>
               {saving ? 'Creating…' : 'Create account'}
+            </button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!pendingPromote}
+        tone="default"
+        title={pendingPromote ? `Make ${pendingPromote.firstName} ${pendingPromote.lastName} an admin?` : 'Make admin'}
+        description="They'll get full admin access and stop appearing in staff assignment lists. Tasks already assigned to them stay assigned."
+        confirmLabel="Make admin"
+        onCancel={() => setPendingPromote(null)}
+        onConfirm={async () => {
+          if (pendingPromote) await changeRole(pendingPromote, UserRole.ADMIN);
+          setPendingPromote(null);
+        }}
+      />
+
+      {/* Demote modal: becoming staff needs a staff profile (department + position) */}
+      <Modal
+        open={!!demoteTarget}
+        onClose={() => !demoting && setDemoteTarget(null)}
+        title={demoteTarget ? `Change ${demoteTarget.firstName} ${demoteTarget.lastName} to staff?` : 'Change to staff'}
+        description="They'll lose admin access and appear in staff assignment lists."
+        size="sm"
+      >
+        <form onSubmit={onDemoteSubmit} className="flex min-h-0 flex-1 flex-col">
+          <ModalBody>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label htmlFor="demote-department" className="text-sm font-medium text-zinc-700">Department</label>
+                <input
+                  id="demote-department"
+                  className="input"
+                  placeholder="e.g. Front Desk"
+                  value={demoteForm.department}
+                  onChange={(e) => setDemoteForm({ ...demoteForm, department: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <label htmlFor="demote-position" className="text-sm font-medium text-zinc-700">Position</label>
+                <input
+                  id="demote-position"
+                  className="input"
+                  placeholder="e.g. Receptionist"
+                  value={demoteForm.position}
+                  onChange={(e) => setDemoteForm({ ...demoteForm, position: e.target.value })}
+                />
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" className="btn-secondary" onClick={() => setDemoteTarget(null)} disabled={demoting}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={demoting}>
+              {demoting ? 'Working…' : 'Change to staff'}
             </button>
           </ModalFooter>
         </form>
