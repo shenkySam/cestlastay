@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { ComponentType, ReactNode, useEffect, useRef } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useIsPresent, type Transition } from 'framer-motion';
 import { XIcon } from '@phosphor-icons/react';
 import clsx from 'clsx';
-import { AdminSidebar } from './AdminSidebar';
 import { useScrollLock } from './hooks';
 
 /** Critically damped: a drawer that overshoots shows a gap at the screen edge. */
@@ -11,8 +10,16 @@ const slide: Transition = { type: 'spring', stiffness: 300, damping: 36 };
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
+export interface DrawerSidebarProps {
+  animatePill?: boolean;
+  headerAction?: ReactNode;
+  onNavigate?: () => void;
+}
+
 interface NavDrawerProps {
   open: boolean;
+  /** AdminSidebar or StaffSidebar */
+  sidebar: ComponentType<DrawerSidebarProps>;
   /** Esc, scrim or the close button: close and hand focus back to the menu button */
   onClose: () => void;
   /** A link was followed: close without moving focus */
@@ -20,13 +27,13 @@ interface NavDrawerProps {
 }
 
 /** Below lg the sidebar slides in from the left over a scrim. */
-export function NavDrawer({ open, onClose, onNavigate }: NavDrawerProps) {
+export function NavDrawer({ open, sidebar, onClose, onNavigate }: NavDrawerProps) {
   useScrollLock(open);
 
-  return <AnimatePresence>{open && <DrawerPanel key="drawer" onClose={onClose} onNavigate={onNavigate} />}</AnimatePresence>;
+  return <AnimatePresence>{open && <DrawerPanel key="drawer" sidebar={sidebar} onClose={onClose} onNavigate={onNavigate} />}</AnimatePresence>;
 }
 
-function DrawerPanel({ onClose, onNavigate }: Omit<NavDrawerProps, 'open'>) {
+function DrawerPanel({ sidebar: Sidebar, onClose, onNavigate }: Omit<NavDrawerProps, 'open'>) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
@@ -75,14 +82,14 @@ function DrawerPanel({ onClose, onNavigate }: Omit<NavDrawerProps, 'open'>) {
         role="dialog"
         aria-modal="true"
         aria-label="Navigation"
-        className="absolute inset-y-0 left-0 w-[min(300px,86vw)] border-r border-zinc-200/60 bg-[#f9fafb] shadow-[0_32px_64px_-24px_rgb(24_24_27/0.35)]"
+        className="absolute inset-y-0 left-0 w-[min(300px,86vw)] border-r border-zinc-200/60 bg-[var(--shell-canvas)] shadow-[0_32px_64px_-24px_rgb(24_24_27/0.35)]"
         initial={{ x: '-100%' }}
         animate={{ x: 0 }}
         exit={{ x: '-100%' }}
         transition={slide}
       >
-        <LayoutGroup id="admin-nav-drawer">
-          <AdminSidebar
+        <LayoutGroup id="nav-drawer">
+          <Sidebar
             animatePill={false}
             onNavigate={onNavigate}
             headerAction={

@@ -15,23 +15,14 @@ import {
   ModalFooter,
   PageHeader,
   Panel,
+  ROOM_STATUS_TONE,
   Skeleton,
   StatusDot,
   humanize,
   riseItem,
   stagger,
 } from '@/components/admin/ui';
-import type { SegmentOption, Tone } from '@/components/admin/ui';
-
-/** Status light per room state. Occupied and reserved share lagoon; only occupied breathes. */
-const STATUS_TONE: Record<RoomStatus, { tone: Tone; pulse: boolean }> = {
-  [RoomStatus.AVAILABLE]: { tone: 'emerald', pulse: false },
-  [RoomStatus.OCCUPIED]: { tone: 'lagoon', pulse: true },
-  [RoomStatus.RESERVED]: { tone: 'lagoon', pulse: false },
-  [RoomStatus.CLEANING]: { tone: 'amber', pulse: true },
-  [RoomStatus.MAINTENANCE]: { tone: 'rose', pulse: true },
-  [RoomStatus.OUT_OF_ORDER]: { tone: 'rose', pulse: true },
-};
+import type { SegmentOption } from '@/components/admin/ui';
 
 const STATUS_OPTIONS: SegmentOption<string>[] = [
   { value: '', label: 'All' },
@@ -39,7 +30,7 @@ const STATUS_OPTIONS: SegmentOption<string>[] = [
     value: s,
     label: (
       <>
-        <StatusDot tone={STATUS_TONE[s].tone} pulse={false} />
+        <StatusDot tone={ROOM_STATUS_TONE[s].tone} pulse={false} />
         {humanize(s)}
       </>
     ),
@@ -251,7 +242,7 @@ export default function AdminRoomsPage() {
 
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {list.map((room) => {
-                  const status = STATUS_TONE[room.status];
+                  const status = ROOM_STATUS_TONE[room.status];
                   return (
                     <Panel key={room.id} variants={riseItem} flush bodyClassName="gap-5 p-6">
                       <div className="flex items-start justify-between gap-3">

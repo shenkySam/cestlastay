@@ -4,6 +4,25 @@ import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { IBooking, IGuest, IRoom, BookingSource, BookingStatus } from '@shared/index';
 import { roomNumbersLabel } from '@/lib/rooms';
+import { motion } from 'framer-motion';
+import { AirplaneTiltIcon, CheckIcon, CoinsIcon, PercentIcon, PlusIcon, WalletIcon } from '@phosphor-icons/react';
+import {
+  EmptyState,
+  FilterPills,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  PageHeader,
+  Panel,
+  SOURCE_LABEL,
+  SkeletonRows,
+  StatTile,
+  humanize,
+  money,
+  riseItem,
+  stagger,
+} from '@/components/admin/ui';
+import type { SegmentOption } from '@/components/admin/ui';
 
 const OTA_SOURCES: BookingSource[] = [
   BookingSource.BOOKING_COM,
@@ -13,13 +32,12 @@ const OTA_SOURCES: BookingSource[] = [
   BookingSource.OTHER_OTA,
 ];
 
-const SOURCE_LABEL: Record<string, string> = {
-  [BookingSource.BOOKING_COM]: 'Booking.com',
-  [BookingSource.AIRBNB]: 'Airbnb',
-  [BookingSource.EXPEDIA]: 'Expedia',
-  [BookingSource.AGODA]: 'Agoda',
-  [BookingSource.OTHER_OTA]: 'Other OTA',
-};
+const FILTER_OPTIONS: SegmentOption<string>[] = [
+  { value: '', label: 'All sources' },
+  ...OTA_SOURCES.map((s) => ({ value: s, label: SOURCE_LABEL[s] })),
+];
+
+const money2 = (n: number | string | null | undefined) => money(n, { cents: true });
 
 const STATUS_BADGE: Record<string, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -186,145 +204,118 @@ export default function StaffOtaBookingsPage() {
     .reduce((sum, r) => sum + Number(r.category?.basePrice ?? 0), 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">OTA Bookings</h2>
-          <p className="text-gray-500 text-sm mt-1">
-            Manually enter bookings from external platforms (Booking.com, Airbnb, etc.)
-          </p>
-        </div>
-        <button className="btn-primary" onClick={openModal}>+ New OTA Booking</button>
-      </div>
-
-      {/* Revenue summary */}
-      {revenue && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'OTA Bookings', value: revenue.totals.bookings, icon: '✈️' },
-            { label: 'Gross Revenue', value: `$${revenue.totals.grossRevenue.toFixed(2)}`, icon: '💰' },
-            { label: 'Commission', value: `$${revenue.totals.commission.toFixed(2)}`, icon: '📉' },
-            { label: 'Net Revenue', value: `$${revenue.totals.netRevenue.toFixed(2)}`, icon: '✅' },
-          ].map((s) => (
-            <div key={s.label} className="card p-5">
-              <span className="text-2xl">{s.icon}</span>
-              <p className="text-2xl font-bold text-gray-900 mt-2">{s.value}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Revenue by source */}
-      {revenue && revenue.bySource.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200">
-            <h3 className="font-semibold text-gray-800">Revenue by Source</h3>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                {['Source', 'Bookings', 'Gross', 'Commission', 'Net'].map((h) => (
-                  <th key={h} className="text-left px-4 py-2 text-gray-600 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {revenue.bySource.map((row) => (
-                <tr key={row.source} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium">{SOURCE_LABEL[row.source] ?? row.source}</td>
-                  <td className="px-4 py-2">{row.bookings}</td>
-                  <td className="px-4 py-2">${row.grossRevenue.toFixed(2)}</td>
-                  <td className="px-4 py-2 text-red-600">−${row.commission.toFixed(2)}</td>
-                  <td className="px-4 py-2 font-bold text-green-700">${row.netRevenue.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setFilterSource('')}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-            filterSource === ''
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          All Sources
-        </button>
-        {OTA_SOURCES.map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilterSource(s)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-              filterSource === s
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {SOURCE_LABEL[s]}
+    <div className="space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Front desk"
+        title="OTA bookings"
+        description="Enter bookings that arrive from external platforms such as Booking.com and Airbnb."
+        actions={
+          <button type="button" className="btn-primary" onClick={openModal}>
+            <PlusIcon size={16} weight="regular" aria-hidden />
+            New OTA booking
           </button>
-        ))}
-      </div>
+        }
+      />
 
-      {/* Bookings table */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
-      ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                {['Booking #', 'OTA ID', 'Source', 'Guest', 'Room', 'Check-in', 'Total', 'Commission', 'Status'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-blue-700">{b.bookingNumber}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">{b.otaBookingId ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <span className="badge badge-blue">{SOURCE_LABEL[b.source] ?? b.source}</span>
-                  </td>
-                  <td className="px-4 py-3 font-medium">{b.guest?.firstName} {b.guest?.lastName}</td>
-                  <td className="px-4 py-3">{roomNumbersLabel(b)}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                    {format(new Date(b.checkInDate), 'dd MMM yyyy')}
-                  </td>
-                  <td className="px-4 py-3 font-medium">${Number(b.totalAmount).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-red-600">
-                    {b.otaCommission ? `$${Number(b.otaCommission).toFixed(2)}` : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`badge ${STATUS_BADGE[b.status] ?? 'badge-gray'}`}>
-                      {b.status.replace('_', ' ')}
-                    </span>
-                  </td>
+      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile variants={riseItem} label="OTA bookings" value={revenue?.totals.bookings ?? 0} icon={AirplaneTiltIcon} loading={!revenue} />
+        <StatTile variants={riseItem} label="Gross revenue" value={revenue?.totals.grossRevenue ?? 0} format={money2} icon={CoinsIcon} loading={!revenue} />
+        <StatTile variants={riseItem} label="Commission" value={revenue?.totals.commission ?? 0} format={money2} icon={PercentIcon} loading={!revenue} />
+        <StatTile variants={riseItem} label="Net revenue" value={revenue?.totals.netRevenue ?? 0} format={money2} icon={WalletIcon} loading={!revenue} />
+      </motion.div>
+
+      {revenue && revenue.bySource.length > 0 && (
+        <Panel eyebrow="Revenue" title="By source" flush>
+          <div className="overflow-x-auto pb-3">
+            <table className="w-full text-sm">
+              <thead className="border-b">
+                <tr>
+                  {['Source', 'Bookings', 'Gross', 'Commission', 'Net'].map((h) => (
+                    <th key={h} className="px-4 py-2.5 text-left first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {bookings.length === 0 && (
-            <div className="text-center py-12 text-gray-400">No OTA bookings yet.</div>
-          )}
-        </div>
+              </thead>
+              <tbody className="divide-y">
+                {revenue.bySource.map((row) => (
+                  <tr key={row.source}>
+                    <td className="py-3 pl-6 pr-4 font-medium text-zinc-900 md:pl-8">{SOURCE_LABEL[row.source] ?? humanize(row.source)}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-600">{row.bookings}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-700">{money2(row.grossRevenue)}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-500">−{money2(row.commission)}</td>
+                    <td className="py-3 pl-4 pr-6 font-mono font-medium tabular-nums text-zinc-950 md:pr-8">{money2(row.netRevenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       )}
 
-      {/* ── New OTA Booking Modal ─────────────────────────────── */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 my-8">
-            <h3 className="text-lg font-semibold">New OTA Booking</h3>
+      <FilterPills
+        options={FILTER_OPTIONS}
+        value={filterSource}
+        onChange={setFilterSource}
+        layoutId="ota-source"
+        aria-label="Filter by source"
+      />
+
+      <Panel flush>
+        {loading && bookings.length === 0 ? (
+          <SkeletonRows rows={5} avatar={false} className="px-6 md:px-8" />
+        ) : bookings.length === 0 ? (
+          <EmptyState
+            icon={AirplaneTiltIcon}
+            title={filterSource ? `No ${SOURCE_LABEL[filterSource]} bookings` : 'No OTA bookings yet'}
+            description="Add one with New OTA booking when a reservation arrives from a platform."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b">
+                <tr>
+                  {['Booking', 'OTA ID', 'Source', 'Guest', 'Room', 'Check-in', 'Total', 'Commission', 'Status'].map((h) => (
+                    <th key={h} className="whitespace-nowrap px-4 py-3.5 text-left first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {bookings.map((b) => (
+                  <tr key={b.id}>
+                    <td className="whitespace-nowrap py-3 pl-6 pr-4 font-mono text-xs text-lagoon-700 md:pl-8">{b.bookingNumber}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-zinc-600">{b.otaBookingId ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="badge badge-blue whitespace-nowrap">{SOURCE_LABEL[b.source] ?? humanize(b.source)}</span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-zinc-900">{b.guest?.firstName} {b.guest?.lastName}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-zinc-700">{roomNumbersLabel(b)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-zinc-500">{format(new Date(b.checkInDate), 'dd MMM yyyy')}</td>
+                    <td className="px-4 py-3 font-mono font-medium tabular-nums text-zinc-900">{money2(b.totalAmount)}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-500">
+                      {b.otaCommission ? money2(b.otaCommission) : '—'}
+                    </td>
+                    <td className="py-3 pl-4 pr-6 md:pr-8">
+                      <span className={`badge whitespace-nowrap ${STATUS_BADGE[b.status] ?? 'badge-gray'}`}>{humanize(b.status)}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
+      <Modal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        title="New OTA booking"
+        description="Copy the details from the platform's confirmation."
+        size="lg"
+      >
+        <ModalBody className="space-y-4">
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Source</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Source</label>
                 <select
                   className="input"
                   value={form.source}
@@ -336,7 +327,7 @@ export default function StaffOtaBookingsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">OTA Booking ID</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">OTA booking ID</label>
                 <input
                   className="input font-mono"
                   placeholder="e.g. BDC-12345678"
@@ -347,35 +338,36 @@ export default function StaffOtaBookingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="mb-1.5 block text-xs font-medium text-zinc-600">
                 Room{form.roomIds.length > 1 ? `s (${form.roomIds.length})` : ''}
               </label>
-              <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto divide-y divide-gray-100">
+              <div className="max-h-44 divide-y divide-zinc-100 overflow-y-auto rounded-2xl border border-zinc-200">
                 {rooms.map((r) => {
                   const checked = form.roomIds.includes(r.id);
                   return (
                     <label
                       key={r.id}
-                      className={`flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 ${
-                        checked ? 'bg-blue-50' : ''
+                      className={`flex cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-sm transition-colors hover:bg-zinc-50 ${
+                        checked ? 'bg-lagoon-50' : ''
                       }`}
                     >
                       <input
                         type="checkbox"
+                        className="size-4 rounded border-zinc-300 accent-zinc-900"
                         checked={checked}
                         onChange={() => toggleRoom(r.id)}
                       />
-                      <span className="font-medium">Room #{r.roomNumber}</span>
-                      <span className="text-gray-500">
-                        {r.category?.name} (Floor {r.floor}) · ${Number(r.category?.basePrice ?? 0).toFixed(0)}/night
+                      <span className="font-medium text-zinc-900">Room <span className="font-mono">{r.roomNumber}</span></span>
+                      <span className="truncate text-xs text-zinc-500">
+                        {r.category?.name} · Floor {r.floor} · {money(r.category?.basePrice ?? 0)}/night
                       </span>
                     </label>
                   );
                 })}
               </div>
               {form.roomIds.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Rack total: ${(selectedPerNight * wizardNights).toFixed(2)} — {form.roomIds.length} room
+                <p className="mt-1.5 text-xs text-zinc-500">
+                  Rack total <span className="font-mono tabular-nums text-zinc-700">{money2(selectedPerNight * wizardNights)}</span> · {form.roomIds.length} room
                   {form.roomIds.length !== 1 ? 's' : ''} × {wizardNights} night{wizardNights !== 1 ? 's' : ''}
                 </p>
               )}
@@ -383,7 +375,7 @@ export default function StaffOtaBookingsPage() {
 
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Check-in</label>
                 <input
                   type="date"
                   className="input"
@@ -392,7 +384,7 @@ export default function StaffOtaBookingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Check-out</label>
                 <input
                   type="date"
                   className="input"
@@ -402,7 +394,7 @@ export default function StaffOtaBookingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Guests</label>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">Guests</label>
                 <input
                   type="number"
                   className="input"
@@ -416,8 +408,8 @@ export default function StaffOtaBookingsPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Total Amount <span className="text-gray-400 font-normal">(OTA-supplied)</span>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                  Total amount <span className="font-normal text-zinc-400">(from the OTA)</span>
                 </label>
                 <input
                   type="number"
@@ -430,8 +422,8 @@ export default function StaffOtaBookingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Commission <span className="text-gray-400 font-normal">(default: 15-18%)</span>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-600">
+                  Commission <span className="font-normal text-zinc-400">(default 15–18%)</span>
                 </label>
                 <input
                   type="number"
@@ -446,26 +438,26 @@ export default function StaffOtaBookingsPage() {
             </div>
 
             {/* Guest selector */}
-            <div className="border-t border-gray-200 pt-4 space-y-3">
-              <p className="text-sm font-medium text-gray-700">Guest</p>
+            <div className="space-y-3 border-t border-zinc-100 pt-4">
+              <p className="text-xs font-medium text-zinc-600">Guest</p>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, useExistingGuest: false })}
-                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium ${
-                    !form.useExistingGuest ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-gray-300 text-gray-600'
+                  className={`flex-1 rounded-full border py-2 text-sm font-medium transition-colors ${
+                    !form.useExistingGuest ? 'border-lagoon-300 bg-lagoon-50 text-lagoon-800' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'
                   }`}
                 >
-                  New Guest
+                  New guest
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, useExistingGuest: true })}
-                  className={`flex-1 py-1.5 rounded-lg border text-sm font-medium ${
-                    form.useExistingGuest ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-gray-300 text-gray-600'
+                  className={`flex-1 rounded-full border py-2 text-sm font-medium transition-colors ${
+                    form.useExistingGuest ? 'border-lagoon-300 bg-lagoon-50 text-lagoon-800' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'
                   }`}
                 >
-                  Existing Guest
+                  Existing guest
                 </button>
               </div>
 
@@ -478,26 +470,27 @@ export default function StaffOtaBookingsPage() {
                     onChange={(e) => searchGuests(e.target.value)}
                   />
                   {guestResults.length > 0 && (
-                    <div className="border border-gray-200 rounded-lg max-h-32 overflow-y-auto">
+                    <div className="max-h-32 overflow-y-auto rounded-2xl border border-zinc-200 p-1">
                       {guestResults.map((g) => (
                         <button
                           key={g.id}
                           type="button"
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 ${
-                            selectedGuest?.id === g.id ? 'bg-blue-100' : ''
+                          className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-50 ${
+                            selectedGuest?.id === g.id ? 'bg-lagoon-50 ring-1 ring-inset ring-lagoon-600/15' : ''
                           }`}
                           onClick={() => selectGuest(g)}
                         >
                           <span className="font-medium">{g.firstName} {g.lastName}</span>
-                          <span className="text-gray-500 ml-2">{g.email}</span>
+                          <span className="text-zinc-500 ml-2">{g.email}</span>
                         </button>
                       ))}
                     </div>
                   )}
                   {selectedGuest && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
-                      ✓ {selectedGuest.firstName} {selectedGuest.lastName} ({selectedGuest.email})
-                    </div>
+                    <p className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/15">
+                      <CheckIcon size={14} weight="bold" aria-hidden />
+                      {selectedGuest.firstName} {selectedGuest.lastName} ({selectedGuest.email})
+                    </p>
                   )}
                 </div>
               ) : (
@@ -531,7 +524,7 @@ export default function StaffOtaBookingsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Special Requests</label>
+              <label className="mb-1.5 block text-xs font-medium text-zinc-600">Special requests</label>
               <textarea
                 className="input"
                 rows={2}
@@ -541,17 +534,16 @@ export default function StaffOtaBookingsPage() {
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <button className="btn-primary flex-1" disabled={saving} onClick={handleSubmit}>
-                {saving ? 'Creating…' : 'Create Booking'}
-              </button>
-              <button className="btn-secondary flex-1" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>
+            Cancel
+          </button>
+          <button type="button" className="btn-primary" disabled={saving} onClick={handleSubmit}>
+            {saving ? 'Creating…' : 'Create booking'}
+          </button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

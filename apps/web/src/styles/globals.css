@@ -74,97 +74,133 @@
   .badge-purple { @apply badge bg-purple-100 text-purple-800; }
 }
 
-/* ── Admin console ("Lagoon") ─────────────────────────────────────────────
-   Everything below is scoped under .admin-shell (AdminLayout's root), so the
-   staff and guest portals keep the classes above untouched. Zinc neutrals,
-   one desaturated lagoon accent, Geist + Geist Mono, pill buttons.
-   Component overrides use :where(.admin-shell) .x — same specificity as the
-   base .x rule (so they win by source order) and as utilities (which come
-   later, so `pl-10` or `hover:bg-rose-50` on the element still wins).
-   Fonts and table defaults keep .admin-shell specificity on purpose: they
-   must beat the base Caveat headings and leftover gray table utilities. */
+/* ── Console ("Lagoon"): admin and front desk ─────────────────────────────
+   Everything below is scoped under .admin-shell (AdminLayout's root) and
+   .staff-shell (StaffLayout's root), so the guest portal keeps the classes
+   above untouched. Zinc neutrals, one desaturated lagoon accent, Geist +
+   Geist Mono, pill buttons. The front desk is the same system one tier down:
+   .staff-shell remaps --lagoon-* to "mist", the same hue and lightness steps
+   at about a third of the saturation, so every lagoon-* utility and shared
+   component reads as staff without per-component overrides.
+   Component overrides use :where(.admin-shell, .staff-shell) .x — same
+   specificity as the base .x rule (so they win by source order) and as
+   utilities (which come later, so `pl-10` or `hover:bg-rose-50` still wins).
+   Fonts and table defaults keep class specificity on purpose: they must beat
+   the base Caveat headings and leftover gray table utilities. */
+:root {
+  --lagoon-50: 240 249 250;
+  --lagoon-100: 217 240 242;
+  --lagoon-200: 181 225 230;
+  --lagoon-300: 132 203 212;
+  --lagoon-400: 78 172 185;
+  --lagoon-500: 51 144 158;
+  --lagoon-600: 42 118 132;
+  --lagoon-700: 39 96 108;
+  --lagoon-800: 38 79 89;
+  --lagoon-900: 35 67 76;
+  --lagoon-950: 19 43 50;
+}
+
 @layer components {
   .admin-shell {
     @apply font-geist text-zinc-900 antialiased;
-    background-color: #f9fafb;
+    --shell-canvas: #f9fafb;
+    background-color: var(--shell-canvas);
+  }
+
+  .staff-shell {
+    @apply font-geist text-zinc-900 antialiased;
+    --shell-canvas: #f6f7f7;
+    background-color: var(--shell-canvas);
+    --lagoon-50: 243 246 247;
+    --lagoon-100: 227 234 236;
+    --lagoon-200: 200 213 216;
+    --lagoon-300: 163 183 188;
+    --lagoon-400: 124 152 159;
+    --lagoon-500: 95 125 132;
+    --lagoon-600: 77 103 109;
+    --lagoon-700: 66 86 91;
+    --lagoon-800: 56 72 76;
+    --lagoon-900: 48 61 64;
+    --lagoon-950: 29 37 39;
   }
 
   /* Base h1–h3 are Caveat app-wide; the admin uses Geist. Sizes are left alone. */
-  .admin-shell :is(h1, h2, h3) {
+  :is(.admin-shell, .staff-shell) :is(h1, h2, h3) {
     @apply font-geist tracking-tight;
   }
 
-  .admin-shell :is(.font-mono, code, kbd) {
+  :is(.admin-shell, .staff-shell) :is(.font-mono, code, kbd) {
     @apply font-geist-mono;
   }
 
-  :where(.admin-shell) .eyebrow {
+  :where(.admin-shell, .staff-shell) .eyebrow {
     @apply text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500;
   }
 
-  :where(.admin-shell) .card {
+  :where(.admin-shell, .staff-shell) .card {
     @apply rounded-[2rem] border border-zinc-200/60 bg-white shadow-diffuse;
   }
 
-  :where(.admin-shell) :is(.btn-primary, .btn-secondary, .btn-accent, .btn-danger, .btn-ghost) {
+  :where(.admin-shell, .staff-shell) :is(.btn-primary, .btn-secondary, .btn-accent, .btn-danger, .btn-ghost) {
     @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium
            transition-[background-color,border-color,color,transform] duration-300
            ease-[cubic-bezier(0.16,1,0.3,1)] active:scale-[0.98]
            focus:outline-none focus-visible:ring-2 focus-visible:ring-lagoon-500/40 focus-visible:ring-offset-2
            focus:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50;
   }
-  :where(.admin-shell) .btn-primary {
+  :where(.admin-shell, .staff-shell) .btn-primary {
     @apply bg-zinc-900 text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] hover:bg-zinc-800 focus:ring-lagoon-500/40;
   }
-  :where(.admin-shell) .btn-secondary {
+  :where(.admin-shell, .staff-shell) .btn-secondary {
     @apply border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 focus:ring-lagoon-500/40;
   }
-  :where(.admin-shell) .btn-accent {
+  :where(.admin-shell, .staff-shell) .btn-accent {
     @apply bg-lagoon-600 text-white hover:bg-lagoon-700 focus:ring-lagoon-500/40;
   }
-  :where(.admin-shell) .btn-danger {
+  :where(.admin-shell, .staff-shell) .btn-danger {
     @apply bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500/40;
   }
-  :where(.admin-shell) .btn-ghost {
+  :where(.admin-shell, .staff-shell) .btn-ghost {
     @apply bg-transparent px-3 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900;
   }
   /* Square icon-only button — always pair with aria-label */
-  :where(.admin-shell) .btn-icon {
+  :where(.admin-shell, .staff-shell) .btn-icon {
     @apply inline-flex size-9 items-center justify-center rounded-full text-zinc-500
            transition-[background-color,color,transform] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
            hover:bg-zinc-100 hover:text-zinc-900 active:scale-[0.96]
            focus:outline-none focus-visible:ring-2 focus-visible:ring-lagoon-500/40;
   }
 
-  :where(.admin-shell) .input {
+  :where(.admin-shell, .staff-shell) .input {
     @apply rounded-xl border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder-zinc-400
            shadow-[inset_0_1px_2px_rgb(24_24_27/0.04)]
            focus:border-lagoon-400 focus:ring-4 focus:ring-lagoon-500/10;
   }
-  :where(.admin-shell) .badge {
+  :where(.admin-shell, .staff-shell) .badge {
     @apply gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset;
   }
-  :where(.admin-shell) .badge-green  { @apply bg-emerald-50 text-emerald-700 ring-emerald-600/15; }
-  :where(.admin-shell) .badge-red    { @apply bg-rose-50 text-rose-700 ring-rose-600/15; }
-  :where(.admin-shell) .badge-yellow { @apply bg-amber-50 text-amber-800 ring-amber-600/20; }
-  :where(.admin-shell) .badge-blue   { @apply bg-lagoon-50 text-lagoon-800 ring-lagoon-600/20; }
-  :where(.admin-shell) .badge-gray   { @apply bg-zinc-100 text-zinc-700 ring-zinc-500/15; }
-  :where(.admin-shell) .badge-purple { @apply bg-zinc-900 text-white ring-zinc-900; }
+  :where(.admin-shell, .staff-shell) .badge-green  { @apply bg-emerald-50 text-emerald-700 ring-emerald-600/15; }
+  :where(.admin-shell, .staff-shell) .badge-red    { @apply bg-rose-50 text-rose-700 ring-rose-600/15; }
+  :where(.admin-shell, .staff-shell) .badge-yellow { @apply bg-amber-50 text-amber-800 ring-amber-600/20; }
+  :where(.admin-shell, .staff-shell) .badge-blue   { @apply bg-lagoon-50 text-lagoon-800 ring-lagoon-600/20; }
+  :where(.admin-shell, .staff-shell) .badge-gray   { @apply bg-zinc-100 text-zinc-700 ring-zinc-500/15; }
+  :where(.admin-shell, .staff-shell) .badge-purple { @apply bg-zinc-900 text-white ring-zinc-900; }
 
   /* Tables: quiet headers, hairline rows */
-  .admin-shell thead {
+  :is(.admin-shell, .staff-shell) thead {
     @apply border-zinc-100 bg-transparent;
   }
-  .admin-shell th {
+  :is(.admin-shell, .staff-shell) th {
     @apply text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500;
   }
-  .admin-shell tbody {
+  :is(.admin-shell, .staff-shell) tbody {
     @apply divide-zinc-100;
   }
-  .admin-shell tbody tr {
+  :is(.admin-shell, .staff-shell) tbody tr {
     @apply transition-colors duration-200;
   }
-  .admin-shell tbody tr:hover {
+  :is(.admin-shell, .staff-shell) tbody tr:hover {
     @apply bg-zinc-50/70;
   }
 }

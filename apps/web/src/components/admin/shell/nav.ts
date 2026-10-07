@@ -17,7 +17,7 @@ export interface AdminNavItem {
   href: string;
   icon: Icon;
   /** Extra words the command palette matches on */
-  keywords: string;
+  keywords?: string;
 }
 
 export interface AdminNavGroup {
@@ -60,15 +60,17 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
 ];
 
-const ALL_ITEMS = ADMIN_NAV.flatMap((group) => group.items);
-
 /** Page name for the top bar: the longest nav href that prefixes the path. */
-export function adminPageTitle(pathname: string): string {
-  const path = pathname.replace(/\/+$/, '') || ADMIN_HOME;
+export function navPageTitle(nav: AdminNavGroup[], home: string, pathname: string): string {
+  const path = pathname.replace(/\/+$/, '') || home;
   let best: AdminNavItem | undefined;
-  for (const item of ALL_ITEMS) {
+  for (const item of nav.flatMap((group) => group.items)) {
     const hit = path === item.href || path.startsWith(`${item.href}/`);
     if (hit && (!best || item.href.length > best.href.length)) best = item;
   }
   return best?.label ?? 'Dashboard';
+}
+
+export function adminPageTitle(pathname: string): string {
+  return navPageTitle(ADMIN_NAV, ADMIN_HOME, pathname);
 }

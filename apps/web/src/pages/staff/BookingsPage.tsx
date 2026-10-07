@@ -5,6 +5,21 @@ import toast from 'react-hot-toast';
 import { IBooking, IGuest, IRoom, IRoomCategory, BookingStatus, BookingSource } from '@shared/index';
 import InvoiceEditor from '@/components/invoices/InvoiceEditor';
 import { roomNumbersLabel } from '@/lib/rooms';
+import clsx from 'clsx';
+import { CalendarBlankIcon, CheckIcon, MagnifyingGlassIcon, PlusIcon, ReceiptIcon } from '@phosphor-icons/react';
+import {
+  EmptyState,
+  FilterPills,
+  Modal,
+  ModalBody,
+  PageHeader,
+  Panel,
+  SOURCE_LABEL,
+  SkeletonRows,
+  humanize,
+  money,
+} from '@/components/admin/ui';
+import type { SegmentOption } from '@/components/admin/ui';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -16,7 +31,15 @@ const STATUS_BADGE: Record<BookingStatus, string> = {
 };
 
 // ── Wizard types ────────────────────────────────────────────────
-type Step = 'guest' | 'room' | 'dates' | 'confirm';
+type Step = 'guest' | 'dates' | 'room' | 'confirm';
+const STEPS: Step[] = ['guest', 'dates', 'room', 'confirm'];
+
+const FILTER_OPTIONS: SegmentOption<string>[] = [
+  { value: '', label: 'All' },
+  ...Object.values(BookingStatus).map((s) => ({ value: s, label: humanize(s) })),
+];
+
+const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? humanize(s);
 
 const EMPTY_GUEST = {
   firstName: '', lastName: '', email: '', phone: '',
@@ -127,7 +150,7 @@ export default function StaffBookingsPage() {
         source,
         specialRequests: specialRequests || undefined,
       });
-      toast.success('Booking created!');
+      toast.success('Booking created');
       setShowWizard(false);
       load();
     } catch {
@@ -154,89 +177,87 @@ export default function StaffBookingsPage() {
   // ── Render ──────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Bookings</h2>
-          <p className="text-gray-500 text-sm mt-1">{bookings.length} bookings</p>
-        </div>
-        <button className="btn-primary" onClick={openWizard}>+ New Booking</button>
-      </div>
+    <div className="space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Front desk"
+        title="Bookings"
+        description={loading ? 'Loading bookings…' : `${bookings.length} ${bookings.length === 1 ? 'booking' : 'bookings'}${filterStatus || search ? ' match your filters' : ''}.`}
+        actions={
+          <button type="button" className="btn-primary" onClick={openWizard}>
+            <PlusIcon size={16} weight="regular" aria-hidden />
+            New booking
+          </button>
+        }
+      />
 
-      <div className="flex gap-3 flex-wrap items-center">
-        <input
-          className="input w-64"
-          placeholder="Search booking # or guest..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <FilterPills
+          options={FILTER_OPTIONS}
+          value={filterStatus}
+          onChange={setFilterStatus}
+          layoutId="bookings-status"
+          aria-label="Filter bookings by status"
+          className="min-w-0"
         />
-        <div className="flex gap-2 flex-wrap">
-          {['', ...Object.values(BookingStatus)].map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                filterStatus === s
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              {s || 'All'}
-            </button>
-          ))}
+        <div className="relative w-full shrink-0 lg:w-72">
+          <MagnifyingGlassIcon size={16} weight="regular" aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            className="input pl-10"
+            placeholder="Search booking # or guest…"
+            aria-label="Search bookings"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
-      ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                {['Booking #', 'Guest', 'Room', 'Check-in', 'Check-out', 'Nights', 'Total', 'Status', ''].map((h, i) => (
-                  <th key={i} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-blue-700">{b.bookingNumber}</td>
-                  <td className="px-4 py-3 font-medium">
-                    {b.guest?.firstName} {b.guest?.lastName}
-                  </td>
-                  <td className="px-4 py-3">{roomNumbersLabel(b)}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {format(new Date(b.checkInDate), 'dd MMM yyyy')}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {format(new Date(b.checkOutDate), 'dd MMM yyyy')}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{nights(b)}</td>
-                  <td className="px-4 py-3 font-medium">${Number(b.totalAmount).toFixed(2)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`badge ${STATUS_BADGE[b.status as BookingStatus]}`}>
-                      {b.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      onClick={() => setFolioBooking(b)}
-                    >
-                      Folio
-                    </button>
-                  </td>
+      <Panel flush>
+        {loading && bookings.length === 0 ? (
+          <SkeletonRows rows={6} avatar={false} className="px-6 md:px-8" />
+        ) : bookings.length === 0 ? (
+          <EmptyState
+            icon={CalendarBlankIcon}
+            title="No bookings found"
+            description={filterStatus || search ? 'Try another status or search term.' : 'Create the first booking with New booking.'}
+          />
+        ) : (
+          <div className={clsx('overflow-x-auto transition-opacity duration-300', loading && 'opacity-60')}>
+            <table className="w-full text-sm">
+              <thead className="border-b">
+                <tr>
+                  {['Booking', 'Guest', 'Room', 'Check-in', 'Check-out', 'Nights', 'Total', 'Status', ''].map((h, i) => (
+                    <th key={i} className="whitespace-nowrap px-4 py-3.5 text-left first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {bookings.length === 0 && (
-            <div className="text-center py-12 text-gray-400">No bookings found.</div>
-          )}
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y">
+                {bookings.map((b) => (
+                  <tr key={b.id}>
+                    <td className="whitespace-nowrap py-3 pl-6 pr-4 font-mono text-xs text-lagoon-700 md:pl-8">{b.bookingNumber}</td>
+                    <td className="px-4 py-3 font-medium text-zinc-900">
+                      {b.guest?.firstName} {b.guest?.lastName}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-zinc-700">{roomNumbersLabel(b)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-zinc-500">{format(new Date(b.checkInDate), 'dd MMM yyyy')}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-zinc-500">{format(new Date(b.checkOutDate), 'dd MMM yyyy')}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums text-zinc-600">{nights(b)}</td>
+                    <td className="px-4 py-3 font-mono font-medium tabular-nums text-zinc-900">{money(b.totalAmount, { cents: true })}</td>
+                    <td className="px-4 py-3">
+                      <span className={`badge whitespace-nowrap ${STATUS_BADGE[b.status as BookingStatus]}`}>{humanize(b.status)}</span>
+                    </td>
+                    <td className="py-3 pl-4 pr-4 text-right md:pr-6">
+                      <button type="button" className="btn-ghost py-1.5" onClick={() => setFolioBooking(b)}>
+                        <ReceiptIcon size={16} weight="regular" aria-hidden />
+                        Folio
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
 
       {/* ── Invoice / Folio editor ───────────────────────────────── */}
       {folioBooking && (
@@ -244,40 +265,47 @@ export default function StaffBookingsPage() {
       )}
 
       {/* ── Booking Wizard Modal ─────────────────────────────────── */}
-      {showWizard && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-5">
-            {/* Steps indicator */}
-            <div className="flex items-center gap-2 text-xs font-medium">
-              {(['guest', 'room', 'dates', 'confirm'] as Step[]).map((s, i) => (
-                <div key={s} className="flex items-center gap-1">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    step === s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>{i + 1}</div>
-                  <span className={step === s ? 'text-blue-700' : 'text-gray-400'}>
-                    {s.charAt(0).toUpperCase() + s.slice(1)}
-                  </span>
-                  {i < 3 && <span className="text-gray-300 mx-1">›</span>}
-                </div>
-              ))}
-            </div>
+      <Modal open={showWizard} onClose={() => setShowWizard(false)} title="New booking" size="lg">
+        <ModalBody className="space-y-5">
+            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
+              {STEPS.map((s, i) => {
+                const current = step === s;
+                const done = STEPS.indexOf(step) > i;
+                return (
+                  <li key={s} className="flex items-center gap-1.5" aria-current={current ? 'step' : undefined}>
+                    <span
+                      className={clsx(
+                        'flex size-6 items-center justify-center rounded-full font-mono text-[11px]',
+                        current ? 'bg-zinc-900 text-white' : done ? 'bg-lagoon-100 text-lagoon-800' : 'bg-zinc-100 text-zinc-500',
+                      )}
+                    >
+                      {done ? <CheckIcon size={12} weight="bold" aria-hidden /> : i + 1}
+                    </span>
+                    <span className={current ? 'text-zinc-900' : 'text-zinc-500'}>{humanize(s)}</span>
+                    {i < STEPS.length - 1 && <span aria-hidden className="mx-1 h-px w-4 bg-zinc-200" />}
+                  </li>
+                );
+              })}
+            </ol>
 
             {/* ── Step: Guest ─── */}
             {step === 'guest' && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-gray-800">Select or Create Guest</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Select or create a guest</h3>
                 <div className="flex gap-3">
                   <button
+                    type="button"
                     onClick={() => setUseExistingGuest(true)}
-                    className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${useExistingGuest ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-gray-300 text-gray-600'}`}
+                    className={`flex-1 rounded-full border py-2 text-sm font-medium transition-colors ${useExistingGuest ? 'border-lagoon-300 bg-lagoon-50 text-lagoon-800' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}
                   >
-                    Existing Guest
+                    Existing guest
                   </button>
                   <button
+                    type="button"
                     onClick={() => setUseExistingGuest(false)}
-                    className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${!useExistingGuest ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-gray-300 text-gray-600'}`}
+                    className={`flex-1 rounded-full border py-2 text-sm font-medium transition-colors ${!useExistingGuest ? 'border-lagoon-300 bg-lagoon-50 text-lagoon-800' : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50'}`}
                   >
-                    New Guest
+                    New guest
                   </button>
                 </div>
 
@@ -285,42 +313,44 @@ export default function StaffBookingsPage() {
                   <div className="space-y-2">
                     <input
                       className="input"
-                      placeholder="Search by name or email..."
+                      placeholder="Search by name or email…"
                       value={guestSearch}
                       onChange={(e) => searchGuests(e.target.value)}
                     />
                     {guestResults.length > 0 && (
-                      <div className="border border-gray-200 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+                      <div className="max-h-40 overflow-y-auto rounded-2xl border border-zinc-200 p-1">
                         {guestResults.map((g) => (
                           <button
                             key={g.id}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors ${selectedGuest?.id === g.id ? 'bg-blue-100' : ''}`}
+                            type="button"
+                            className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-zinc-50 ${selectedGuest?.id === g.id ? 'bg-lagoon-50 ring-1 ring-inset ring-lagoon-600/15' : ''}`}
                             onClick={() => setSelectedGuest(g)}
                           >
                             <span className="font-medium">{g.firstName} {g.lastName}</span>
-                            <span className="text-gray-500 ml-2">{g.email}</span>
+                            <span className="text-zinc-500 ml-2">{g.email}</span>
                           </button>
                         ))}
                       </div>
                     )}
                     {selectedGuest && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
-                        ✓ {selectedGuest.firstName} {selectedGuest.lastName} ({selectedGuest.email})
-                      </div>
+                      <p className="flex items-center gap-2 rounded-2xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-inset ring-emerald-600/15">
+                        <CheckIcon size={14} weight="bold" aria-hidden />
+                        {selectedGuest.firstName} {selectedGuest.lastName} ({selectedGuest.email})
+                      </p>
                     )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { key: 'firstName', label: 'First Name' },
-                      { key: 'lastName', label: 'Last Name' },
+                      { key: 'firstName', label: 'First name' },
+                      { key: 'lastName', label: 'Last name' },
                       { key: 'email', label: 'Email', colSpan: true },
                       { key: 'phone', label: 'Phone', colSpan: true },
                       { key: 'country', label: 'Country' },
-                      { key: 'idType', label: 'ID Type' },
+                      { key: 'idType', label: 'ID type' },
                     ].map(({ key, label, colSpan }) => (
                       <div key={key} className={colSpan ? 'col-span-2' : ''}>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+                        <label className="mb-1.5 block text-xs font-medium text-zinc-600">{label}</label>
                         <input
                           className="input"
                           value={(newGuest as any)[key]}
@@ -333,15 +363,16 @@ export default function StaffBookingsPage() {
 
                 <div className="flex gap-3 pt-1">
                   <button
+                    type="button"
                     className="btn-primary flex-1"
                     disabled={useExistingGuest ? !selectedGuest : !newGuest.firstName || !newGuest.email || !newGuest.phone}
                     onClick={() => {
                       setStep('dates');
                     }}
                   >
-                    Next: Dates →
+                    Next: dates
                   </button>
-                  <button className="btn-secondary flex-1" onClick={() => setShowWizard(false)}>Cancel</button>
+                  <button type="button" className="btn-secondary flex-1" onClick={() => setShowWizard(false)}>Cancel</button>
                 </div>
               </div>
             )}
@@ -349,10 +380,10 @@ export default function StaffBookingsPage() {
             {/* ── Step: Dates ─── */}
             {step === 'dates' && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-gray-800">Select Dates</h3>
+                <h3 className="text-sm font-semibold text-zinc-900">Dates and details</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Check-in</label>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">Check-in</label>
                     <input
                       type="date"
                       className="input"
@@ -362,7 +393,7 @@ export default function StaffBookingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Check-out</label>
+                    <label className="mb-1.5 block text-xs font-medium text-zinc-600">Check-out</label>
                     <input
                       type="date"
                       className="input"
@@ -373,7 +404,7 @@ export default function StaffBookingsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Number of Guests</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Number of guests</label>
                   <input
                     type="number"
                     className="input"
@@ -384,19 +415,19 @@ export default function StaffBookingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Booking Source</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Booking source</label>
                   <select
                     className="input"
                     value={source}
                     onChange={(e) => setSource(e.target.value as BookingSource)}
                   >
                     {Object.values(BookingSource).map((s) => (
-                      <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                      <option key={s} value={s}>{sourceLabel(s)}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Special Requests</label>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-600">Special requests</label>
                   <textarea
                     className="input"
                     rows={2}
@@ -406,12 +437,13 @@ export default function StaffBookingsPage() {
                   />
                 </div>
                 <div className="flex gap-3 pt-1">
-                  <button className="btn-secondary flex-1" onClick={() => setStep('guest')}>← Back</button>
+                  <button type="button" className="btn-secondary flex-1" onClick={() => setStep('guest')}>Back</button>
                   <button
+                    type="button"
                     className="btn-primary flex-1"
                     onClick={async () => { await loadAvailableRooms(); setStep('room'); }}
                   >
-                    Next: Pick Room →
+                    Next: pick rooms
                   </button>
                 </div>
               </div>
@@ -420,12 +452,12 @@ export default function StaffBookingsPage() {
             {/* ── Step: Room ─── */}
             {step === 'room' && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-gray-800">
-                  Available Rooms — {wizardNights} night{wizardNights !== 1 ? 's' : ''}
+                <h3 className="text-sm font-semibold text-zinc-900">
+                  Available rooms · {wizardNights} night{wizardNights !== 1 ? 's' : ''}
                 </h3>
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                   {availableRooms.length === 0 && (
-                    <p className="text-gray-500 text-sm text-center py-6">No available rooms for selected dates.</p>
+                    <p className="py-6 text-center text-sm text-zinc-500">No rooms are free for these dates.</p>
                   )}
                   {availableRooms.map((room) => {
                     const checked = selectedRooms.some((r) => r.id === room.id);
@@ -433,46 +465,49 @@ export default function StaffBookingsPage() {
                       <button
                         key={room.id}
                         onClick={() => toggleRoom(room)}
-                        className={`w-full text-left rounded-lg border-2 px-4 py-3 transition-colors ${
+                        type="button"
+                        aria-pressed={checked}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition-colors ${
                           checked
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-lagoon-300 bg-lagoon-50 ring-1 ring-inset ring-lagoon-600/15'
+                            : 'border-zinc-200 hover:border-zinc-300'
                         }`}
                       >
                         <div className="flex justify-between items-center">
-                          <span className="flex items-center gap-2 font-semibold">
-                            <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
-                              checked ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 text-transparent'
-                            }`}>✓</span>
-                            Room #{room.roomNumber}
+                          <span className="flex items-center gap-2 font-medium text-zinc-900">
+                            <span className={`flex size-4 items-center justify-center rounded border ${
+                              checked ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 text-transparent'
+                            }`}><CheckIcon size={10} weight="bold" aria-hidden /></span>
+                            Room <span className="font-mono">{room.roomNumber}</span>
                           </span>
-                          <span className="text-blue-700 font-bold">
-                            ${(Number(room.category?.basePrice ?? 0) * wizardNights).toFixed(0)} total
+                          <span className="font-mono text-sm font-medium tabular-nums text-zinc-900">
+                            {money(Number(room.category?.basePrice ?? 0) * wizardNights)} total
                           </span>
                         </div>
-                        <div className="text-sm text-gray-600 mt-0.5 ml-6">
+                        <div className="ml-6 mt-0.5 text-xs text-zinc-500">
                           {room.category?.name} · Floor {room.floor} · ${Number(room.category?.basePrice ?? 0).toFixed(0)}/night
                         </div>
                       </button>
                     );
                   })}
                 </div>
-                <div className="flex justify-between items-center bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm">
-                  <span className="text-gray-600">
+                <div className="flex items-center justify-between rounded-2xl bg-zinc-50 px-4 py-3 text-sm ring-1 ring-inset ring-zinc-200/70">
+                  <span className="text-zinc-600">
                     {selectedRooms.length} room{selectedRooms.length !== 1 ? 's' : ''} selected
                   </span>
-                  <span className="font-bold text-blue-700">
-                    ${selectedTotal.toFixed(2)} for {wizardNights} night{wizardNights !== 1 ? 's' : ''}
+                  <span className="font-mono font-medium tabular-nums text-zinc-900">
+                    {money(selectedTotal, { cents: true })} for {wizardNights} night{wizardNights !== 1 ? 's' : ''}
                   </span>
                 </div>
                 <div className="flex gap-3 pt-1">
-                  <button className="btn-secondary flex-1" onClick={() => setStep('dates')}>← Back</button>
+                  <button type="button" className="btn-secondary flex-1" onClick={() => setStep('dates')}>Back</button>
                   <button
+                    type="button"
                     className="btn-primary flex-1"
                     disabled={selectedRooms.length === 0}
                     onClick={() => setStep('confirm')}
                   >
-                    Review →
+                    Review
                   </button>
                 </div>
               </div>
@@ -481,48 +516,48 @@ export default function StaffBookingsPage() {
             {/* ── Step: Confirm ─── */}
             {step === 'confirm' && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-gray-800">Confirm Booking</h3>
-                <div className="bg-gray-50 rounded-lg divide-y divide-gray-200 text-sm">
+                <h3 className="text-sm font-semibold text-zinc-900">Review and confirm</h3>
+                <div className="divide-y divide-zinc-200/70 rounded-2xl bg-zinc-50 text-sm ring-1 ring-inset ring-zinc-200/70">
                   {[
                     ['Guest', selectedGuest
                       ? `${selectedGuest.firstName} ${selectedGuest.lastName}`
                       : `${newGuest.firstName} ${newGuest.lastName} (new)`],
                     [`Room${selectedRooms.length !== 1 ? 's' : ''}`,
-                      selectedRooms.map((r) => `#${r.roomNumber} — ${r.category?.name}`).join(', ')],
+                      selectedRooms.map((r) => `#${r.roomNumber} · ${r.category?.name}`).join(', ')],
                     ['Check-in', format(new Date(checkIn), 'dd MMM yyyy')],
                     ['Check-out', format(new Date(checkOut), 'dd MMM yyyy')],
                     ['Nights', String(wizardNights)],
-                    ['Rate', `$${selectedPerNight.toFixed(0)}/night`],
-                    ['Total', `$${selectedTotal.toFixed(2)}`],
-                    ['Source', source.replace('_', ' ')],
+                    ['Rate', `${money(selectedPerNight)}/night`],
+                    ['Total', money(selectedTotal, { cents: true })],
+                    ['Source', sourceLabel(source)],
                   ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between px-4 py-2">
-                      <span className="text-gray-500">{label}</span>
-                      <span className="font-medium">{value}</span>
+                    <div key={label} className="flex justify-between gap-4 px-4 py-2.5">
+                      <span className="text-zinc-500">{label}</span>
+                      <span className="text-right font-medium text-zinc-900">{value}</span>
                     </div>
                   ))}
                   {specialRequests && (
                     <div className="px-4 py-2">
-                      <span className="text-gray-500 block text-xs mb-0.5">Special Requests</span>
-                      <span className="text-gray-700">{specialRequests}</span>
+                      <span className="mb-0.5 block text-xs text-zinc-500">Special requests</span>
+                      <span className="text-zinc-700">{specialRequests}</span>
                     </div>
                   )}
                 </div>
                 <div className="flex gap-3 pt-1">
-                  <button className="btn-secondary flex-1" onClick={() => setStep('room')}>← Back</button>
+                  <button type="button" className="btn-secondary flex-1" onClick={() => setStep('room')}>Back</button>
                   <button
+                    type="button"
                     className="btn-primary flex-1"
                     disabled={savingBooking}
                     onClick={handleCreateBooking}
                   >
-                    {savingBooking ? 'Creating...' : 'Confirm Booking'}
+                    {savingBooking ? 'Creating…' : 'Confirm booking'}
                   </button>
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
+        </ModalBody>
+      </Modal>
     </div>
   );
 }

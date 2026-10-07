@@ -3,6 +3,22 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { HousekeepingStatus } from '@shared/index';
+import { motion } from 'framer-motion';
+import { BroomIcon, CheckCircleIcon, ClockIcon, NoteIcon, PlusIcon } from '@phosphor-icons/react';
+import {
+  EmptyState,
+  FilterPills,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  PageHeader,
+  Panel,
+  Skeleton,
+  humanize,
+  riseItem,
+  stagger,
+} from '@/components/admin/ui';
+import type { SegmentOption } from '@/components/admin/ui';
 
 interface HousekeepingTask {
   id: string;
@@ -26,10 +42,15 @@ const STATUS_BADGE: Record<HousekeepingStatus, string> = {
 };
 
 const TASK_LABEL: Record<string, string> = {
-  checkout_cleaning: 'Checkout Clean',
-  daily_cleaning: 'Daily Clean',
-  deep_cleaning: 'Deep Clean',
+  checkout_cleaning: 'Checkout clean',
+  daily_cleaning: 'Daily clean',
+  deep_cleaning: 'Deep clean',
 };
+
+const FILTER_OPTIONS: SegmentOption<string>[] = [
+  { value: '', label: 'All' },
+  ...Object.values(HousekeepingStatus).map((s) => ({ value: s, label: humanize(s) })),
+];
 
 const NEXT_STATUS: Partial<Record<HousekeepingStatus, HousekeepingStatus>> = {
   [HousekeepingStatus.PENDING]: HousekeepingStatus.IN_PROGRESS,
@@ -38,9 +59,9 @@ const NEXT_STATUS: Partial<Record<HousekeepingStatus, HousekeepingStatus>> = {
 };
 
 const NEXT_LABEL: Partial<Record<HousekeepingStatus, string>> = {
-  [HousekeepingStatus.PENDING]: 'Start Cleaning',
-  [HousekeepingStatus.IN_PROGRESS]: 'Mark Completed',
-  [HousekeepingStatus.COMPLETED]: 'Mark Inspected (→ Room Available)',
+  [HousekeepingStatus.PENDING]: 'Start cleaning',
+  [HousekeepingStatus.IN_PROGRESS]: 'Mark completed',
+  [HousekeepingStatus.COMPLETED]: 'Mark inspected',
 };
 
 export default function StaffHousekeepingPage() {
@@ -83,7 +104,7 @@ export default function StaffHousekeepingPage() {
     try {
       const { data } = await api.patch(`/housekeeping/${task.id}`, { status: next });
       setTasks((prev) => prev.map((t) => (t.id === task.id ? data : t)));
-      toast.success(`Room #${task.room.roomNumber} → ${next.replace('_', ' ')}`);
+      toast.success(`Room ${task.room.roomNumber} → ${humanize(next)}`);
     } catch {
       // errors shown by interceptor
     }
@@ -117,152 +138,168 @@ export default function StaffHousekeepingPage() {
   const inProgress = tasks.filter((t) => t.status === HousekeepingStatus.IN_PROGRESS).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Housekeeping</h2>
-          <p className="text-gray-500 text-sm mt-1">{pending} pending · {inProgress} in progress</p>
-        </div>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>+ New Task</button>
-      </div>
-
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
-        {['', ...Object.values(HousekeepingStatus)].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-              filterStatus === s
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {s || 'All'}
+    <div className="space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Operations"
+        title="Housekeeping"
+        description={
+          <>
+            <span className="font-mono tabular-nums text-zinc-700">{pending}</span> pending ·{' '}
+            <span className="font-mono tabular-nums text-zinc-700">{inProgress}</span> in progress
+          </>
+        }
+        actions={
+          <button type="button" className="btn-primary" onClick={() => setShowCreate(true)}>
+            <PlusIcon size={16} weight="regular" aria-hidden />
+            New task
           </button>
-        ))}
-      </div>
+        }
+      />
 
-      {/* Task grid */}
+      <FilterPills
+        options={FILTER_OPTIONS}
+        value={filterStatus}
+        onChange={setFilterStatus}
+        layoutId="housekeeping-status"
+        aria-label="Filter tasks by status"
+      />
+
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading...</div>
+        <div role="status" aria-label="Loading tasks" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-56 rounded-[2rem]" />
+          ))}
+        </div>
       ) : tasks.length === 0 ? (
-        <div className="card p-8 text-center text-gray-400">No housekeeping tasks.</div>
+        <Panel>
+          <EmptyState
+            icon={BroomIcon}
+            title={filterStatus ? `No ${humanize(filterStatus).toLowerCase()} tasks` : 'No housekeeping tasks'}
+            description="Checkouts create cleaning tasks automatically. You can also add one by hand."
+          />
+        </Panel>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tasks.map((task) => (
-            <div key={task.id} className="card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-gray-900">Room #{task.room.roomNumber}</span>
-                <span className={`badge ${STATUS_BADGE[task.status]}`}>
-                  {task.status.replace('_', ' ')}
-                </span>
+            <Panel key={task.id} variants={riseItem} flush bodyClassName="gap-4 p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-mono text-2xl font-medium leading-none tracking-tight text-zinc-950">
+                    <span className="sr-only">Room </span>
+                    {task.room.roomNumber}
+                  </h3>
+                  <p className="mt-2 text-sm font-medium text-zinc-700">{TASK_LABEL[task.taskType] ?? humanize(task.taskType)}</p>
+                </div>
+                <span className={`badge shrink-0 ${STATUS_BADGE[task.status]}`}>{humanize(task.status)}</span>
               </div>
 
-              <div className="text-sm text-gray-600 space-y-0.5">
-                <p className="font-medium">{TASK_LABEL[task.taskType] ?? task.taskType}</p>
-                <p className="text-gray-400">Floor {task.room.floor}</p>
-                <p className="text-gray-400">
-                  Scheduled: {format(new Date(task.scheduledFor), 'dd MMM HH:mm')}
+              <div className="space-y-1.5 text-xs text-zinc-500">
+                <p className="flex items-center gap-1.5">
+                  <ClockIcon size={14} weight="regular" aria-hidden className="text-zinc-400" />
+                  {format(new Date(task.scheduledFor), 'dd MMM, HH:mm')}
+                  <span className="text-zinc-300">·</span>
+                  Floor <span className="font-mono tabular-nums text-zinc-700">{task.room.floor}</span>
                 </p>
-                {task.notes && <p className="text-gray-500 italic">{task.notes}</p>}
-              </div>
-
-              {/* Assign */}
-              <div className="relative">
-                <select
-                  className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 bg-white"
-                  value={task.assignedTo?.id ?? ''}
-                  disabled={assigningId === task.id}
-                  onChange={(e) => assign(task, e.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {staffList.map((s) => (
-                    <option key={s.id} value={s.staff?.id ?? ''}>
-                      {s.firstName} {s.lastName}
-                      {s.staff?.department ? ` — ${s.staff.department}` : ''}
-                    </option>
-                  ))}
-                </select>
-                {assigningId === task.id && (
-                  <div className="absolute inset-y-0 right-6 flex items-center pointer-events-none">
-                    <svg className="animate-spin h-3.5 w-3.5 text-blue-500" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  </div>
+                {task.notes && (
+                  <p className="flex items-start gap-1.5 leading-relaxed">
+                    <NoteIcon size={14} weight="regular" aria-hidden className="mt-0.5 shrink-0 text-zinc-400" />
+                    <span className="line-clamp-2">{task.notes}</span>
+                  </p>
                 )}
               </div>
 
-              {NEXT_STATUS[task.status] && (
-                <button
-                  className="btn-primary w-full text-sm py-1.5"
-                  onClick={() => advance(task)}
-                >
-                  {NEXT_LABEL[task.status]}
-                </button>
-              )}
+              <div className="mt-auto space-y-3 border-t border-zinc-100 pt-4">
+                <label className="block">
+                  <span className="sr-only">Assign room {task.room.roomNumber} task</span>
+                  <select
+                    className="input py-2 text-xs"
+                    value={task.assignedTo?.id ?? ''}
+                    disabled={assigningId === task.id}
+                    onChange={(e) => assign(task, e.target.value)}
+                  >
+                    <option value="">Unassigned</option>
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.staff?.id ?? ''}>
+                        {s.firstName} {s.lastName}
+                        {s.staff?.department ? ` · ${s.staff.department}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              {task.status === HousekeepingStatus.INSPECTED && (
-                <p className="text-xs text-green-600 font-medium text-center">
-                  ✓ Inspected — room set to AVAILABLE
-                </p>
-              )}
-            </div>
+                {NEXT_STATUS[task.status] && (
+                  <button type="button" className="btn-primary w-full" onClick={() => advance(task)}>
+                    {NEXT_LABEL[task.status]}
+                  </button>
+                )}
+
+                {task.status === HousekeepingStatus.COMPLETED && (
+                  <p className="text-center text-xs text-zinc-500">Inspecting sets the room to available.</p>
+                )}
+
+                {task.status === HousekeepingStatus.INSPECTED && (
+                  <p className="flex items-center justify-center gap-1.5 text-xs font-medium text-emerald-700">
+                    <CheckCircleIcon size={14} weight="fill" aria-hidden />
+                    Inspected · room is available
+                  </p>
+                )}
+              </div>
+            </Panel>
           ))}
-        </div>
+        </motion.div>
       )}
 
-      {/* Create task modal */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
-            <h3 className="font-semibold text-gray-900">New Housekeeping Task</h3>
+      <Modal
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        title="New housekeeping task"
+        description="Schedule a clean for a room and optionally note what it needs."
+        size="sm"
+      >
+        <ModalBody className="grid gap-4">
+          <div className="grid gap-2">
+            <label htmlFor="hk-room" className="text-xs font-medium text-zinc-600">Room</label>
+            <select id="hk-room" className="input" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })}>
+              <option value="">Select room</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>#{r.roomNumber} · Floor {r.floor} ({humanize(r.status)})</option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
-              <select className="input" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })}>
-                <option value="">Select room</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>#{r.roomNumber} — Floor {r.floor} ({r.status})</option>
-                ))}
-              </select>
-            </div>
+          <div className="grid gap-2">
+            <label htmlFor="hk-type" className="text-xs font-medium text-zinc-600">Task type</label>
+            <select id="hk-type" className="input" value={form.taskType} onChange={(e) => setForm({ ...form, taskType: e.target.value })}>
+              <option value="checkout_cleaning">Checkout cleaning</option>
+              <option value="daily_cleaning">Daily cleaning</option>
+              <option value="deep_cleaning">Deep cleaning</option>
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Task Type</label>
-              <select className="input" value={form.taskType} onChange={(e) => setForm({ ...form, taskType: e.target.value })}>
-                <option value="checkout_cleaning">Checkout Cleaning</option>
-                <option value="daily_cleaning">Daily Cleaning</option>
-                <option value="deep_cleaning">Deep Cleaning</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled For</label>
-              <input type="date" className="input" value={form.scheduledFor}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <label htmlFor="hk-date" className="text-xs font-medium text-zinc-600">Scheduled for</label>
+              <input id="hk-date" type="date" className="input" value={form.scheduledFor}
                 onChange={(e) => setForm({ ...form, scheduledFor: e.target.value })} />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Priority (1–5)</label>
-              <input type="number" className="input" min={1} max={5} value={form.priority}
+            <div className="grid gap-2">
+              <label htmlFor="hk-priority" className="text-xs font-medium text-zinc-600">Priority (1–5)</label>
+              <input id="hk-priority" type="number" className="input" min={1} max={5} value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: Number(e.target.value) })} />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-              <textarea className="input" rows={2} value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" />
-            </div>
-
-            <div className="flex gap-3">
-              <button className="btn-primary flex-1" disabled={!form.roomId} onClick={handleCreate}>Create</button>
-              <button className="btn-secondary flex-1" onClick={() => setShowCreate(false)}>Cancel</button>
-            </div>
           </div>
-        </div>
-      )}
+
+          <div className="grid gap-2">
+            <label htmlFor="hk-notes" className="text-xs font-medium text-zinc-600">Notes</label>
+            <textarea id="hk-notes" className="input" rows={2} value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional" />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <button type="button" className="btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
+          <button type="button" className="btn-primary" disabled={!form.roomId} onClick={handleCreate}>Create task</button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

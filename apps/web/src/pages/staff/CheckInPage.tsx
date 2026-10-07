@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { format } from 'date-fns';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { IBooking, BookingStatus } from '@shared/index';
 import { roomNumbersLabel } from '@/lib/rooms';
+import { ArrowRightIcon, CheckIcon, MagnifyingGlassIcon, NoteIcon, XCircleIcon } from '@phosphor-icons/react';
+import { ConfirmDialog, PageHeader, Panel, SOURCE_LABEL, humanize, money } from '@/components/admin/ui';
 
 const STATUS_BADGE: Record<BookingStatus, string> = {
   [BookingStatus.PENDING]: 'badge-yellow',
@@ -19,6 +21,7 @@ export default function StaffCheckInPage() {
   const [booking, setBooking] = useState<IBooking | null>(null);
   const [searching, setSearching] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   async function search() {
     if (!query.trim()) return;
@@ -63,7 +66,6 @@ export default function StaffCheckInPage() {
 
   async function handleCancel() {
     if (!booking) return;
-    if (!confirm('Cancel this booking?')) return;
     setProcessing(true);
     try {
       const { data } = await api.post(`/bookings/${booking.id}/cancel`);
@@ -71,118 +73,134 @@ export default function StaffCheckInPage() {
       toast.success('Booking cancelled');
     } finally {
       setProcessing(false);
+      setConfirmCancel(false);
     }
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">Check In / Check Out</h2>
-        <p className="text-gray-500 text-sm mt-1">Look up a booking by number or guest name.</p>
-      </div>
+    <div className="max-w-3xl space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Front desk"
+        title="Check in / out"
+        description="Look up a booking by its number or the guest's name."
+      />
 
-      {/* Search */}
-      <div className="card p-5 space-y-3">
-        <label className="block text-sm font-medium text-gray-700">Booking Number or Guest Name</label>
-        <div className="flex gap-3">
-          <input
-            className="input flex-1"
-            placeholder="e.g. BKG-20260501-0001 or John Smith"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && search()}
-          />
-          <button className="btn-primary" onClick={search} disabled={searching}>
-            {searching ? 'Searching...' : 'Look Up'}
+      <Panel>
+        <label htmlFor="checkin-search" className="eyebrow">Booking number or guest name</label>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <MagnifyingGlassIcon size={16} weight="regular" aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              id="checkin-search"
+              className="input pl-10"
+              placeholder="e.g. BKG-20260501-0001 or John Smith"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && search()}
+            />
+          </div>
+          <button type="button" className="btn-primary" onClick={search} disabled={searching}>
+            {searching ? 'Searching…' : 'Look up'}
           </button>
         </div>
-      </div>
+      </Panel>
 
-      {/* Booking card */}
       {booking && (
-        <div className="card p-6 space-y-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="font-mono text-sm text-blue-700">{booking.bookingNumber}</p>
-              <h3 className="text-xl font-bold text-gray-900 mt-0.5">
+        <Panel bodyClassName="gap-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-mono text-xs text-lagoon-700">{booking.bookingNumber}</p>
+              <h2 className="mt-1.5 truncate text-xl font-semibold tracking-tight text-zinc-950">
                 {booking.guest?.firstName} {booking.guest?.lastName}
-              </h3>
-              <p className="text-gray-500 text-sm">{booking.guest?.email}</p>
+              </h2>
+              <p className="mt-0.5 truncate text-sm text-zinc-500">{booking.guest?.email}</p>
             </div>
-            <span className={`badge text-sm ${STATUS_BADGE[booking.status as BookingStatus]}`}>
-              {booking.status.replace('_', ' ')}
+            <span className={`badge shrink-0 ${STATUS_BADGE[booking.status as BookingStatus]}`}>
+              {humanize(booking.status)}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4 text-sm">
-            <div>
-              <p className="text-gray-500 text-xs">Room{(booking.rooms?.length ?? 0) > 1 ? 's' : ''}</p>
-              <p className="font-semibold">
-                {(booking.rooms ?? [])
-                  .map((r) => `#${r.room?.roomNumber} — ${r.room?.category?.name}`)
-                  .join(', ') || '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-gray-500 text-xs">Guests</p>
-              <p className="font-semibold">{booking.numberOfGuests}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 text-xs">Check-in</p>
-              <p className="font-semibold">{format(new Date(booking.checkInDate), 'dd MMM yyyy')}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 text-xs">Check-out</p>
-              <p className="font-semibold">{format(new Date(booking.checkOutDate), 'dd MMM yyyy')}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 text-xs">Total Amount</p>
-              <p className="font-semibold">${Number(booking.totalAmount).toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 text-xs">Source</p>
-              <p className="font-semibold">{booking.source?.replace('_', ' ')}</p>
-            </div>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-2xl bg-zinc-50/80 p-5 text-sm ring-1 ring-inset ring-zinc-200/60 sm:grid-cols-3">
+            <Detail label={(booking.rooms?.length ?? 0) > 1 ? 'Rooms' : 'Room'} className="col-span-2 sm:col-span-3">
+              {(booking.rooms ?? [])
+                .map((r) => `#${r.room?.roomNumber} · ${r.room?.category?.name}`)
+                .join(', ') || '—'}
+            </Detail>
+            <Detail label="Check-in">{format(new Date(booking.checkInDate), 'dd MMM yyyy')}</Detail>
+            <Detail label="Check-out">{format(new Date(booking.checkOutDate), 'dd MMM yyyy')}</Detail>
+            <Detail label="Guests" mono>{booking.numberOfGuests}</Detail>
+            <Detail label="Total" mono>{money(booking.totalAmount, { cents: true })}</Detail>
+            <Detail label="Source">{booking.source ? SOURCE_LABEL[booking.source] ?? humanize(booking.source) : '—'}</Detail>
             {booking.actualCheckInAt && (
-              <div>
-                <p className="text-gray-500 text-xs">Checked In At</p>
-                <p className="font-semibold">{format(new Date(booking.actualCheckInAt), 'dd MMM yyyy HH:mm')}</p>
-              </div>
+              <Detail label="Checked in">{format(new Date(booking.actualCheckInAt), 'dd MMM yyyy, HH:mm')}</Detail>
             )}
             {booking.actualCheckOutAt && (
-              <div>
-                <p className="text-gray-500 text-xs">Checked Out At</p>
-                <p className="font-semibold">{format(new Date(booking.actualCheckOutAt), 'dd MMM yyyy HH:mm')}</p>
-              </div>
+              <Detail label="Checked out">{format(new Date(booking.actualCheckOutAt), 'dd MMM yyyy, HH:mm')}</Detail>
             )}
-          </div>
+          </dl>
 
           {booking.specialRequests && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 text-sm text-yellow-800">
-              <span className="font-medium">Special Requests: </span>{booking.specialRequests}
-            </div>
+            <p className="flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/15">
+              <NoteIcon size={16} weight="regular" aria-hidden className="mt-0.5 shrink-0 text-amber-700" />
+              <span><span className="font-medium">Special requests: </span>{booking.specialRequests}</span>
+            </p>
           )}
 
-          {/* Action buttons */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col gap-3 sm:flex-row">
             {booking.status === BookingStatus.CONFIRMED && (
-              <button className="btn-primary flex-1" onClick={handleCheckIn} disabled={processing}>
-                {processing ? 'Processing...' : '✓ Check In'}
+              <button type="button" className="btn-primary flex-1" onClick={handleCheckIn} disabled={processing}>
+                <CheckIcon size={16} weight="bold" aria-hidden />
+                {processing ? 'Processing…' : 'Check in'}
               </button>
             )}
             {booking.status === BookingStatus.CHECKED_IN && (
-              <button className="btn-primary flex-1" onClick={handleCheckOut} disabled={processing}>
-                {processing ? 'Processing...' : '→ Check Out'}
+              <button type="button" className="btn-primary flex-1" onClick={handleCheckOut} disabled={processing}>
+                <ArrowRightIcon size={16} weight="bold" aria-hidden />
+                {processing ? 'Processing…' : 'Check out'}
               </button>
             )}
             {[BookingStatus.CONFIRMED, BookingStatus.PENDING].includes(booking.status as BookingStatus) && (
-              <button className="btn-danger flex-1" onClick={handleCancel} disabled={processing}>
-                Cancel Booking
+              <button
+                type="button"
+                className="btn-secondary flex-1 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                onClick={() => setConfirmCancel(true)}
+                disabled={processing}
+              >
+                <XCircleIcon size={16} weight="regular" aria-hidden />
+                Cancel booking
               </button>
             )}
           </div>
-        </div>
+        </Panel>
       )}
+
+      <ConfirmDialog
+        open={confirmCancel}
+        title="Cancel this booking?"
+        description={booking ? `${booking.bookingNumber} will be cancelled and its rooms released.` : undefined}
+        confirmLabel="Cancel booking"
+        cancelLabel="Keep booking"
+        onConfirm={handleCancel}
+        onCancel={() => setConfirmCancel(false)}
+      />
+    </div>
+  );
+}
+
+interface DetailProps {
+  label: string;
+  mono?: boolean;
+  className?: string;
+  children: ReactNode;
+}
+
+function Detail({ label, mono, className, children }: DetailProps) {
+  return (
+    <div className={className}>
+      <dt className="text-xs text-zinc-500">{label}</dt>
+      <dd className={mono ? 'mt-0.5 font-mono font-medium tabular-nums text-zinc-900' : 'mt-0.5 font-medium text-zinc-900'}>
+        {children}
+      </dd>
     </div>
   );
 }

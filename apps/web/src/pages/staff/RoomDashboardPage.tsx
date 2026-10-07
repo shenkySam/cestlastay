@@ -1,32 +1,31 @@
 import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import clsx from 'clsx';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { BedIcon, FunnelSimpleIcon } from '@phosphor-icons/react';
 import { useSocket } from '@/contexts/SocketContext';
 import { IRoom, RoomStatus } from '@shared/index';
-
-const STATUS_BADGE: Record<RoomStatus, string> = {
-  [RoomStatus.AVAILABLE]: 'badge-green',
-  [RoomStatus.OCCUPIED]: 'badge-red',
-  [RoomStatus.RESERVED]: 'badge-blue',
-  [RoomStatus.CLEANING]: 'badge-yellow',
-  [RoomStatus.MAINTENANCE]: 'badge-gray',
-  [RoomStatus.OUT_OF_ORDER]: 'badge-red',
-};
-
-const STATUS_COLORS: Record<RoomStatus, string> = {
-  [RoomStatus.AVAILABLE]: 'border-green-300 bg-green-50',
-  [RoomStatus.OCCUPIED]: 'border-red-300 bg-red-50',
-  [RoomStatus.RESERVED]: 'border-blue-300 bg-blue-50',
-  [RoomStatus.CLEANING]: 'border-yellow-300 bg-yellow-50',
-  [RoomStatus.MAINTENANCE]: 'border-gray-300 bg-gray-50',
-  [RoomStatus.OUT_OF_ORDER]: 'border-red-400 bg-red-100',
-};
+import {
+  EmptyState,
+  FilterPills,
+  PageHeader,
+  Panel,
+  ROOM_STATUS_TONE,
+  Skeleton,
+  StatusDot,
+  humanize,
+  riseItem,
+  stagger,
+} from '@/components/admin/ui';
+import type { SegmentOption } from '@/components/admin/ui';
 
 export default function StaffRoomDashboardPage() {
   const { socket } = useSocket();
   const [rooms, setRooms] = useState<IRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<RoomStatus | ''>('');
 
   useEffect(() => {
     load();
@@ -57,7 +56,7 @@ export default function StaffRoomDashboardPage() {
     setUpdatingId(room.id);
     try {
       await api.patch(`/rooms/${room.id}/status`, { status });
-      toast.success(`Room ${room.roomNumber} → ${status}`);
+      toast.success(`Room ${room.roomNumber} → ${humanize(status)}`);
     } catch {
       // errors shown by interceptor
     } finally {
@@ -65,61 +64,113 @@ export default function StaffRoomDashboardPage() {
     }
   }
 
-  const counts = Object.values(RoomStatus).map((s) => ({
-    status: s,
-    count: rooms.filter((r) => r.status === s).length,
-  }));
+  const options: SegmentOption<RoomStatus | ''>[] = [
+    { value: '', label: 'All', count: rooms.length },
+    ...Object.values(RoomStatus).map((s) => ({
+      value: s,
+      label: (
+        <>
+          <StatusDot tone={ROOM_STATUS_TONE[s].tone} pulse={false} />
+          {humanize(s)}
+        </>
+      ),
+      count: rooms.filter((r) => r.status === s).length,
+    })),
+  ];
+
+  const visible = filter ? rooms.filter((r) => r.status === filter) : rooms;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900">Room Dashboard</h2>
-        <p className="text-gray-500 text-sm mt-1">
-          Live occupancy status — updates in real-time
-        </p>
-      </div>
+    <div className="space-y-6 md:space-y-8">
+      <PageHeader
+        eyebrow="Today"
+        title="Room board"
+        description="Live occupancy. Changes made here or anywhere else appear instantly."
+      />
 
-      {/* Summary strip */}
-      <div className="flex gap-3 flex-wrap">
-        {counts.map(({ status, count }) => (
-          <div key={status} className={`card px-4 py-2 flex items-center gap-2 border-2 ${STATUS_COLORS[status]}`}>
-            <span className={`badge ${STATUS_BADGE[status]}`}>{status}</span>
-            <span className="font-bold text-gray-900">{count}</span>
-          </div>
-        ))}
-      </div>
+      <FilterPills
+        options={options}
+        value={filter}
+        onChange={setFilter}
+        layoutId="room-board-status"
+        aria-label="Filter rooms by status"
+      />
 
-      {/* Room grid */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading rooms...</div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {rooms.map((room) => (
-            <div
-              key={room.id}
-              className={`rounded-xl border-2 p-3 space-y-2 transition-all ${STATUS_COLORS[room.status]} ${updatingId === room.id ? 'opacity-50' : ''}`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-bold text-gray-900">#{room.roomNumber}</span>
-                <span className={`badge text-xs ${STATUS_BADGE[room.status]}`}>{room.status}</span>
-              </div>
-              <p className="text-xs text-gray-600">{room.category?.name}</p>
-              <p className="text-xs text-gray-400">Floor {room.floor}</p>
-
-              {/* Quick-change status */}
-              <select
-                className="w-full text-xs border border-gray-300 rounded-md px-1 py-1 bg-white"
-                value={room.status}
-                disabled={updatingId === room.id}
-                onChange={(e) => changeStatus(room, e.target.value as RoomStatus)}
-              >
-                {Object.values(RoomStatus).map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
+        <div role="status" aria-label="Loading rooms" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-44 rounded-[2rem]" />
           ))}
         </div>
+      ) : visible.length === 0 ? (
+        <Panel>
+          {filter ? (
+            <EmptyState
+              icon={FunnelSimpleIcon}
+              title="No rooms with this status"
+              description={`None are marked “${humanize(filter)}” right now.`}
+              action={
+                <button type="button" className="btn-secondary" onClick={() => setFilter('')}>
+                  Show all rooms
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState icon={BedIcon} title="No rooms yet" description="An admin adds rooms from the admin console." />
+          )}
+        </Panel>
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
+          {visible.map((room) => {
+            const status = ROOM_STATUS_TONE[room.status];
+            const busy = updatingId === room.id;
+            return (
+              <Panel
+                key={room.id}
+                variants={riseItem}
+                flush
+                bodyClassName="gap-4 p-6"
+                className={clsx('transition-opacity duration-300', busy && 'opacity-60')}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="font-mono text-3xl font-medium leading-none tracking-tight text-zinc-950">
+                    <span className="sr-only">Room </span>
+                    {room.roomNumber}
+                  </h3>
+                  <p className="flex items-center gap-2 text-xs font-medium text-zinc-600">
+                    <StatusDot tone={status.tone} pulse={status.pulse} />
+                    {humanize(room.status)}
+                  </p>
+                </div>
+
+                <p className="truncate text-sm text-zinc-600">
+                  {room.category?.name ?? '—'}
+                  <span className="text-zinc-400"> · Floor </span>
+                  <span className="font-mono tabular-nums text-zinc-700">{room.floor}</span>
+                </p>
+
+                <label className="mt-auto block border-t border-zinc-100 pt-4">
+                  <span className="sr-only">Set status for room {room.roomNumber}</span>
+                  <select
+                    className="input py-2 text-xs"
+                    value={room.status}
+                    disabled={busy}
+                    onChange={(e) => changeStatus(room, e.target.value as RoomStatus)}
+                  >
+                    {Object.values(RoomStatus).map((s) => (
+                      <option key={s} value={s}>{humanize(s)}</option>
+                    ))}
+                  </select>
+                </label>
+              </Panel>
+            );
+          })}
+        </motion.div>
       )}
     </div>
   );
