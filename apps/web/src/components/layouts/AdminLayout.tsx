@@ -74,7 +74,7 @@ export function AdminLayout() {
           </div>
         </div>
 
-        <NavDrawer open={navOpen} onClose={closeNav} onNavigate={dismissNav} />
+        <NavDrawer open={navOpen} sidebar={AdminSidebar} onClose={closeNav} onNavigate={dismissNav} />
         <LiveActivityIsland />
         <div id="admin-overlay-root" />
       </div>

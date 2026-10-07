@@ -16,3 +16,4 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { Avatar } from './Avatar';
 export * from './motion';
 export * from './format';
+export { ROOM_STATUS_TONE } from './roomStatus';

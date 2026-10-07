@@ -105,7 +105,7 @@ export function CommandPalette() {
         hint: group.label,
         icon: item.icon,
         // Generic verbs so the typed hints ("Jump to bookings") match literally.
-        keywords: `${item.keywords} jump go to open page`,
+        keywords: `${item.keywords ?? ''} jump go to open page`,
         run: go(item.href),
       })),
     );

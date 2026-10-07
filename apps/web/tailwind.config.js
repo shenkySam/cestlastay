@@ -93,20 +93,14 @@ export default {
           800: '#5c3e24',
           900: '#4e3621',
         },
-        // Lagoon — the admin console's single accent: the logo's ocean, desaturated (<80% sat).
-        lagoon: {
-          50: '#f0f9fa',
-          100: '#d9f0f2',
-          200: '#b5e1e6',
-          300: '#84cbd4',
-          400: '#4eacb9',
-          500: '#33909e',
-          600: '#2a7684',
-          700: '#27606c',
-          800: '#264f59',
-          900: '#23434c',
-          950: '#132b32',
-        },
+        // Lagoon — the console's single accent: the logo's ocean, desaturated (<80% sat).
+        // RGB channels in --lagoon-* (globals.css) so .staff-shell can swap in its muted scale.
+        lagoon: Object.fromEntries(
+          [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((step) => [
+            step,
+            `rgb(var(--lagoon-${step}) / <alpha-value>)`,
+          ]),
+        ),
         // Earthen — the guest site's palette, used on the sign-in page.
         cream: '#f4efe5',
         ink: '#3a2a1f',

@@ -10,11 +10,11 @@ import { adminPageTitle } from './nav';
 import { CommandPalette } from './CommandPalette';
 
 /**
- * NotificationDropdown is shared with the staff portal and stays untouched;
+ * NotificationDropdown keeps its own default styling;
  * these wrapper-scoped variants only bring its bell and panel onto the
  * console's zinc/lagoon tokens. If its markup changes they simply stop matching.
  */
-const NOTIFICATIONS_SKIN = clsx(
+export const NOTIFICATIONS_SKIN = clsx(
   '[&>div>button]:rounded-full [&>div>button]:text-zinc-500',
   '[&>div>button:hover]:bg-zinc-100 [&>div>button:hover]:text-zinc-900',
   '[&>div>button>span]:bg-lagoon-600 [&>div>button>span]:font-mono [&>div>button>span]:tabular-nums',
@@ -66,7 +66,7 @@ export function AdminTopbar({ onOpenNav, menuButtonRef }: AdminTopbarProps) {
   );
 }
 
-function LiveIndicator() {
+export function LiveIndicator() {
   const { socket, connected } = useSocket();
   const live = connected || Boolean(socket?.connected);
 
