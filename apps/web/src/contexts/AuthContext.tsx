@@ -71,6 +71,8 @@ interface AuthContextValue {
   /** Guest sign-in with a Google ID token, matched to a booking by email. */
   guestGoogleLogin: (idToken: string) => Promise<void>;
   logout: () => void;
+  /** Re-read the signed-in staff/admin from GET /auth/me (e.g. after their role changed). */
+  refreshUser: () => Promise<void>;
   isRole: (...roles: UserRole[]) => boolean;
 }
 
@@ -167,11 +169,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     startGuestSession(data);
   };
 
+  const refreshUser = useCallback(async () => {
+    if (localStorage.getItem('isGuest') === 'true') return;
+    try {
+      const { data } = await api.get('/auth/me');
+      setUser(data);
+    } catch {
+      // An invalid session 401s and the api client logs out; otherwise keep the current user
+    }
+  }, []);
+
   const isRole = (...roles: UserRole[]) => !!user && roles.includes(user.role);
 
   return (
     <AuthContext.Provider
-      value={{ user, accessToken, loading, login, guestLogin, guestGoogleLogin, logout, isRole }}
+      value={{ user, accessToken, loading, login, guestLogin, guestGoogleLogin, logout, refreshUser, isRole }}
     >
       {children}
     </AuthContext.Provider>

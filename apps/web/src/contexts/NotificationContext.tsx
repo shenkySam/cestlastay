@@ -21,7 +21,7 @@ const NotificationContext = createContext<NotificationContextValue>({
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { socket } = useSocket();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [notifications, setNotifications] = useState<INotification[]>([]);
 
   // Guests use a guest-portal token (sub = guestId, not a userId) so
@@ -45,6 +45,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const onNotification = (n: INotification) => {
       setNotifications((prev) => [n, ...prev]);
       toast.success(n.title, { id: n.id });
+      // An admin promoted or demoted us: reload the user so ProtectedRoute
+      // moves us to the console that matches the new role
+      if (n.metadata?.kind === 'ROLE_CHANGED') refreshUser();
     };
     socket.on('notification:new', onNotification);
 
@@ -53,7 +56,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Remove only this listener — the admin dashboard listens on the same event
       socket.off('notification:new', onNotification);
     };
-  }, [socket, user]);
+  }, [socket, user, refreshUser]);
 
   const markRead = useCallback((id: string) => {
     api.patch(`/notifications/${id}/read`).catch(() => {});

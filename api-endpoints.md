@@ -51,6 +51,7 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 | GET | `/users/:id` | ADMIN, STAFF | Get user details |
 | PATCH | `/users/:id` | Own profile or ADMIN | Update profile (firstName, lastName, phone, profileImageUrl) |
 | PATCH | `/users/:id/status` | ADMIN | Activate / deactivate / suspend user |
+| PATCH | `/users/:id/role` | ADMIN | Promote STAFF→ADMIN or demote ADMIN→STAFF; body `{ role, department?, position? }` (profile fields used on demotion). Refuses self, guests, the system user, and leaving no active admin |
 | DELETE | `/users/:id` | ADMIN | Delete user |
 
 **`GET /users/staff-list` response shape:**
