@@ -70,10 +70,21 @@ export class InboundEmailService {
 
     const event = JSON.parse(rawBody.toString('utf8')) as {
       type: string;
-      data?: { email_id?: string };
+      data?: {
+        email_id?: string;
+        to?: string[];
+        received_for?: string[];
+      };
     };
 
     if (event.type !== 'email.received') return { ignored: event.type };
+    const recipients = [...(event.data?.to ?? []), ...(event.data?.received_for ?? [])]
+      .map((address) => address.toLowerCase());
+
+    if (!recipients.some((address) => address.endsWith('@cestlastay.com'))) {
+      return { forwarded: false, reason: 'not a cestlastay recipient' };
+    }
+
     const emailId = event.data?.email_id;
     if (!emailId) throw new BadRequestException('Missing email_id');
 
