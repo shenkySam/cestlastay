@@ -157,7 +157,7 @@ export class OtaService {
       netRevenue: number;
     }> = {};
 
-    let totals = { bookings: 0, grossRevenue: 0, commission: 0, netRevenue: 0 };
+    const totals = { bookings: 0, grossRevenue: 0, commission: 0, netRevenue: 0 };
 
     for (const b of bookings) {
       const gross = Number(b.totalAmount);

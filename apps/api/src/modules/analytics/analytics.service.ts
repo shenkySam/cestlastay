@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { addDays, eachDayOfInterval, format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { eachDayOfInterval, format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { BookingSource } from '@hms/shared';
 
 const OTA_SOURCES: BookingSource[] = [
