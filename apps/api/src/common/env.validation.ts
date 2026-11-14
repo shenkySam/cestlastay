@@ -14,7 +14,9 @@ export function validateEnv(env: Record<string, unknown>): Record<string, unknow
   for (const key of ['JWT_SECRET', 'JWT_REFRESH_SECRET']) {
     const value = str(key);
     if (!value) errors.push(`${key} is required`);
-    else if (value.length < MIN_SECRET_LENGTH) {
+    else if (value.startsWith('change-me')) {
+      errors.push(`${key} is still the placeholder from .env.example`);
+    } else if (value.length < MIN_SECRET_LENGTH) {
       errors.push(`${key} must be at least ${MIN_SECRET_LENGTH} characters`);
     }
   }
