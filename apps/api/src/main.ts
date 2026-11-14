@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
@@ -11,6 +12,17 @@ async function bootstrap() {
   // Railway terminates traffic at its proxy; trust one hop so req.ip is the
   // visitor's address (sign-in rate limits are per IP) rather than the proxy's.
   app.set('trust proxy', 1);
+
+  // Security headers. This is a JSON API (no HTML), so CSP and the
+  // cross-origin isolation headers add nothing and could block the Stripe
+  // webhook or the web app's cross-origin calls; keep the rest.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   app.setGlobalPrefix('api/v1');
 

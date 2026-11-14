@@ -79,15 +79,25 @@ export class AuthController {
     return this.authService.refreshTokens(refreshToken);
   }
 
+  // Guests use GET /auth/guest/me (their token's sub is a guests.id).
   @Get('me')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   getMe(@CurrentUser() user: { id: string }) {
     return this.authService.getMe(user.id);
   }
 
+  /**
+   * Revokes the refresh token in the body. Public because the access token may
+   * already have expired by the time the user signs out; holding the refresh
+   * token is what proves the right to revoke it.
+   */
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  logout() {
-    // JWT is stateless; client discards the token
-    return;
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ minute: { limit: 30, ttl: minutes(1) } })
+  @SkipThrottle(SKIP_HOURLY)
+  async logout(@Body('refreshToken') refreshToken: unknown) {
+    await this.authService.logout(refreshToken);
   }
 }

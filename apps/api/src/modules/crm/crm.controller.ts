@@ -9,7 +9,9 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard, hours, minutes } from '@nestjs/throttler';
 import { CrmService } from './crm.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
@@ -24,6 +26,8 @@ export class CrmController {
   // ── Newsletter ──────────────────────────────────────
   @Post('subscribe')
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ minute: { limit: 5, ttl: minutes(1) }, hour: { limit: 20, ttl: hours(1) } })
   subscribe(@Body() dto: SubscribeDto) {
     return this.service.subscribe(dto);
   }
