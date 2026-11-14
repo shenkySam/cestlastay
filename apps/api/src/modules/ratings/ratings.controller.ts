@@ -49,9 +49,15 @@ export class RatingsController {
     return this.service.getSummary();
   }
 
-  /** Get rating for a specific booking */
+  /** Rating for a booking: staff/admin for any booking, a guest only for their own */
   @Get('booking/:bookingId')
-  findByBooking(@Param('bookingId') bookingId: string) {
+  findByBooking(
+    @CurrentUser() user: { role: string; bookingId?: string },
+    @Param('bookingId') bookingId: string,
+  ) {
+    if (user.role === UserRole.GUEST && user.bookingId !== bookingId) {
+      throw new ForbiddenException();
+    }
     return this.service.findByBooking(bookingId);
   }
 }

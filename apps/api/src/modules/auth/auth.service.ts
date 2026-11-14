@@ -1,3 +1,4 @@
+import { createHash, randomUUID } from 'node:crypto';
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -109,7 +110,7 @@ export class AuthService {
     });
 
     const { googleId: _g, appleId: _a, ...safeUser } = user;
-    const tokens = this.signTokens(user.id, user.email, user.role);
+    const { refreshTokenId: _id, ...tokens } = await this.signTokens(user.id, user.email, user.role);
     return { user: safeUser, ...tokens };
   }
 
@@ -180,7 +181,7 @@ export class AuthService {
   /** Short-lived guest token: sub = guestId (guests table), scoped to one booking. */
   private issueGuestSession(booking: GuestBooking) {
     const accessToken = this.jwt.sign(
-      { sub: booking.guestId, bookingId: booking.id, role: 'GUEST' },
+      { sub: booking.guestId, bookingId: booking.id, role: 'GUEST', typ: 'access' },
       { expiresIn: '24h', secret: this.config.get('JWT_SECRET') },
     );
     return { accessToken, booking };
@@ -207,28 +208,107 @@ export class AuthService {
     });
   }
 
-  private signTokens(userId: string, email: string, role: string) {
-    const payload = { sub: userId, email, role };
-    const accessToken = this.jwt.sign(payload, {
-      expiresIn: this.config.get('JWT_EXPIRES_IN', '15m'),
-      secret: this.config.get('JWT_SECRET'),
+  /**
+   * Access token (stateless, short-lived) plus a refresh token that is tracked
+   * in refresh_tokens by the sha256 of its jti, so it can be rotated and revoked.
+   */
+  private async signTokens(userId: string, email: string, role: string) {
+    const accessToken = this.jwt.sign(
+      { sub: userId, email, role, typ: 'access' },
+      { expiresIn: this.config.get('JWT_EXPIRES_IN', '15m'), secret: this.config.get('JWT_SECRET') },
+    );
+    const jti = randomUUID();
+    const refreshToken = this.jwt.sign(
+      { sub: userId, typ: 'refresh', jti },
+      {
+        expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+        secret: this.config.get('JWT_REFRESH_SECRET'),
+      },
+    );
+    const { exp } = this.jwt.decode(refreshToken) as { exp: number };
+    const row = await this.prisma.refreshToken.create({
+      data: { userId, tokenHash: hashJti(jti), expiresAt: new Date(exp * 1000) },
+      select: { id: true },
     });
-    const refreshToken = this.jwt.sign(payload, {
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
-      secret: this.config.get('JWT_REFRESH_SECRET'),
-    });
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, refreshTokenId: row.id };
   }
 
-  async refreshTokens(refreshToken: string) {
+  /** Verified refresh-token payload, or null for anything else (incl. access tokens). */
+  private verifyRefresh(token: unknown): { sub: string; jti: string } | null {
+    if (typeof token !== 'string' || !token) return null;
     try {
-      const payload = this.jwt.verify(refreshToken, {
-        secret: this.config.get('JWT_REFRESH_SECRET'),
-      });
-      const tokens = this.signTokens(payload.sub, payload.email, payload.role);
-      return tokens;
+      const payload = this.jwt.verify(token, { secret: this.config.get('JWT_REFRESH_SECRET') });
+      if (payload?.typ !== 'refresh' || typeof payload.jti !== 'string') return null;
+      return payload;
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      return null;
     }
   }
+
+  /**
+   * Rotate a refresh token: the presented one is revoked and a new pair is
+   * issued with the user's current role and email. Presenting a token that was
+   * revoked longer ago than the grace window is treated as theft and revokes
+   * every refresh token the user holds.
+   */
+  async refreshTokens(refreshToken: string) {
+    const invalid = () => new UnauthorizedException('Invalid refresh token');
+    const payload = this.verifyRefresh(refreshToken);
+    if (!payload) throw invalid();
+
+    const row = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash: hashJti(payload.jti) },
+    });
+    if (!row || row.userId !== payload.sub || row.expiresAt <= new Date()) throw invalid();
+
+    if (row.revokedAt) {
+      // Two tabs refreshing with the same token at once is normal (they share
+      // localStorage); only a replay after the grace window counts as reuse.
+      if (Date.now() - row.revokedAt.getTime() > ROTATION_GRACE_MS) {
+        await this.revokeAllForUser(row.userId);
+        throw invalid();
+      }
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: row.userId },
+      select: { id: true, email: true, role: true, status: true },
+    });
+    if (!user || user.status !== 'ACTIVE' || user.email.toLowerCase() === SYSTEM_USER_EMAIL) {
+      await this.revokeAllForUser(row.userId);
+      throw invalid();
+    }
+
+    const tokens = await this.signTokens(user.id, user.email, user.role);
+    if (!row.revokedAt) {
+      await this.prisma.refreshToken.updateMany({
+        where: { id: row.id, revokedAt: null },
+        data: { revokedAt: new Date(), replacedById: tokens.refreshTokenId },
+      });
+    }
+    const { refreshTokenId: _id, ...result } = tokens;
+    return result;
+  }
+
+  /** Revoke the presented refresh token. Silent for unknown or invalid tokens. */
+  async logout(refreshToken: unknown) {
+    const payload = this.verifyRefresh(refreshToken);
+    if (!payload) return;
+    await this.prisma.refreshToken.updateMany({
+      where: { tokenHash: hashJti(payload.jti), revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  private async revokeAllForUser(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
 }
+
+/** A replay of a just-rotated token within this window is not treated as theft. */
+const ROTATION_GRACE_MS = 30_000;
+
+const hashJti = (jti: string) => createHash('sha256').update(jti).digest('hex');

@@ -10,6 +10,7 @@ export interface JwtPayload {
   email?: string;
   role: string;
   bookingId?: string;
+  typ?: 'access' | 'refresh';
 }
 
 @Injectable()
@@ -26,6 +27,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
+    // Only access tokens authenticate requests. Tokens issued before the typ
+    // claim existed have none and are still accepted until they expire.
+    if (payload.typ !== undefined && payload.typ !== 'access') throw new UnauthorizedException();
+
     // Guest tokens carry sub = guestId (guests table), not a userId, and are
     // scoped to one booking. Load that booking (with its guest) and return a
     // guest-shaped principal; bookingStatus gates pre-arrival actions.

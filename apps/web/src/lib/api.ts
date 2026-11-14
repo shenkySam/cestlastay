@@ -45,6 +45,11 @@ const api = axios.create({
   adapter: cachingAdapter,
 });
 
+/** Absolute URL for an API path, for calls made outside the `api` instance. */
+export function apiUrl(path: string): string {
+  return `${String(api.defaults.baseURL).replace(/\/+$/, '')}${path}`;
+}
+
 // Attach access token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
@@ -99,9 +104,11 @@ api.interceptors.response.use(
         // Same origin as every other API call — api.defaults.baseURL is the
         // deployed API host in production, where a relative path would hit the
         // web app's own origin (405) and log the user out on every refresh.
-        const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken });
+        // The server rotates the refresh token on every use, so the new one must
+        // be saved: the old one is revoked and reusing it ends the session.
+        const { data } = await axios.post(apiUrl('/auth/refresh'), { refreshToken });
         localStorage.setItem('accessToken', data.accessToken);
-        api.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
+        if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
         processQueue(null, data.accessToken);
         return api(original);
       } catch (refreshError) {

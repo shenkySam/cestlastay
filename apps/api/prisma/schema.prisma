@@ -172,6 +172,7 @@ model User {
   guest           Guest?
   notifications   Notification[]
   createdBookings Booking[]  @relation("BookingCreatedBy")
+  refreshTokens   RefreshToken[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -588,4 +589,23 @@ model MarketingOptOut {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("marketing_opt_outs")
+}
+
+// One row per issued refresh token (staff/admin sessions). Only a sha256 of the
+// token's jti is stored. Rotation revokes the old row and points it at the new
+// one; presenting a revoked token again revokes every token the user holds.
+model RefreshToken {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  replacedById String?   @map("replaced_by_id")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }

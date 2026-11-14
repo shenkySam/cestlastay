@@ -76,6 +76,7 @@ export class NotificationsGateway
     const payload = await this.jwt.verifyAsync<JwtPayload>(token, {
       secret: this.config.get<string>('JWT_SECRET'),
     });
+    if (payload.typ !== undefined && payload.typ !== 'access') throw new Error('not an access token');
 
     // Guest tokens carry sub = guestId (guests table), scoped to one booking.
     if (payload.role === 'GUEST') {

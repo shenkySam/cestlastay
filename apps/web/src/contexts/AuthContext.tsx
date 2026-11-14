@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { IUser, UserRole, UserStatus } from '@shared/index';
-import api from '@/lib/api';
+import api, { apiUrl } from '@/lib/api';
 import { disconnectSocket } from '@/lib/socket';
 import type { OAuthProvider } from '@/lib/oauth';
 
@@ -87,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     const isGuest = localStorage.getItem('isGuest') === 'true';
+    // Revoke the refresh token on the server. keepalive lets the request
+    // finish even though the page navigates away right after.
+    const refreshToken = localStorage.getItem('refreshToken');
+    if (refreshToken) {
+      fetch(apiUrl('/auth/logout'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+        keepalive: true,
+      }).catch(() => {});
+    }
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('isGuest');

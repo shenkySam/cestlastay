@@ -48,7 +48,9 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  // Guest principals carry a guests.id, not a users.id, so they have no user to edit.
   @Patch(':id')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   update(
     @Param('id') id: string,
     @Body() dto: UpdateUserDto,

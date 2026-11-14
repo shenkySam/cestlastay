@@ -60,6 +60,7 @@ export class RoomsController {
   // ── Rooms CRUD ───────────────────────────────────────────────
 
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   findAll(
     @Query('status') status?: RoomStatus,
     @Query('floor') floor?: string,
@@ -73,6 +74,7 @@ export class RoomsController {
   }
 
   @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.STAFF)
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }

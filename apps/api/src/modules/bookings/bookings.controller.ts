@@ -1,6 +1,7 @@
 import {
-  Controller, Get, Post, Patch, Body, Param, Query,
+  Controller, Get, Post, Patch, Body, Param, Query, UseGuards,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard, hours, minutes } from '@nestjs/throttler';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreatePublicBookingDto } from './dto/create-public-booking.dto';
@@ -15,8 +16,12 @@ export class BookingsController {
   constructor(private readonly service: BookingsService) {}
 
   // Public, unauthenticated self-service booking from the guest landing site.
+  // Per-IP limits (throttlers defined in AuthModule) so the open endpoint can't
+  // be used to flood the calendar with fake reservations.
   @Public()
   @Post('public')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ minute: { limit: 10, ttl: minutes(1) }, hour: { limit: 30, ttl: hours(1) } })
   createPublic(@Body() dto: CreatePublicBookingDto) {
     return this.service.createPublic(dto);
   }
