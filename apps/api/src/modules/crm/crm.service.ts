@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { addDays, endOfDay, format, startOfDay } from 'date-fns';
+import { addDays, endOfDay, startOfDay } from 'date-fns';
 import { customAlphabet } from 'nanoid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from './email.service';

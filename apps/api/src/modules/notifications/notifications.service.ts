@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
-import { UserRole } from '@hms/shared';
 
 interface NotifyPayload {
   type: string;
