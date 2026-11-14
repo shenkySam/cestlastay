@@ -21,6 +21,12 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...ok, JWT_SECRET: 'short' })).toThrow(/at least 32/);
   });
 
+  it('rejects the .env.example placeholders', () => {
+    expect(() =>
+      validateEnv({ ...ok, JWT_SECRET: 'change-me-min-32-chars-random-string' }),
+    ).toThrow(/placeholder/);
+  });
+
   it('rejects identical access and refresh secrets', () => {
     expect(() => validateEnv({ ...ok, JWT_REFRESH_SECRET: ok.JWT_SECRET })).toThrow(/different/);
   });

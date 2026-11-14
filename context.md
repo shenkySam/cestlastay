@@ -19,6 +19,7 @@ This file captures the exact state of the codebase, key decisions, patterns, and
 | Multi-room bookings | `booking_rooms` join table, `roomIds[]` in staff wizard + OTA entry | ✅ Merged (PR #28) |
 | Security/concurrency P0s | WS handshake auth + staff-scoped broadcasts; retry on BKG/INV number collisions; guest portal CHECKED_IN-only | ✅ Merged (PR #30, #31) |
 | Inbound email | `stay@cestlastay.com` → team inboxes via Resend webhook; BIMI logo | ✅ Merged (PR #32–#34) |
+| Phase 1 audit fixes | Revocable/rotating refresh tokens (`refresh_tokens`), `typ` claim, env validation, guest ownership/role gaps, helmet, public-route rate limits; jest + eslint + `typecheck` task actually run | 🚧 `fix/phase1-auth-hardening` → `chore/phase1-tooling` → `docs/phase1-audit` |
 | Unified login | One `/login` for guests + staff (Guest \| Staff switch, CSS 3D card), guest Google sign-in, pre-arrival guest portal, sign-in rate limits | 🚧 `feat/unified-login` |
 
 ---
@@ -43,6 +44,8 @@ cestlastay/
 **Run API alone:** `cd apps/api && npx ts-node -r tsconfig-paths/register src/main.ts`
 **Run Web alone:** `cd apps/web && pnpm dev`
 **Run Landing alone:** `cd apps/guest && pnpm dev`
+**Checks:** `pnpm typecheck`, `pnpm lint` (eslint, api only), `pnpm test` (jest, api only; specs sit next to the source as `*.spec.ts`)
+**API dev** now uses `ts-node-dev --respawn`, so backend changes reload automatically.
 
 ---
 
@@ -73,6 +76,15 @@ apps/api/src/modules/<name>/
 // no @Roles = any authenticated user
 @Public()                           // no JWT required
 ```
+
+### Tokens
+
+- Every token carries `typ`: `access` (15m, `JWT_SECRET`) or `refresh` (7d, `JWT_REFRESH_SECRET`, has a `jti`). `JwtStrategy` and the WS handshake reject refresh tokens.
+- `POST /auth/refresh` rotates: the presented token is revoked and a new pair is returned, signed with the user's **current** role/email from the DB (inactive users are refused). The web client must save the new `refreshToken` (`lib/api.ts`).
+- Reusing a rotated token within 30s is allowed (two tabs refreshing at once). After that it counts as theft and revokes all of that user's refresh tokens.
+- `POST /auth/logout` is `@Public` and takes `{ refreshToken }` in the body; it revokes that token.
+- Guest tokens (24h) have no refresh token.
+- `ConfigModule` validates env at boot (`common/env.validation.ts`): `DATABASE_URL`, plus both JWT secrets ≥32 chars and different.
 
 ### Prisma Service
 
@@ -117,6 +129,7 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 | `marketing_opt_outs` | email (PK, lowercased) | Unsubscribed from marketing (post-stay offer + newsletter); written by `POST /crm/unsubscribe` |
 | `loyalty_discounts` | code, discountType, discountValue, validFrom, validUntil | Post-stay discount codes |
 | `ratings` | bookingId (unique), guestId, overallRating, roomRating, comment | Post-stay reviews — one per booking |
+| `refresh_tokens` | userId, tokenHash (sha256 of jti, unique), expiresAt, revokedAt, replacedById | One row per staff/admin refresh token; rotated on every refresh, revoked on logout |
 | `audit_logs` | userId (no FK), action, entity, entityId, changes | Immutable action log (no `updated_at`) |
 
 ### Migrations
@@ -271,13 +284,15 @@ socket.on('notification:new', (n) => { ... });
 
 ## Known Issues / Tech Debt
 
-1. **API dev server has no hot reload** — `dev` script uses `ts-node` directly. Restart required after any backend change. To add hot reload: `ts-node-dev --respawn -r tsconfig-paths/register src/main.ts`.
+1. **Seed `guest@hotel.com` user unnecessary** — has no purpose since guests access via booking ID. If that user signs in with Google/Apple they get a GUEST token without a `bookingId`, which `JwtStrategy` rejects, so they are logged out immediately. Safe to ignore.
 
-2. **Seed `guest@hotel.com` user unnecessary** — has no purpose since guests access via booking ID. Safe to ignore.
+2. **Tokens live in `localStorage`** — any XSS can read them. Moving to httpOnly cookies needs cross-site cookie + CORS work (Vercel ↔ Railway); not done yet.
 
-3. **Token refresh bypasses `VITE_API_URL`.** `apps/web/src/lib/api.ts` refreshes with a bare `axios.post('/api/v1/auth/refresh', …)` instead of the configured instance. In production that resolves against the Vercel origin, not the Railway API, so the refresh fails and staff/admin sessions are logged out when the 15-minute access token expires.
+3. **Rate-limit counters are in memory** — fine for one API instance; more replicas need a shared (Redis) throttler store.
 
-4. **CRM emails fail-soft** — when `SENDGRID_API_KEY` is not configured (or doesn't start with `SG.`), `EmailService` falls back to STUB mode: logs are still written to `email_logs` with `status=SENT` and the email body is logged via `Logger`, but no real email is sent. This keeps Phase 5 functional during local dev.
+4. **~90 `any`s in the API** — `no-explicit-any` is an eslint warning, not an error, until they are cleaned up.
+
+5. **CRM emails fail-soft** — when `SENDGRID_API_KEY` is not configured (or doesn't start with `SG.`), `EmailService` falls back to STUB mode: logs are still written to `email_logs` with `status=SENT` and the email body is logged via `Logger`, but no real email is sent. This keeps Phase 5 functional during local dev.
 
 ---
 
