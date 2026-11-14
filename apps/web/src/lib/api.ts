@@ -96,7 +96,10 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const { data } = await axios.post('/api/v1/auth/refresh', { refreshToken });
+        // Same origin as every other API call — api.defaults.baseURL is the
+        // deployed API host in production, where a relative path would hit the
+        // web app's own origin (405) and log the user out on every refresh.
+        const { data } = await axios.post(`${api.defaults.baseURL}/auth/refresh`, { refreshToken });
         localStorage.setItem('accessToken', data.accessToken);
         api.defaults.headers.common.Authorization = `Bearer ${data.accessToken}`;
         processQueue(null, data.accessToken);
