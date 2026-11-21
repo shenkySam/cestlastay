@@ -30,7 +30,7 @@ Required env for the public booking + newsletter to work:
 
 `CORS_ORIGINS` is read at API boot — redeploy/restart the API after changing it.
 
-**Email (`stay@cestlastay.com`):** inbound mail is received by **Resend** and forwarded to the team by the API (see [§6](#6-inbound-email--stay-forwarding-resend)). Outbound transactional mail (booking confirmation, reminders) still goes through **SendGrid**. The BIMI sender logo is served from the landing at `https://cestlastay.com/bimi-logo.svg` ([§7](#7-bimi-sender-logo)).
+**Email (`stay@cestlastay.com`):** inbound mail is received by **Resend** and forwarded to the team by the API (see [§6](#6-inbound-email--stay-forwarding-resend)). Outbound transactional mail (booking confirmation, reminders, guest sign-in codes) goes through **Resend** too, from `EMAIL_FROM`. The BIMI sender logo is served from the landing at `https://cestlastay.com/bimi-logo.svg` ([§7](#7-bimi-sender-logo)).
 
 ---
 
@@ -50,9 +50,10 @@ Required env for the public booking + newsletter to work:
    | `GOOGLE_CLIENT_ID` | Google OAuth **Web** client ID — staff sign in with Google/Apple only, and guests can use Google too. Add the admin web app origin under *Authorized JavaScript origins*. The OAuth consent screen must be **In production** (not *Testing*), or only listed test users — not guests — can sign in; the basic scopes (openid, email, profile) don't need Google verification |
    | `APPLE_CLIENT_ID` | Apple **Services ID** (Sign in with Apple). Register the admin web app domain + return URL `https://<admin-domain>/login` |
    | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | payments |
-   | `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME` | email (optional) |
+   | `RESEND_API_KEY` | all email. Without it the API runs in stub mode: emails are logged, not sent (guests get no sign-in code) |
+   | `EMAIL_FROM` | optional, defaults to `C'est La Stay <stay@cestlastay.com>`. Its domain must be verified in Resend |
    | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` | SMS (optional) |
-   | `RESEND_API_KEY`, `RESEND_WEBHOOK_SECRET`, `RESEND_FORWARD_TO` | inbound `stay@` forwarding (optional; disabled with a startup warning if any is missing). `RESEND_FORWARD_TO` is a comma-separated list of inboxes. See §6 |
+   | `RESEND_WEBHOOK_SECRET`, `RESEND_FORWARD_TO` | inbound `stay@` forwarding, with `RESEND_API_KEY` (optional; disabled with a startup warning if any is missing). `RESEND_FORWARD_TO` is a comma-separated list of inboxes. See §6 |
    | `RESEND_FORWARD_FROM` | optional, defaults to `C'est La Stay Inbox <stay@cestlastay.com>` |
    | `NODE_ENV` = `production` | |
    | `TAX_RATE` = `10` | |

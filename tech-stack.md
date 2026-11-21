@@ -212,23 +212,23 @@ The live public `C'est La Stay` site is **not** a React app. It is a hand-writte
 
 ## Email & SMS
 
-### SendGrid + Resend + Twilio
+### Resend + Twilio
 
-**Decision:** SendGrid for outbound transactional email, Resend for inbound `stay@` mail, Twilio for SMS
+**Decision:** Resend for all email (outbound transactional and inbound `stay@` mail), Twilio for SMS
 
 | Direction | Provider | Status |
 |-----------|----------|--------|
-| Outbound (booking confirmation, check-in reminder, loyalty) | **SendGrid** (`@sendgrid/mail`) | Live. HTML is rendered in code (`crm/email-templates.ts`), not SendGrid dynamic templates. Stub mode without an API key |
+| Outbound (booking confirmation, check-in reminder, loyalty, guest sign-in codes) | **Resend** (`POST /emails` via native `fetch`) | Live. HTML is rendered in code (`crm/email-templates.ts`). Stub mode without an API key |
 | Inbound (`stay@cestlastay.com` → team inboxes) | **Resend** (REST API via native `fetch`, Svix-signed webhook, no SDK) | Live. See `api-endpoints.md` → *Inbound Email* |
 | SMS | **Twilio** | The dependency and env keys exist, but nothing in `apps/api/src` uses them yet |
 
 The Resend integration adds no npm dependency: it uses native `fetch` for the API and `crypto` for the Svix HMAC check.
 
-**Why SendGrid?**
-- **Free tier:** 100 emails/day forever
-- **Tracking:** Open rate, click rate, bounce handling
-- **Deliverability:** Strong reputation, SPF/DKIM setup
-- **API-friendly:** Simple REST API and Node.js SDK
+**Why Resend for everything?**
+- **One provider:** one account, one API key and one verified domain for sending and receiving
+- **Free plan:** enough for a small hotel's transactional volume
+- **Deliverability:** SPF/DKIM on the verified cestlastay.com domain
+- SendGrid handled outbound mail until Nov 2026 but was never configured in production, so it was removed
 
 **Why Twilio?**
 - **Pay-as-you-go:** No monthly fees, pay per SMS
@@ -318,7 +318,7 @@ The Resend integration adds no npm dependency: it uses native `fetch` for the AP
 | Landing (3D)       | three.js + GSAP  | WebGL scenes + scroll animation on the guest site |
 | Real-time          | Socket.IO        | Reliable, fallback support             |
 | Payments           | Stripe           | PCI-compliant, strong SDKs             |
-| Email              | SendGrid         | Free tier, good deliverability         |
+| Email              | Resend           | One provider for send + receive        |
 | SMS                | Twilio           | Pay-as-you-go, reliable                |
 | Deployment (Web)   | Vercel           | Free, auto-deploy, CDN                 |
 | Deployment (API)   | Railway          | Free tier, PostgreSQL included         |

@@ -125,7 +125,7 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 | `invoice_items` | invoiceId, description, quantity, unitPrice, totalPrice | Line items |
 | `payments` | invoiceId, amount, method, status, stripePaymentId | Stripe payment records |
 | `notifications` | userId, type, status (UNREAD/READ), title, message, link | userId → users.id (not guests.id) |
-| `email_logs` | recipientEmail, type, status, sendgridId | CRM email tracking |
+| `email_logs` | recipientEmail, type, status, providerMessageId (column `sendgrid_id`) | CRM email tracking |
 | `marketing_opt_outs` | email (PK, lowercased) | Unsubscribed from marketing (post-stay offer + newsletter); written by `POST /crm/unsubscribe` |
 | `loyalty_discounts` | code, discountType, discountValue, validFrom, validUntil | Post-stay discount codes |
 | `ratings` | bookingId (unique), guestId, overallRating, roomRating, comment | Post-stay reviews — one per booking |
@@ -292,7 +292,7 @@ socket.on('notification:new', (n) => { ... });
 
 4. **~90 `any`s in the API** — `no-explicit-any` is an eslint warning, not an error, until they are cleaned up.
 
-5. **CRM emails fail-soft** — when `SENDGRID_API_KEY` is not configured (or doesn't start with `SG.`), `EmailService` falls back to STUB mode: logs are still written to `email_logs` with `status=SENT` and the email body is logged via `Logger`, but no real email is sent. This keeps Phase 5 functional during local dev.
+5. **CRM emails fail-soft** — when `RESEND_API_KEY` is not configured, `EmailService` falls back to STUB mode: logs are still written to `email_logs` with `status=SENT` and the email body is logged via `Logger`, but no real email is sent. This keeps Phase 5 functional during local dev.
 
 ---
 
@@ -317,10 +317,9 @@ STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PUBLISHABLE_KEY=
 
-# Phase 5 — SendGrid (STUB mode if key missing/invalid)
-SENDGRID_API_KEY=
-SENDGRID_FROM_EMAIL=
-SENDGRID_FROM_NAME=
+# Email — Resend (STUB mode if key missing)
+RESEND_API_KEY=
+EMAIL_FROM=
 
 # Optional — Twilio SMS (keys reserved; not used by any code yet)
 TWILIO_ACCOUNT_SID=

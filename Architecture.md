@@ -17,7 +17,7 @@ System overview for the **C'est La Stay** hotel platform — a Turborepo monorep
                 └───────────────┬───────────────┘
                                 ▼
                  ┌──────────────────────────────┐      ┌──────────────────────┐
-                 │  @hms/api  (Railway)          │ ───▶ │ SendGrid (outbound   │
+                 │  @hms/api  (Railway)          │ ───▶ │ Resend (outbound     │
                  │  NestJS REST + Socket.IO      │      │  transactional mail) │
                  │  cestlastay-production        │      └──────────────────────┘
                  │       .up.railway.app/api/v1  │      ┌──────────────────────┐
@@ -51,7 +51,7 @@ Deployment steps and required env vars live in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 | App | Stack | Role |
 |-----|-------|------|
-| `apps/api` | NestJS 10, Prisma 6, Socket.IO, JWT, Stripe, SendGrid, Resend | REST API + real-time gateway + cron jobs + inbound-mail webhook |
+| `apps/api` | NestJS 10, Prisma 6, Socket.IO, JWT, Stripe, Resend | REST API + real-time gateway + cron jobs + inbound-mail webhook |
 | `apps/web` | React 18 + Vite, React Router, Tailwind | Admin / staff / guest-portal SPA (authenticated); one sign-in page at `/login` (`?as=guest\|staff`) |
 | `apps/guest` | Static `index.html` + vanilla JS in `public/` (self-hosted three.js via importmap); Vite only serves/copies it | Public marketing landing + self-service booking |
 
@@ -70,7 +70,7 @@ Database is **Neon** Postgres via Prisma (`DATABASE_URL` pooled + `DIRECT_URL`).
 
 **Newsletter.** The footer email field posts to `POST /crm/subscribe` (`@Public`), persisted to `newsletter_subscribers`; admins read `GET /crm/subscribers`.
 
-**Inbound email.** `stay@cestlastay.com` (shown in the landing's contact section and footer) has no mailbox. Resend receives the mail and POSTs a signed `email.received` webhook to `POST /webhooks/resend`. The API verifies the signature, fetches the message and attachments from Resend, and re-sends it to the team inboxes in `RESEND_FORWARD_TO` with Reply-To set to the original sender. Outbound transactional mail (confirmations, reminders, loyalty) goes through SendGrid. See [api-endpoints.md](api-endpoints.md) → *Inbound Email*.
+**Inbound email.** `stay@cestlastay.com` (shown in the landing's contact section and footer) has no mailbox. Resend receives the mail and POSTs a signed `email.received` webhook to `POST /webhooks/resend`. The API verifies the signature, fetches the message and attachments from Resend, and re-sends it to the team inboxes in `RESEND_FORWARD_TO` with Reply-To set to the original sender. Outbound transactional mail (confirmations, reminders, loyalty, guest sign-in codes) goes through Resend as well, from `EMAIL_FROM`. See [api-endpoints.md](api-endpoints.md) → *Inbound Email*.
 
 **Real-time (web only).** A single `NotificationsGateway` (Socket.IO, namespace `/`) emits `notification:new` (per user), plus `room:status-changed` and `booking:checked-in/out` (staff room only). The JWT is verified in the handshake. The guest landing does not use sockets. See [websocket-events.md](websocket-events.md).
 
