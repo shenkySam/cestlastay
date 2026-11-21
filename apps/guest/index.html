@@ -292,6 +292,13 @@
   .modal-msg.err{color:#b3261e}
   .modal-done{text-align:center;padding:26px 0}
   .modal-done .tick{width:58px;height:58px;border-radius:50%;background:#e7efe3;color:#3f6b3f;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px}
+  .otp{text-align:left;margin-top:6px}
+  .otp-lead{font-size:14px;color:var(--ink-soft);margin-bottom:16px}
+  .otp-lead b{color:var(--ink);font-weight:500;word-break:break-all}
+  .mfield .otp-input{text-align:center;font-family:Menlo,Consolas,monospace;font-size:24px;letter-spacing:.5em;padding:12px 0 12px .5em}
+  .otp-resend{text-align:center;font-size:13px;color:var(--ink-soft);margin-top:14px}
+  .otp-resend button,.otp-later{background:none;border:none;color:var(--clay);font:inherit;font-size:13px;cursor:pointer;border-bottom:1px solid currentColor;padding:0}
+  .otp-later{display:block;margin:16px auto 0}
   .news-msg{font-size:13px;margin-top:8px;color:#3f6b3f}
   .news-msg.err{color:#b3261e}
   .news-note{font-size:12px;margin-top:10px;color:var(--ink-soft)}
@@ -581,7 +588,18 @@
       <div class="tick">✓</div>
       <h3>Thank you</h3>
       <p class="sub" id="bookDoneMsg"></p>
-      <button class="btn btn-solid" type="button" data-book-close>Close</button>
+      <form class="otp" id="otpForm" novalidate style="display:none">
+        <p class="otp-lead">We’ve emailed a 6-digit code to <b id="otpEmail"></b>. Enter it to open your stay in the guest portal.</p>
+        <div class="mfield">
+          <label for="otpCode">Sign-in code</label>
+          <input id="otpCode" class="otp-input" inputmode="numeric" autocomplete="one-time-code" placeholder="••••••" aria-describedby="otpMsg">
+        </div>
+        <p class="modal-msg" id="otpMsg" role="status"></p>
+        <button class="btn btn-solid" type="submit" id="otpSubmit">Open my stay</button>
+        <p class="otp-resend" id="otpResend"></p>
+      </form>
+      <button class="btn btn-solid" type="button" data-book-close id="bookDoneClose">Close</button>
+      <button class="otp-later" type="button" data-book-close id="otpLater" style="display:none">I’ll do this later</button>
     </div>
   </div>
 </div>

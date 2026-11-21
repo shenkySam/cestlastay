@@ -1,6 +1,7 @@
 /*
  * C'est La Stay — landing interactivity (static page).
- * Booking modal -> POST /bookings/public, DB-driven stay prices via
+ * Booking modal -> POST /bookings/public, then the emailed sign-in code ->
+ * POST /auth/guest/otp/verify and on to the guest portal, DB-driven stay prices via
  * GET /rooms/categories, and the footer newsletter -> POST /crm/subscribe.
  * No build step: the API base is chosen at runtime by hostname.
  */
@@ -11,6 +12,8 @@
   const API = isLocal
     ? 'http://localhost:3000/api/v1'
     : 'https://cestlastay-production.up.railway.app/api/v1';
+  // Guest portal (the cestlastay app), for the sign-in handoff after booking
+  const PORTAL = isLocal ? 'http://localhost:5173' : 'https://app.cestlastay.com';
 
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
@@ -79,6 +82,7 @@
     prefill = prefill || {};
     formWrap.style.display = '';
     doneWrap.style.display = 'none';
+    resetOtp();
     const msg = $('#bkMsg'); msg.textContent = ''; msg.classList.remove('err');
 
     const ci = prefill.checkIn || ($('#bbCheckIn') && $('#bbCheckIn').value) || '';
@@ -189,12 +193,126 @@
         formWrap.style.display = 'none';
         doneWrap.style.display = '';
         $('#bookDoneMsg').textContent =
-          (booking.status === 'CONFIRMED' ? 'Your stay is confirmed.' : 'Request received.') +
-          num + ' A confirmation is on its way to your inbox.';
+          (booking.status === 'CONFIRMED'
+            ? 'Your stay is confirmed.' + num
+            : 'Request received.' + num + ' Our team will confirm availability by email.');
+        // The API emailed a sign-in code with the booking: enter it here to
+        // land in the guest portal already signed in.
+        showOtp(email);
       } catch (_) {
         fail('We couldn’t complete your reservation. Please try again, or email stay@cestlastay.com.');
       } finally {
         btn.disabled = false; btn.textContent = 'Request to reserve';
+      }
+    });
+  }
+
+  // ---- Sign-in code after booking --------------------------------------------
+  // Matches the API's per-email resend cooldown.
+  const RESEND_SECONDS = 60;
+  let otpEmail = '';
+  let resendTimer = null;
+
+  function resetOtp() {
+    otpEmail = '';
+    clearInterval(resendTimer);
+    const form = $('#otpForm');
+    if (!form) return;
+    form.style.display = 'none';
+    $('#otpCode').value = '';
+    $('#otpMsg').textContent = '';
+    $('#otpMsg').classList.remove('err');
+    $('#bookDoneClose').style.display = '';
+    $('#otpLater').style.display = 'none';
+  }
+
+  function showOtp(email) {
+    const form = $('#otpForm');
+    if (!form) return;
+    otpEmail = email;
+    $('#otpEmail').textContent = email;
+    form.style.display = '';
+    $('#bookDoneClose').style.display = 'none';
+    $('#otpLater').style.display = '';
+    startResendCountdown();
+    setTimeout(() => $('#otpCode').focus(), 50);
+  }
+
+  function startResendCountdown() {
+    const box = $('#otpResend');
+    let left = RESEND_SECONDS;
+    clearInterval(resendTimer);
+    const paint = () => {
+      if (left > 0) {
+        box.textContent = 'Didn’t get it? You can resend in ' + left + 's.';
+        return;
+      }
+      clearInterval(resendTimer);
+      box.textContent = 'Didn’t get it? ';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Resend code';
+      b.addEventListener('click', resendOtp);
+      box.appendChild(b);
+    };
+    paint();
+    resendTimer = setInterval(() => { left -= 1; paint(); }, 1000);
+  }
+
+  async function resendOtp() {
+    const msg = $('#otpMsg');
+    msg.classList.remove('err');
+    startResendCountdown();
+    try {
+      const res = await fetch(API + '/auth/guest/otp/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpEmail }),
+      });
+      if (!res.ok) throw new Error('bad status');
+      msg.textContent = 'A new code is on its way.';
+    } catch (_) {
+      msg.textContent = 'We couldn’t send a new code just now. Please try again shortly.';
+      msg.classList.add('err');
+    }
+  }
+
+  const otpForm = $('#otpForm');
+  if (otpForm) {
+    $('#otpCode').addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    });
+    otpForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = $('#otpMsg');
+      msg.classList.remove('err');
+      const code = $('#otpCode').value;
+      if (!/^\d{6}$/.test(code)) {
+        msg.textContent = 'Enter the 6-digit code from the email.';
+        msg.classList.add('err');
+        return;
+      }
+      const btn = $('#otpSubmit');
+      btn.disabled = true; btn.textContent = 'Opening your stay…';
+      try {
+        const res = await fetch(API + '/auth/guest/otp/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // handoff: the portal is another origin, so get a one-time code it
+          // exchanges for the session instead of a token here.
+          body: JSON.stringify({ email: otpEmail, code, handoff: true }),
+        });
+        if (res.status === 429) throw new Error('rate');
+        if (!res.ok) throw new Error('bad code');
+        const data = await res.json();
+        // The code goes in the fragment, which browsers never send to servers.
+        location.assign(PORTAL + '/guest/continue#code=' + encodeURIComponent(data.handoffCode));
+      } catch (err) {
+        msg.textContent = err && err.message === 'rate'
+          ? 'Too many attempts. Please wait a minute and try again.'
+          : 'That code is wrong or has expired. Check the latest email, or send a new code.';
+        msg.classList.add('err');
+        btn.disabled = false; btn.textContent = 'Open my stay';
       }
     });
   }
