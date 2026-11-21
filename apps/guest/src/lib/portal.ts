@@ -9,3 +9,10 @@ const base = import.meta.env.VITE_PORTAL_URL || 'http://localhost:5173';
  * same page has a Staff side for Google / Apple staff sign-in.
  */
 export const guestPortalUrl = `${base}/login?as=guest`;
+
+/**
+ * Lands a just-verified guest in the portal, already signed in. The one-time
+ * code travels in the fragment, which browsers never send to servers.
+ */
+export const portalHandoffUrl = (code: string) =>
+  `${base}/guest/continue#code=${encodeURIComponent(code)}`;

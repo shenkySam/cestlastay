@@ -5,6 +5,7 @@ import { Check, Loader2 } from 'lucide-react';
 import { reserve as reserveContent, rooms, formatPrice } from '../../lib/content';
 import Reveal from '../ui/Reveal';
 import Button from '../ui/Button';
+import VerifyStay from './VerifyStay';
 import { submitReservation, getRoomCategories, isBookingApiEnabled } from '../../lib/booking';
 import type { ReservationResult } from '../../lib/booking';
 import type { IRoomCategory } from '../../types/booking.types';
@@ -204,6 +205,7 @@ export default function Reserve() {
                   <p className="mt-3 max-w-sm font-sans text-sm leading-relaxed text-muted">
                     {result.message}
                   </p>
+                  {result.email && <VerifyStay email={result.email} />}
                   <button
                     type="button"
                     onClick={reset}

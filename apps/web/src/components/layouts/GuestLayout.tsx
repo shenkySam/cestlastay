@@ -5,6 +5,7 @@ import { SignOutIcon } from '@phosphor-icons/react';
 import clsx from 'clsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { GUEST_HOME, GuestNavItem, guestNav } from '@/components/guest/nav';
+import { isPreArrival } from '@/components/guest/format';
 import { snappy } from '@/components/admin/ui/motion';
 
 const FOCUS =
@@ -20,7 +21,7 @@ const PILL = 'absolute inset-0 rounded-full bg-guest-raised ring-1 ring-guest-in
 export function GuestLayout() {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
-  const nav = guestNav(user?.booking?.status === 'CONFIRMED');
+  const nav = guestNav(isPreArrival(user?.booking?.status));
 
   // Match the page canvas so overscroll never flashes the base sand colour
   useEffect(() => {

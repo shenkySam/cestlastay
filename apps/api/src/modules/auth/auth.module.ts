@@ -10,10 +10,13 @@ import { OAuthVerifierService } from './oauth-verifier.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { PendingStayGuard } from './guards/pending-stay.guard';
+import { GuestOtpModule } from './guest-otp.module';
 
 @Module({
   imports: [
     PassportModule,
+    GuestOtpModule,
     JwtModule.registerAsync({
       // Global so the notifications gateway can verify WebSocket handshake tokens
       // against the same secret, without a second copy of this config.
@@ -38,9 +41,10 @@ import { RolesGuard } from './guards/roles.guard';
     AuthService,
     OAuthVerifierService,
     JwtStrategy,
-    // Apply JwtAuthGuard and RolesGuard globally
+    // Applied globally, in this order (PendingStayGuard needs the user JwtAuthGuard sets)
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PendingStayGuard },
   ],
   exports: [AuthService],
 })

@@ -50,7 +50,31 @@ export async function createBooking(
 export interface ReservationResult {
   ok: boolean;
   bookingNumber?: string;
+  /** CONFIRMED or PENDING; absent in demo mode */
+  status?: string;
+  /** Set when a real booking was made — a sign-in code was emailed here */
+  email?: string;
   message: string;
+}
+
+// ── Email sign-in code (sent automatically after a booking) ───────────────
+
+/** POST /auth/guest/otp/request — always 204, even for unknown emails. */
+export async function requestGuestOtp(email: string): Promise<void> {
+  await api.post('/auth/guest/otp/request', { email });
+}
+
+/**
+ * POST /auth/guest/otp/verify with handoff — returns a one-time code the
+ * portal (another origin) exchanges for the guest's session.
+ */
+export async function verifyGuestOtp(email: string, code: string): Promise<string> {
+  const { data } = await api.post<{ handoffCode: string }>('/auth/guest/otp/verify', {
+    email,
+    code,
+    handoff: true,
+  });
+  return data.handoffCode;
 }
 
 export async function submitReservation(
@@ -75,6 +99,8 @@ export async function submitReservation(
     return {
       ok: true,
       bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      email: payload.email,
       message: confirmed
         ? `Your stay is confirmed — reservation ${booking.bookingNumber}. A confirmation is on its way to your inbox.`
         : `Request submitted — reservation ${booking.bookingNumber}. Our team will confirm availability and email you shortly.`,

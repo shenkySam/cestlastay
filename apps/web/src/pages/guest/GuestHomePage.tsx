@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { GuestBookingSummary } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { riseItem, stagger } from '@/components/admin/ui/motion';
-import { nights, stayDate } from '@/components/guest/format';
+import { isPreArrival, nights, stayDate } from '@/components/guest/format';
 import { Badge, IconTile, Pending, Skeleton } from '@/components/guest/ui';
 import { Sheet, SheetBody, SheetFooter } from '@/components/guest/Sheet';
 import { StarPicker } from '@/components/guest/StarRating';
@@ -68,8 +68,9 @@ export default function GuestHomePage() {
   const firstName = user?.firstName;
   const bookingId = user?.bookingId;
   const booking = user?.booking;
-  // Signed in before arrival (booking confirmed, not yet checked in)
-  const preArrival = booking?.status === 'CONFIRMED';
+  // Signed in before arrival (booking confirmed or awaiting confirmation, not yet checked in)
+  const preArrival = isPreArrival(booking?.status);
+  const awaitingConfirmation = booking?.status === 'PENDING';
   const actions = preArrival ? ACTIONS.filter((a) => a.href !== '/guest/services') : ACTIONS;
 
   // Check if the guest has already submitted a rating for this booking
@@ -117,6 +118,15 @@ export default function GuestHomePage() {
             ? `We look forward to welcoming you${firstName ? `, ${firstName}` : ''}.`
             : 'How can we make your stay more comfortable?'}
         </p>
+        {awaitingConfirmation && (
+          <p
+            role="status"
+            className="mt-4 max-w-[60ch] rounded-2xl bg-guest-clay/10 px-4 py-3 text-sm leading-relaxed text-guest-ink"
+          >
+            <span className="font-medium">Awaiting confirmation.</span> Our team is checking availability for your
+            dates and will email you once your stay is confirmed. You can follow it here in the meantime.
+          </p>
+        )}
       </motion.header>
 
       {booking && (
@@ -219,6 +229,7 @@ export default function GuestHomePage() {
 /** "Check-in in 12 days" before arrival, "Night 2 of 4" during the stay. */
 function stayStatus(booking: GuestBookingSummary, preArrival: boolean, stayNights: number): string {
   const today = startOfToday();
+  if (booking.status === 'PENDING') return 'Awaiting confirmation';
   if (preArrival) {
     const days = differenceInCalendarDays(stayDate(booking.checkInDate), today);
     return days > 0 ? `Check-in in ${days} day${days !== 1 ? 's' : ''}` : 'Arriving today';

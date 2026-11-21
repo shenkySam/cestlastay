@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SYSTEM_USER_EMAIL } from '../../common/system-user';
 import { GuestPortalDto } from './dto/guest-portal.dto';
 import { OAuthProvider, OAuthVerifierService } from './oauth-verifier.service';
+import { GuestOtpService, normalizeEmail } from './guest-otp.service';
 
 const PROVIDER_LABEL: Record<OAuthProvider, string> = { google: 'Google', apple: 'Apple' };
 
@@ -37,15 +38,29 @@ const GUEST_BOOKING_INCLUDE = {
 type GuestBooking = Prisma.BookingGetPayload<{ include: typeof GUEST_BOOKING_INCLUDE }>;
 
 /**
- * Bookings a guest may sign in to: the stay in progress, or a confirmed one
- * that hasn't ended yet (so the guest can see it before arrival).
+ * Bookings a guest may sign in to: the stay in progress, or a confirmed or
+ * pending one that hasn't ended yet (so the guest can see it before arrival).
+ * Pending stays are read-only — see PendingStayGuard.
  */
 const activeStay = (): Prisma.BookingWhereInput => ({
   OR: [
     { status: 'CHECKED_IN' },
-    { status: 'CONFIRMED', checkOutDate: { gte: startOfToday() } },
+    { status: { in: ['CONFIRMED', 'PENDING'] }, checkOutDate: { gte: startOfToday() } },
   ],
 });
+
+/**
+ * The booking to open for a guest with several: the stay in progress (latest
+ * check-in), else the next confirmed arrival, else the next pending one.
+ * Expects bookings sorted by check-in ascending.
+ */
+export function pickGuestStay<T extends { status: string }>(bookings: T[]): T | undefined {
+  return (
+    bookings.filter((b) => b.status === 'CHECKED_IN').pop() ??
+    bookings.find((b) => b.status === 'CONFIRMED') ??
+    bookings.find((b) => b.status === 'PENDING')
+  );
+}
 
 @Injectable()
 export class AuthService {
@@ -54,6 +69,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly oauth: OAuthVerifierService,
+    private readonly otp: GuestOtpService,
   ) {}
 
   /**
@@ -133,38 +149,87 @@ export class AuthService {
     return this.issueGuestSession(booking);
   }
 
-  /**
-   * Guest sign-in with Google: the verified Google email is matched against the
-   * email on the booking. Guest emails aren't unique (repeat guests, staff
-   * typos), so this matches bookings rather than guest records.
-   */
+  /** Guest sign-in with Google: the verified Google email is matched against the booking's. */
   async guestGoogleLogin(idToken: string) {
     const identity = await this.oauth.verify('google', idToken);
     if (!identity.email || !identity.emailVerified) {
       throw new UnauthorizedException('Your Google account has no verified email address');
     }
 
+    const booking = await this.findGuestStayByEmail(identity.email);
+    if (!booking) {
+      throw new NotFoundException(
+        `We couldn't find a current or upcoming stay booked under ${identity.email}. ` +
+          'Try "Email me a code", or your booking number and last name.',
+      );
+    }
+
+    return this.issueGuestSession(booking);
+  }
+
+  /**
+   * Guest emails aren't unique (repeat guests, staff typos), so this matches
+   * bookings rather than guest records.
+   */
+  private async findGuestStayByEmail(email: string) {
     const bookings = await this.prisma.booking.findMany({
       where: {
-        guest: { email: { equals: identity.email, mode: 'insensitive' } },
+        guest: { email: { equals: normalizeEmail(email), mode: 'insensitive' } },
         ...activeStay(),
       },
       include: GUEST_BOOKING_INCLUDE,
       orderBy: { checkInDate: 'asc' },
     });
+    return pickGuestStay(bookings);
+  }
 
-    // Prefer the stay in progress (latest check-in), else the next arrival
-    const booking =
-      bookings.filter((b) => b.status === 'CHECKED_IN').pop() ??
-      bookings.find((b) => b.status === 'CONFIRMED');
+  /**
+   * Email a sign-in code if `email` has a current or upcoming stay. The caller
+   * always answers 204, so this can't be used to find out who has a booking.
+   */
+  async requestGuestOtp(email: string) {
+    const booking = await this.findGuestStayByEmail(email);
+    if (!booking) return;
+    await this.otp.sendOtp(email, { firstName: booking.guest.firstName });
+  }
 
-    if (!booking) {
-      throw new NotFoundException(
-        `We couldn't find a current or upcoming stay booked under ${identity.email}. ` +
-          'Try your booking number and last name.',
-      );
+  /**
+   * Verify an emailed code. Signs in to the booking the code was sent for
+   * (right after booking) if it is still active, else the guest's best stay.
+   * With `handoff`, returns a one-time code for the portal instead of a
+   * session — the landing site is a different origin from the portal.
+   */
+  async verifyGuestOtp(email: string, code: string, handoff = false) {
+    const invalid = () => new UnauthorizedException('That code is wrong or has expired');
+    const row = await this.otp.verifyOtp(email, code);
+    if (!row) throw invalid();
+
+    let booking: GuestBooking | null | undefined = null;
+    if (row.bookingId) {
+      booking = await this.prisma.booking.findFirst({
+        where: { id: row.bookingId, ...activeStay() },
+        include: GUEST_BOOKING_INCLUDE,
+      });
     }
+    booking ??= await this.findGuestStayByEmail(email);
+    if (!booking) throw invalid();
 
+    if (handoff) {
+      return { handoffCode: await this.otp.createHandoff(booking.id, email) };
+    }
+    return this.issueGuestSession(booking);
+  }
+
+  /** Exchange a handoff code from the landing site for a guest session. */
+  async guestHandoff(code: string) {
+    const invalid = () => new UnauthorizedException('This sign-in link has expired');
+    const bookingId = await this.otp.consumeHandoff(code);
+    if (!bookingId) throw invalid();
+    const booking = await this.prisma.booking.findFirst({
+      where: { id: bookingId, ...activeStay() },
+      include: GUEST_BOOKING_INCLUDE,
+    });
+    if (!booking) throw invalid();
     return this.issueGuestSession(booking);
   }
 

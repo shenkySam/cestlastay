@@ -138,6 +138,7 @@ enum EmailType {
   LOYALTY_DISCOUNT
   PROMOTIONAL
   PASSWORD_RESET
+  GUEST_LOGIN_CODE
 }
 
 enum EmailStatus {
@@ -608,4 +609,30 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+enum GuestLoginCodePurpose {
+  OTP
+  HANDOFF
+}
+
+// Guest sign-in codes. OTP: a 6-digit code emailed to the address on a
+// booking. HANDOFF: a single-use code that carries a just-verified guest from
+// the landing site to the portal (another origin). Only an HMAC of the code is
+// stored; attempts caps guesses per OTP.
+model GuestLoginCode {
+  id         String                @id @default(uuid())
+  email      String
+  codeHash   String                @map("code_hash")
+  bookingId  String?               @map("booking_id")
+  purpose    GuestLoginCodePurpose
+  attempts   Int                   @default(0)
+  expiresAt  DateTime              @map("expires_at")
+  consumedAt DateTime?             @map("consumed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, purpose])
+  @@index([codeHash])
+  @@map("guest_login_codes")
 }

@@ -74,7 +74,7 @@ api.interceptors.response.use(
     // Sign-in calls: LoginPage shows the error inline (including 429 "too many
     // attempts"). A 401/404 here means "no such account / booking", not an
     // expired session — don't refresh/redirect or toast.
-    if (/^\/auth\/(google|apple|guest-portal|guest\/google)$/.test(original?.url ?? '')) {
+    if (/^\/auth\/(google|apple|guest-portal|guest\/(google|otp\/request|otp\/verify|handoff))$/.test(original?.url ?? '')) {
       return Promise.reject(error);
     }
 
