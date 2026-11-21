@@ -493,8 +493,8 @@ model EmailLog {
   status         EmailStatus @default(QUEUED)
   subject        String
   body           String      @db.Text
-  // Resend message id; the column keeps its old name from SendGrid days
-  providerMessageId String?  @unique @map("sendgrid_id")
+  // Resend message id
+  providerMessageId String?  @unique @map("provider_message_id")
   sentAt         DateTime?   @map("sent_at")
   openedAt       DateTime?   @map("opened_at")
   clickedAt      DateTime?   @map("clicked_at")
