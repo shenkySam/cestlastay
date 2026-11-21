@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import sgMail from '@sendgrid/mail';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type EmailType =
@@ -28,29 +27,33 @@ interface SendEmailParams {
   logBody?: string;
   /** Stored and logged instead of `subject`, for the same reason as logBody. */
   logSubject?: string;
-  /** Printed with the stub-mode log line (no SendGrid key), outside production only. */
+  /** Printed with the stub-mode log line (no Resend key), outside production only. */
   devNote?: string;
 }
 
+const RESEND_API = 'https://api.resend.com';
+const DEFAULT_FROM = "C'est La Stay <stay@cestlastay.com>";
+
+/**
+ * Outbound transactional email through Resend — the same account (and
+ * verified cestlastay.com domain) that handles inbound stay@ forwarding.
+ * Without RESEND_API_KEY it runs in stub mode: the email is logged to
+ * email_logs and the console but not sent.
+ */
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly fromEmail: string;
-  private readonly fromName: string;
-  private readonly enabled: boolean;
+  private readonly apiKey: string;
+  private readonly from: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    const apiKey = this.config.get<string>('SENDGRID_API_KEY') ?? '';
-    this.fromEmail = this.config.get<string>('SENDGRID_FROM_EMAIL') ?? 'noreply@hotel.local';
-    this.fromName = this.config.get<string>('SENDGRID_FROM_NAME') ?? 'Hotel Manager';
-    this.enabled = apiKey.startsWith('SG.');
-    if (this.enabled) {
-      sgMail.setApiKey(apiKey);
-    } else {
-      this.logger.warn('SENDGRID_API_KEY not configured — emails will be logged only.');
+    this.apiKey = this.config.get<string>('RESEND_API_KEY') ?? '';
+    this.from = this.config.get<string>('EMAIL_FROM') || DEFAULT_FROM;
+    if (!this.apiKey) {
+      this.logger.warn('RESEND_API_KEY not configured — emails will be logged only.');
     }
   }
 
@@ -66,7 +69,7 @@ export class EmailService {
       },
     });
 
-    if (!this.enabled) {
+    if (!this.apiKey) {
       // Stub mode: mark as sent so the log reflects "would have sent".
       await this.prisma.emailLog.update({
         where: { id: log.id },
@@ -79,26 +82,33 @@ export class EmailService {
     }
 
     try {
-      const [response] = await sgMail.send({
-        to: { email: params.to, name: params.toName },
-        from: { email: this.fromEmail, name: this.fromName },
-        subject: params.subject,
-        html: params.html,
-        headers: params.headers,
+      const res = await fetch(`${RESEND_API}/emails`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          // A retried send of the same log row is delivered once.
+          'Idempotency-Key': `email-log-${log.id}`,
+        },
+        body: JSON.stringify({
+          from: this.from,
+          to: [params.to],
+          subject: params.subject,
+          html: params.html,
+          ...(params.headers && { headers: params.headers }),
+        }),
       });
-      const sgId = response.headers['x-message-id'] as string | undefined;
+      const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
+      if (!res.ok) throw new Error(data.message || `Resend responded ${res.status}`);
+
       await this.prisma.emailLog.update({
         where: { id: log.id },
-        data: {
-          status: 'SENT' as any,
-          sentAt: new Date(),
-          sendgridId: sgId,
-        },
+        data: { status: 'SENT' as any, sentAt: new Date(), providerMessageId: data.id },
       });
       return log;
     } catch (err: any) {
-      const errorMessage = err?.response?.body?.errors?.[0]?.message ?? err?.message ?? 'Unknown error';
-      this.logger.error(`SendGrid failure (${params.type} → ${params.to}): ${errorMessage}`);
+      const errorMessage = err?.message ?? 'Unknown error';
+      this.logger.error(`Email failure (${params.type} → ${params.to}): ${errorMessage}`);
       await this.prisma.emailLog.update({
         where: { id: log.id },
         data: { status: 'FAILED' as any, errorMessage },

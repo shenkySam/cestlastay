@@ -314,7 +314,7 @@ An invoice is the booking's **folio**: staff/admin create it as a DRAFT, build i
 - Daily 09:00 cron → `CHECK_IN_REMINDER` for bookings with `checkInDate = tomorrow` and `status = CONFIRMED`
 - Daily 11:00 cron → `LOYALTY_DISCOUNT` for bookings checked out yesterday (skips guests already emailed in last 2 days)
 
-**SendGrid stub mode:** if `SENDGRID_API_KEY` is missing or invalid, emails are logged (`status=SENT`) but never sent — used for local dev.
+**Email stub mode:** if `RESEND_API_KEY` is missing, emails are logged (`status=SENT`) but never sent — used for local dev. With the key, mail is sent through Resend from `EMAIL_FROM`; a rejected send is logged `FAILED` with Resend's reason.
 
 **`POST /crm/discount-codes` body:**
 ```json
