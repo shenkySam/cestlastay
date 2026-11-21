@@ -509,7 +509,7 @@ pnpm install
 **Solution:**
 - No `RESEND_API_KEY` → stub mode (`[STUB EMAIL]` in the logs); nothing is sent
 - Check `email_logs`: `status = FAILED` rows have Resend's reason in `error_message` (e.g. the `EMAIL_FROM` domain isn't verified)
-- `SENT` rows carry Resend's id in `sendgrid_id` (old column name); look it up in Resend → Emails for delivery status
+- `SENT` rows carry Resend's id in `provider_message_id`; look it up in Resend → Emails for delivery status
 
 ---
 

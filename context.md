@@ -125,7 +125,7 @@ All DTOs use `class-validator`. Global `ValidationPipe` in `main.ts` handles val
 | `invoice_items` | invoiceId, description, quantity, unitPrice, totalPrice | Line items |
 | `payments` | invoiceId, amount, method, status, stripePaymentId | Stripe payment records |
 | `notifications` | userId, type, status (UNREAD/READ), title, message, link | userId → users.id (not guests.id) |
-| `email_logs` | recipientEmail, type, status, providerMessageId (column `sendgrid_id`) | CRM email tracking |
+| `email_logs` | recipientEmail, type, status, providerMessageId | CRM email tracking |
 | `marketing_opt_outs` | email (PK, lowercased) | Unsubscribed from marketing (post-stay offer + newsletter); written by `POST /crm/unsubscribe` |
 | `loyalty_discounts` | code, discountType, discountValue, validFrom, validUntil | Post-stay discount codes |
 | `ratings` | bookingId (unique), guestId, overallRating, roomRating, comment | Post-stay reviews — one per booking |

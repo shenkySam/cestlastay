@@ -132,7 +132,7 @@ A comprehensive web-based Hotel Management System designed to streamline daily o
 ---
 
 ### Phase 5: CRM & Email Automation (Week 7) ✅ Complete
-**Goal:** Automated email campaigns (SendGrid at the time; Resend since Nov 2026)
+**Goal:** Automated email campaigns via Resend
 
 **Deliverables:**
 - ✅ Email automation via Resend (with fail-soft stub mode for local dev)

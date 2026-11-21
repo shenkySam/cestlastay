@@ -228,7 +228,6 @@ The Resend integration adds no npm dependency: it uses native `fetch` for the AP
 - **One provider:** one account, one API key and one verified domain for sending and receiving
 - **Free plan:** enough for a small hotel's transactional volume
 - **Deliverability:** SPF/DKIM on the verified cestlastay.com domain
-- SendGrid handled outbound mail until Nov 2026 but was never configured in production, so it was removed
 
 **Why Twilio?**
 - **Pay-as-you-go:** No monthly fees, pay per SMS

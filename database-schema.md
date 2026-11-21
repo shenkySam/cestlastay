@@ -378,7 +378,7 @@ Email sending history.
 | `status` | ENUM | DEFAULT 'QUEUED' | QUEUED, SENT, FAILED, BOUNCED |
 | `subject` | VARCHAR | NOT NULL | Email subject |
 | `body` | TEXT | NOT NULL | Email body (HTML) |
-| `sendgrid_id` | VARCHAR | UNIQUE, NULL | Email provider message ID (Resend; Prisma field `providerMessageId`, the column name is historical) |
+| `provider_message_id` | VARCHAR | UNIQUE, NULL | Resend message ID |
 | `sent_at` | TIMESTAMP | NULL | Sent timestamp |
 | `opened_at` | TIMESTAMP | NULL | Opened timestamp (via tracking) |
 | `clicked_at` | TIMESTAMP | NULL | Clicked timestamp |
