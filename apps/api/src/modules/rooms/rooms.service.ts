@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RoomStatus } from '@hms/shared';
 import { startOfDay } from 'date-fns';
@@ -129,7 +129,7 @@ export class RoomsService {
     return { message: 'Room deleted' };
   }
 
-  async checkAvailability(checkIn: Date, checkOut: Date, categoryId?: string) {
+  async checkAvailability(checkIn: Date, checkOut: Date, categoryId?: string, guests?: number) {
     const occupiedRoomIds = await this.getOccupiedRoomIds(checkIn, checkOut);
 
     return this.prisma.room.findMany({
@@ -137,10 +137,63 @@ export class RoomsService {
         status: { notIn: unbookableStatuses(checkIn) as any },
         id: { notIn: [...occupiedRoomIds] },
         ...(categoryId && { categoryId }),
+        ...(guests && { category: { maxOccupancy: { gte: guests } } }),
       },
       include: ROOM_INCLUDE,
       orderBy: [{ floor: 'asc' }, { roomNumber: 'asc' }],
     });
+  }
+
+  /**
+   * The nearest stay of the same length, starting after `checkIn`, with a room
+   * free for `guests`. Prefers regular rooms; falls back to a VIP-only window.
+   * Returns null when nothing opens up within `horizonDays`.
+   */
+  async findNextAvailable(checkIn: Date, checkOut: Date, guests?: number, horizonDays = 60) {
+    if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime()) || checkOut <= checkIn) {
+      throw new BadRequestException('Choose a check-out date after check-in');
+    }
+    const DAY = 24 * 60 * 60 * 1000;
+    const nights = Math.round((checkOut.getTime() - checkIn.getTime()) / DAY);
+
+    const rooms = await this.prisma.room.findMany({
+      where: {
+        status: { notIn: [RoomStatus.OUT_OF_ORDER, RoomStatus.MAINTENANCE] as any },
+        ...(guests && { category: { maxOccupancy: { gte: guests } } }),
+      },
+      select: { id: true, isVip: true },
+    });
+    if (rooms.length === 0) return null;
+
+    const windowEnd = new Date(checkIn.getTime() + (horizonDays + nights) * DAY);
+    const held = await this.prisma.bookingRoom.findMany({
+      where: {
+        roomId: { in: rooms.map((r) => r.id) },
+        booking: {
+          status: { in: ['CONFIRMED', 'CHECKED_IN'] as any },
+          checkInDate: { lt: windowEnd },
+          checkOutDate: { gt: checkIn },
+        },
+      },
+      select: { roomId: true, booking: { select: { checkInDate: true, checkOutDate: true } } },
+    });
+
+    let vipOnly: { checkIn: string; checkOut: string; rooms: number; vip: boolean } | null = null;
+    for (let d = 1; d <= horizonDays; d++) {
+      const start = new Date(checkIn.getTime() + d * DAY);
+      const end = new Date(start.getTime() + nights * DAY);
+      const free = rooms.filter(
+        (r) =>
+          !held.some(
+            (h) => h.roomId === r.id && h.booking.checkInDate < end && h.booking.checkOutDate > start,
+          ),
+      );
+      const regular = free.filter((r) => !r.isVip).length;
+      const window = { checkIn: start.toISOString().slice(0, 10), checkOut: end.toISOString().slice(0, 10) };
+      if (regular > 0) return { ...window, rooms: regular, vip: false };
+      if (!vipOnly && free.length > 0) vipOnly = { ...window, rooms: free.length, vip: true };
+    }
+    return vipOnly;
   }
 
   // Room ids held by CONFIRMED/CHECKED_IN bookings overlapping [checkIn, checkOut)

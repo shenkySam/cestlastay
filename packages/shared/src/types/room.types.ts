@@ -20,6 +20,8 @@ export interface IRoom {
   status: RoomStatus;
   lastCleanedAt?: string;
   maintenanceNotes?: string;
+  /** Held back on the public site; offered only when regular rooms are full */
+  isVip?: boolean;
   createdAt: string;
   updatedAt: string;
 }

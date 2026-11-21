@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { BedIcon, FunnelSimpleIcon, PencilSimpleIcon, PlusIcon, TrashIcon, WrenchIcon } from '@phosphor-icons/react';
+import { BedIcon, CrownSimpleIcon, FunnelSimpleIcon, PencilSimpleIcon, PlusIcon, TrashIcon, WrenchIcon } from '@phosphor-icons/react';
 import api from '@/lib/api';
 import { IRoom, IRoomCategory, RoomStatus } from '@shared/index';
 import {
@@ -37,7 +37,7 @@ const STATUS_OPTIONS: SegmentOption<string>[] = [
   })),
 ];
 
-const EMPTY_ROOM = { roomNumber: '', categoryId: '', floor: 1, maintenanceNotes: '' };
+const EMPTY_ROOM = { roomNumber: '', categoryId: '', floor: 1, maintenanceNotes: '', isVip: false };
 
 export default function AdminRoomsPage() {
   const [rooms, setRooms] = useState<IRoom[]>([]);
@@ -92,6 +92,7 @@ export default function AdminRoomsPage() {
       categoryId: room.categoryId,
       floor: room.floor,
       maintenanceNotes: room.maintenanceNotes ?? '',
+      isVip: Boolean(room.isVip),
     });
     setShowModal(true);
   }
@@ -106,6 +107,7 @@ export default function AdminRoomsPage() {
           categoryId: form.categoryId,
           floor: Number(form.floor),
           maintenanceNotes: form.maintenanceNotes || undefined,
+          isVip: form.isVip,
         });
         toast.success('Room updated');
       } else {
@@ -156,7 +158,7 @@ export default function AdminRoomsPage() {
       <PageHeader
         eyebrow="Operations"
         title="Rooms"
-        description="Every room by floor. Set its category, floor and maintenance notes here."
+        description="Every room by floor. Set its category, floor, VIP hold and maintenance notes here. Nightly prices live on Stays & Pricing."
         actions={
           <button type="button" className="btn-primary" onClick={openCreate}>
             <PlusIcon size={16} weight="regular" aria-hidden />
@@ -246,10 +248,18 @@ export default function AdminRoomsPage() {
                   return (
                     <Panel key={room.id} variants={riseItem} flush bodyClassName="gap-5 p-6">
                       <div className="flex items-start justify-between gap-3">
-                        <p className="flex items-center gap-2 pt-2 text-xs font-medium text-zinc-600">
-                          <StatusDot tone={status.tone} pulse={status.pulse} />
-                          {humanize(room.status)}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                          <p className="flex items-center gap-2 text-xs font-medium text-zinc-600">
+                            <StatusDot tone={status.tone} pulse={status.pulse} />
+                            {humanize(room.status)}
+                          </p>
+                          {room.isVip && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+                              <CrownSimpleIcon size={12} weight="fill" aria-hidden />
+                              VIP
+                            </span>
+                          )}
+                        </div>
                         <div className="-mr-2 -mt-0.5 flex items-center">
                           <button
                             type="button"
@@ -291,7 +301,7 @@ export default function AdminRoomsPage() {
                         </span>
                         <span>
                           <span className="font-mono text-sm font-medium tabular-nums text-zinc-900">
-                            ${Number(room.category?.basePrice ?? 0).toFixed(0)}
+                            ₹{Number(room.category?.basePrice ?? 0).toLocaleString('en-IN')}
                           </span>
                           /night
                         </span>
@@ -376,6 +386,25 @@ export default function AdminRoomsPage() {
                 />
                 <p className="text-xs text-zinc-500">Shown on the room card. Leave empty if there's nothing to flag.</p>
               </div>
+
+              <label
+                htmlFor="room-vip"
+                className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-200 p-3.5 transition-colors hover:bg-zinc-50"
+              >
+                <input
+                  id="room-vip"
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-zinc-900"
+                  checked={form.isVip}
+                  onChange={(e) => setForm({ ...form, isVip: e.target.checked })}
+                />
+                <span className="grid gap-0.5">
+                  <span className="text-sm font-medium text-zinc-800">VIP room</span>
+                  <span className="text-xs leading-relaxed text-zinc-500">
+                    Held back on cestlastay.com: guests are offered it only when every regular room is taken for their dates.
+                  </span>
+                </span>
+              </label>
             </div>
           </ModalBody>
           <ModalFooter>
