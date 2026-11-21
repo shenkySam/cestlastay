@@ -116,9 +116,7 @@
   .empty{text-align:left;padding:8px 0}
   .empty h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:34px}
   .empty p{margin-top:10px;color:var(--ink-soft);max-width:52ch}
-  .help{margin-top:40px;font-size:14px;color:var(--ink-soft)}
-  .help a{color:var(--clay);border-bottom:1px solid currentColor}
-
+  
   /* Skeletons match the card shape */
   .sk{background:linear-gradient(90deg,rgba(58,42,31,.06) 0,rgba(58,42,31,.11) 40%,rgba(58,42,31,.06) 80%);background-size:300% 100%;animation:shimmer 1.6s linear infinite;border-radius:8px}
   .room.skeleton:hover{transform:none}
@@ -135,6 +133,23 @@
     .room:hover{transform:none}
     .room:hover .room-img img{transform:none}
   }
+
+  /* Footer: same as the landing (index.html) */
+  footer{background:var(--sand);padding:72px 0 36px;border-top:1px solid var(--line)}
+  .foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1.4fr;gap:40px;padding-bottom:54px;border-bottom:1px solid var(--line)}
+  .foot-grid h4{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:20px;font-weight:400}
+  .foot-grid ul{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px;color:var(--ink-soft)}
+  .foot-brand .brand{font-size:30px;margin-bottom:14px}
+  .foot-brand p{font-size:14px;color:var(--ink-soft);max-width:30ch}
+  .news{display:flex;border-bottom:1px solid var(--ink);padding-bottom:8px;margin-top:8px}
+  .news input{flex:1;min-width:0;background:none;border:none;outline:none;font-family:'Jost',sans-serif;font-size:14px;color:var(--ink)}
+  .news button{background:none;border:none;cursor:pointer;font-size:18px;color:var(--clay)}
+  .news-msg{font-size:13px;margin-top:8px;color:#3f6b3f}
+  .news-msg.err{color:#b3261e}
+  .news-note{font-size:12px;margin-top:10px;color:var(--ink-soft)}
+  .foot-bottom{display:flex;justify-content:space-between;padding-top:28px;font-size:12px;letter-spacing:.08em;color:var(--ink-soft)}
+  .foot-bottom a{transition:color .2s}
+  .foot-bottom a:hover{color:var(--clay)}
 
   /* Booking modal (same markup + behaviour as the landing, driven by site.js) */
   .modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(40,28,18,.55);backdrop-filter:blur(4px);padding:20px}
@@ -168,6 +183,7 @@
 
   @media (max-width:900px){
     .top{grid-template-columns:1fr;gap:28px}
+    .foot-grid{grid-template-columns:1fr;gap:34px}
     .notice{grid-template-columns:1fr;gap:24px;padding:30px 24px}
   }
   @media (max-width:640px){
@@ -181,6 +197,8 @@
     .room-foot .pill{width:100%}
     .mrow{grid-template-columns:1fr}
     .modal-card{padding:30px 20px 24px}
+    footer{padding:56px 0 32px}
+    .foot-bottom{flex-direction:column;gap:10px}
   }
 </style>
 </head>
@@ -229,9 +247,42 @@
 
     <div class="results" id="results" aria-live="polite" aria-busy="true"></div>
 
-    <p class="help">Questions before you book? Write to <a href="mailto:stay@cestlastay.com">stay@cestlastay.com</a>.</p>
   </div>
 </main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <div class="brand">C'est La <em>Stay</em></div>
+        <p>A boutique retreat in Auroville, the City of Dawn.</p>
+        <p style="margin-top:12px"><a href="mailto:stay@cestlastay.com">stay@cestlastay.com</a></p>
+      </div>
+      <div>
+        <h4>Stays</h4>
+        <ul><li>Banyan Suite</li><li>Terracotta Villa</li><li>Aura Loft</li><li>Group bookings</li></ul>
+      </div>
+      <div>
+        <h4>Visit</h4>
+        <ul><li>Experiences</li><li>Dining</li><li>Getting here</li><li>FAQ</li></ul>
+      </div>
+      <div>
+        <h4>Stay in touch</h4>
+        <p style="font-size:14px;color:var(--ink-soft)">Seasonal notes from the forest.</p>
+        <form class="news" id="newsForm">
+          <input type="email" id="newsEmail" placeholder="Your email" aria-label="Your email">
+          <button type="submit" aria-label="Subscribe">→</button>
+        </form>
+        <p class="news-msg" id="newsMsg" role="status"></p>
+        <p class="news-note">By subscribing you confirm you’re 18 or older. Unsubscribe anytime.</p>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 C'est La Stay, Auroville, Tamil Nadu</span>
+      <span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · Instagram</span>
+    </div>
+  </div>
+</footer>
 
 <!-- Booking modal: same ids as the landing so site.js drives it -->
 <div class="modal" id="bookModal" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Reserve your stay">
