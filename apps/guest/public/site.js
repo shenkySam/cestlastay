@@ -344,12 +344,27 @@
     el.textContent = text;
   }
 
+  // Day after an ISO date, in local time (YYYY-MM-DD)
+  const nextDay = (iso) => {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString('en-CA');
+  };
+
   const bbIn = $('#bbCheckIn');
   const bbOut = $('#bbCheckOut');
   if (bbIn && bbOut) {
+    // Start with tonight's stay so Search works in one click; keep any dates
+    // the browser restored (e.g. after Back from the availability page).
+    if (!bbIn.value) bbIn.value = localToday();
+    if (!bbOut.value || bbOut.value <= bbIn.value) bbOut.value = nextDay(bbIn.value);
     bbIn.min = localToday();
-    bbOut.min = localToday();
-    bbIn.addEventListener('change', () => { if (bbIn.value) bbOut.min = bbIn.value; });
+    bbOut.min = nextDay(localToday());
+    bbIn.addEventListener('change', () => {
+      if (!bbIn.value) return;
+      bbOut.min = nextDay(bbIn.value);
+      if (!bbOut.value || bbOut.value <= bbIn.value) bbOut.value = nextDay(bbIn.value);
+    });
   }
 
   function onSearch() {
