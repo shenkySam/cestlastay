@@ -175,14 +175,27 @@ export class BookingsService {
       phone: dto.phone ?? '',
     });
 
-    // Is a room in the requested category genuinely free for these dates?
-    const available = await this.rooms.checkAvailability(checkIn, checkOut, dto.categoryId);
-    const isAvailable = available.length > 0;
+    // Is the requested room (or a room in the requested category) genuinely
+    // free for these dates? VIP rooms are only given out when picked by id on
+    // the availability page, never handed to a category-only request.
+    const available = await this.rooms.checkAvailability(
+      checkIn,
+      checkOut,
+      dto.roomId ? undefined : dto.categoryId,
+    );
+    const pool = dto.roomId
+      ? available.filter((r) => r.id === dto.roomId)
+      : available.filter((r) => !r.isVip);
+    const isAvailable = pool.length > 0;
 
-    // When nothing is free we still record a PENDING request, attached to a
-    // representative room in the requested category. PENDING bookings are
-    // excluded from availability/overlap checks, so this never blocks a real one.
-    let room: { id: string; categoryId: string } | null = available[0] ?? null;
+    // When nothing is free we still record a PENDING request, attached to the
+    // requested room or a representative room in the requested category. PENDING
+    // bookings are excluded from availability/overlap checks, so this never
+    // blocks a real one.
+    let room: { id: string; categoryId: string } | null = pool[0] ?? null;
+    if (!room && dto.roomId) {
+      room = await this.prisma.room.findUnique({ where: { id: dto.roomId } });
+    }
     if (!room) {
       room = dto.categoryId
         ? await this.prisma.room.findFirst({ where: { categoryId: dto.categoryId } })

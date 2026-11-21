@@ -49,12 +49,24 @@ export class RoomsController {
     @Query('checkIn') checkIn: string,
     @Query('checkOut') checkOut: string,
     @Query('categoryId') categoryId?: string,
+    @Query('guests') guests?: string,
   ) {
     return this.service.checkAvailability(
       new Date(checkIn),
       new Date(checkOut),
       categoryId,
+      parseGuests(guests),
     );
+  }
+
+  @Get('availability/next')
+  @Public()
+  nextAvailability(
+    @Query('checkIn') checkIn: string,
+    @Query('checkOut') checkOut: string,
+    @Query('guests') guests?: string,
+  ) {
+    return this.service.findNextAvailable(new Date(checkIn), new Date(checkOut), parseGuests(guests));
   }
 
   // ── Rooms CRUD ───────────────────────────────────────────────
@@ -102,4 +114,10 @@ export class RoomsController {
   delete(@Param('id') id: string) {
     return this.service.delete(id);
   }
+}
+
+/** `?guests=3` -> 3; anything missing or not a positive integer -> no filter */
+function parseGuests(raw?: string): number | undefined {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
 }

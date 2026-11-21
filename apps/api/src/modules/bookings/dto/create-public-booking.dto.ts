@@ -35,6 +35,11 @@ export class CreatePublicBookingDto {
   @IsString()
   categoryId?: string;
 
+  /** A specific room picked on the public availability page */
+  @IsOptional()
+  @IsString()
+  roomId?: string;
+
   @IsOptional()
   @IsString()
   specialRequests?: string;

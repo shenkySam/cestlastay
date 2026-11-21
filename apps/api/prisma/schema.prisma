@@ -260,6 +260,8 @@ model Room {
   status           RoomStatus @default(AVAILABLE)
   lastCleanedAt    DateTime?  @map("last_cleaned_at")
   maintenanceNotes String?    @map("maintenance_notes")
+  // Held back on the public site: offered only when regular rooms are full
+  isVip            Boolean    @default(false) @map("is_vip")
 
   bookingRooms      BookingRoom[]
   housekeepingTasks HousekeepingTask[]

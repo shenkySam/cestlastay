@@ -303,12 +303,9 @@
   .news-msg.err{color:#b3261e}
   .news-note{font-size:12px;margin-top:10px;color:var(--ink-soft)}
 
-  /* availability search results */
-  .avail-msg{margin-top:18px;font-size:14px;color:var(--clay);min-height:18px}
-  .avail-msg.err{color:#b3261e}
-  .avail-badge{display:inline-block;margin-top:8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:3px 10px;border-radius:100px}
-  .avail-badge.ok{background:#e7efe3;color:#3f6b3f}
-  .avail-badge.req{background:rgba(177,84,46,.12);color:var(--clay)}
+  /* hero search validation */
+  .search-msg{margin-top:12px;font-size:14px;color:#b3261e;min-height:20px}
+  .modal-card .room-pick{font-size:14px;color:var(--ink);background:rgba(177,84,46,.08);border-radius:3px;padding:10px 13px;margin:-8px 0 18px}
 </style>
 </head>
 <body>
@@ -561,6 +558,7 @@
     <div id="bookForm">
       <h3>Reserve your stay</h3>
       <p class="sub">No prepayment — a real host confirms by email within 24 hours.</p>
+      <p class="room-pick" id="bkRoom" style="display:none"></p>
       <form id="bookFormEl" novalidate>
         <div class="mrow">
           <div class="mfield"><label for="bkFirst">First name</label><input id="bkFirst" autocomplete="given-name"></div>

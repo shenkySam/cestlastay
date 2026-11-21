@@ -19,10 +19,6 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
   const fmtPrice = (n) => '₹' + Number(n).toLocaleString('en-IN');
-  const fmtDate = (iso) => {
-    const d = new Date(iso + 'T00:00:00');
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  };
 
   // ---- Stay catalog (drives prices + the modal dropdown from the admin) ------
   let categories = [];
@@ -50,10 +46,11 @@
   function populateStaySelect() {
     const sel = $('#bkStay');
     if (!sel) return;
-    // Always offer exactly the stays shown on the page; attach the matching
-    // category id (so the booking uses the right room type) when one exists.
+    // Offer exactly the stays shown on the page (or, on pages without the stay
+    // list, every category); attach the matching category id when one exists.
     sel.innerHTML = '';
-    fallbackStays.forEach((name) => {
+    const names = fallbackStays.length ? fallbackStays : categories.map((c) => c.name);
+    names.forEach((name) => {
       const cat = findCategory(name);
       const opt = document.createElement('option');
       opt.value = cat ? cat.id : '';
@@ -77,9 +74,20 @@
   const formWrap = $('#bookForm');
   const doneWrap = $('#bookDone');
 
+  // A specific room picked on the availability page: { id, categoryId, label }
+  let pickedRoom = null;
+
   function openModal(prefill) {
     if (!modal) return;
     prefill = prefill || {};
+    pickedRoom = prefill.room || null;
+    const stayField = $('#bkStay') && $('#bkStay').closest('.mfield');
+    if (stayField) stayField.style.display = pickedRoom ? 'none' : '';
+    const roomNote = $('#bkRoom');
+    if (roomNote) {
+      roomNote.textContent = pickedRoom ? pickedRoom.label : '';
+      roomNote.style.display = pickedRoom ? '' : 'none';
+    }
     formWrap.style.display = '';
     doneWrap.style.display = 'none';
     resetOtp();
@@ -166,7 +174,7 @@
       if (new Date(checkOut) <= new Date(checkIn)) return fail('Departure must be after arrival.');
       if (!$('#bkAdult').checked) return fail('Please confirm you’re 18 or older to book.');
 
-      const categoryId = $('#bkStay').value || undefined;
+      const categoryId = pickedRoom ? pickedRoom.categoryId : $('#bkStay').value || undefined;
       const payload = {
         firstName: first,
         lastName: last,
@@ -178,6 +186,7 @@
         specialRequests: $('#bkNotes').value.trim() || undefined,
       };
       if (categoryId) payload.categoryId = categoryId;
+      if (pickedRoom) payload.roomId = pickedRoom.id;
 
       const btn = $('#bkSubmit');
       btn.disabled = true; btn.textContent = 'Reserving…';
@@ -318,65 +327,40 @@
   }
 
   // ---- Availability search (hero booking bar) --------------------------------
-  function scrollToStays() {
-    const el = document.getElementById('stays');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  // Opens the results on their own page instead of scrolling the landing.
+  const AVAIL_PAGE = isLocal ? '/availability.html' : '/availability';
+  const localToday = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 
-  function ensureAvailMsg() {
-    let el = document.getElementById('availMsg');
+  function searchMsg(text) {
+    let el = document.getElementById('searchMsg');
     if (!el) {
-      const head = document.querySelector('#stays .sec-head');
       el = document.createElement('p');
-      el.id = 'availMsg';
-      el.className = 'avail-msg';
-      el.setAttribute('role', 'status');
-      if (head) head.appendChild(el);
+      el.id = 'searchMsg';
+      el.className = 'search-msg';
+      el.setAttribute('role', 'alert');
+      const bar = $('.booking');
+      if (bar) bar.insertAdjacentElement('afterend', el);
     }
-    return el;
+    el.textContent = text;
   }
 
-  function setRowAvail(row, ok) {
-    const meta = row.querySelector('.stay-meta');
-    if (!meta) return;
-    let b = meta.querySelector('[data-avail]');
-    if (!b) { b = document.createElement('div'); b.setAttribute('data-avail', ''); meta.appendChild(b); }
-    b.className = 'avail-badge ' + (ok ? 'ok' : 'req');
-    b.textContent = ok ? '✓ Available' : 'On request';
+  const bbIn = $('#bbCheckIn');
+  const bbOut = $('#bbCheckOut');
+  if (bbIn && bbOut) {
+    bbIn.min = localToday();
+    bbOut.min = localToday();
+    bbIn.addEventListener('change', () => { if (bbIn.value) bbOut.min = bbIn.value; });
   }
 
-  async function onSearch() {
-    const ci = ($('#bbCheckIn') || {}).value || '';
-    const co = ($('#bbCheckOut') || {}).value || '';
-    const msg = ensureAvailMsg();
-    msg.classList.remove('err');
-    const bad = (t) => { msg.textContent = t; msg.classList.add('err'); scrollToStays(); };
-    if (!ci || !co) return bad('Please choose your arrival and departure dates above.');
-    if (new Date(co) <= new Date(ci)) return bad('Departure must be after arrival.');
-
-    msg.textContent = 'Checking availability…';
-    scrollToStays();
-    let rooms = [];
-    try {
-      const res = await fetch(API + '/rooms/availability?checkIn=' + ci + '&checkOut=' + co);
-      if (res.ok) rooms = await res.json();
-    } catch (_) { /* offline -> treat all as on request */ }
-    // Match available rooms to the page's stays by the category name carried in
-    // the availability response itself — independent of the categories fetch.
-    const availNames = new Set(
-      (rooms || []).map((r) => ((r.category && r.category.name) || '').trim().toLowerCase()),
-    );
-
-    let n = 0;
-    $$('#staysList .stay-row').forEach((row) => {
-      const ok = availNames.has((row.getAttribute('data-stay') || '').trim().toLowerCase());
-      if (ok) n++;
-      setRowAvail(row, ok);
-    });
-    const range = fmtDate(ci) + ' – ' + fmtDate(co);
-    msg.textContent = n > 0
-      ? n + ' stay' + (n > 1 ? 's' : '') + ' open for ' + range + ' — select one below and reserve.'
-      : 'Our rooms are spoken for ' + range + ' — reserve to request these dates and a host will personally confirm by email within 24 hours.';
+  function onSearch() {
+    const ci = (bbIn || {}).value || '';
+    const co = (bbOut || {}).value || '';
+    if (!ci || !co) return searchMsg('Choose your check-in and check-out dates to search.');
+    if (ci < localToday()) return searchMsg('Check-in can’t be in the past.');
+    if (co <= ci) return searchMsg('Check-out must be after check-in.');
+    searchMsg('');
+    const q = new URLSearchParams({ checkIn: ci, checkOut: co, guests: ($('#bbGuests') || {}).value || '2' });
+    location.assign(AVAIL_PAGE + '?' + q.toString());
   }
 
   const bookingBar = $('#bookingBar');
@@ -416,4 +400,7 @@
   }
 
   loadCategories();
+
+  // Shared with /availability (availability.js), which loads after this file.
+  window.CLS = { API, openBooking: openModal, fmtPrice, isLocal };
 })();
