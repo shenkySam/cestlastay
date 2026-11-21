@@ -8,7 +8,7 @@ import type { OAuthProvider } from '@/lib/oauth';
 export interface GuestBookingSummary {
   id: string;
   bookingNumber: string;
-  /** CONFIRMED before arrival, CHECKED_IN during the stay */
+  /** PENDING (awaiting confirmation) or CONFIRMED before arrival, CHECKED_IN during the stay */
   status?: string;
   checkInDate: string;
   checkOutDate: string;
@@ -23,7 +23,7 @@ interface AuthUser extends Omit<IUser, 'createdAt' | 'updatedAt' | 'emailVerifie
   booking?: GuestBookingSummary;
 }
 
-/** Booking as returned by POST /auth/guest-portal, /auth/guest/google and GET /auth/guest/me */
+/** Booking as returned by the guest sign-in routes (guest-portal, google, otp/verify, handoff) and GET /auth/guest/me */
 interface ApiGuestBooking {
   id: string;
   bookingNumber: string;
@@ -70,6 +70,12 @@ interface AuthContextValue {
   guestLogin: (bookingNumber: string, lastName: string) => Promise<void>;
   /** Guest sign-in with a Google ID token, matched to a booking by email. */
   guestGoogleLogin: (idToken: string) => Promise<void>;
+  /** Ask for a 6-digit sign-in code by email (silently ignored for unknown emails). */
+  requestGuestCode: (email: string) => Promise<void>;
+  /** Guest sign-in with the emailed code. */
+  guestCodeLogin: (email: string, code: string) => Promise<void>;
+  /** Finish the landing-site sign-in: one-time handoff code → guest session. */
+  guestHandoffLogin: (code: string) => Promise<void>;
   logout: () => void;
   /** Re-read the signed-in staff/admin from GET /auth/me (e.g. after their role changed). */
   refreshUser: () => Promise<void>;
@@ -163,6 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const startGuestSession = (data: { accessToken: string; booking: ApiGuestBooking }) => {
     const guestUser = toGuestUser(data.booking);
+    // Guest sessions have no refresh token; drop any left from a staff session
+    localStorage.removeItem('refreshToken');
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('isGuest', 'true');
     localStorage.setItem('guestUser', JSON.stringify(guestUser));
@@ -180,6 +188,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     startGuestSession(data);
   };
 
+  const requestGuestCode = async (email: string) => {
+    await api.post('/auth/guest/otp/request', { email });
+  };
+
+  const guestCodeLogin = async (email: string, code: string) => {
+    const { data } = await api.post('/auth/guest/otp/verify', { email, code });
+    startGuestSession(data);
+  };
+
+  const guestHandoffLogin = async (code: string) => {
+    const { data } = await api.post('/auth/guest/handoff', { code });
+    startGuestSession(data);
+  };
+
   const refreshUser = useCallback(async () => {
     if (localStorage.getItem('isGuest') === 'true') return;
     try {
@@ -194,7 +216,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, accessToken, loading, login, guestLogin, guestGoogleLogin, logout, refreshUser, isRole }}
+      value={{
+        user, accessToken, loading, login, guestLogin, guestGoogleLogin,
+        requestGuestCode, guestCodeLogin, guestHandoffLogin, logout, refreshUser, isRole,
+      }}
     >
       {children}
     </AuthContext.Provider>

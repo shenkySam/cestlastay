@@ -11,6 +11,7 @@ import {
 } from '@/lib/oauth';
 import { LoginMode, ModeSwitch } from './login/ModeSwitch';
 import { GuestForm } from './login/GuestForm';
+import { GuestEmailCodeForm } from './login/GuestEmailCodeForm';
 import { ShowcasePanel } from './login/ShowcasePanel';
 import { RICH_MOTION_QUERY, WIDE_QUERY, useMediaQuery, useTilt } from './login/useTilt';
 
@@ -49,11 +50,11 @@ const STAFF_FEATURES = [
 
 /**
  * One sign-in page for guests and staff, switched with ?as=guest|staff.
- * Guests: booking number + last name, or Google (matched by booking email).
+ * Guests: emailed 6-digit code, booking number + last name, or Google (matched by booking email).
  * Staff: Google or Apple account registered by an administrator.
  */
 export default function LoginPage() {
-  const { user, loading, login, guestLogin, guestGoogleLogin } = useAuth();
+  const { user, loading, login, guestLogin, guestGoogleLogin, requestGuestCode, guestCodeLogin } = useAuth();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
 
@@ -63,6 +64,7 @@ export default function LoginPage() {
     asParam === 'guest' || asParam === 'staff' ? asParam : (readStoredMode() ?? 'guest');
 
   const [pending, setPending] = useState<null | 'form' | 'oauth'>(null);
+  const [guestMethod, setGuestMethod] = useState<'code' | 'booking'>('code');
   const [error, setError] = useState('');
 
   // Keep the URL in sync without adding history entries, and remember the mode
@@ -135,6 +137,9 @@ export default function LoginPage() {
       () => guestLogin(bookingNumber, lastName),
       "We couldn't find that booking. Check the number and your last name.",
     );
+
+  const handleGuestCode = (email: string, code: string) =>
+    run('form', () => guestCodeLogin(email, code), 'That code is wrong or has expired.');
 
   // Hidden face of the flipper: out of the tab order and the accessibility tree
   const guestFaceRef = useRef<HTMLDivElement>(null);
@@ -218,11 +223,33 @@ export default function LoginPage() {
                           your bill during your stay.
                         </p>
                         <div className="mt-5">
-                          <GuestForm
-                            pending={pending === 'form'}
+                          {guestMethod === 'code' ? (
+                            <GuestEmailCodeForm
+                              pending={pending === 'form'}
+                              disabled={busy}
+                              onRequest={requestGuestCode}
+                              onVerify={handleGuestCode}
+                            />
+                          ) : (
+                            <GuestForm
+                              pending={pending === 'form'}
+                              disabled={busy}
+                              onSubmit={handleGuestForm}
+                            />
+                          )}
+                          <button
+                            type="button"
                             disabled={busy}
-                            onSubmit={handleGuestForm}
-                          />
+                            onClick={() => {
+                              setError('');
+                              setGuestMethod((m) => (m === 'code' ? 'booking' : 'code'));
+                            }}
+                            className="mt-3 text-xs font-medium text-clay underline-offset-2 hover:text-clay-dark hover:underline"
+                          >
+                            {guestMethod === 'code'
+                              ? 'Use booking number and last name instead'
+                              : 'Email me a sign-in code instead'}
+                          </button>
                         </div>
                         {GOOGLE_CLIENT_ID && (
                           <div className="mt-5 flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.24em] text-ink/40">

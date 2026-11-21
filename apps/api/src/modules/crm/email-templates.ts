@@ -98,3 +98,19 @@ export function postStayDiscountTemplate(d: DiscountEmailData) {
   `, { unsubscribeUrl: d.unsubscribeUrl });
   return { subject, html };
 }
+
+export function guestLoginCodeTemplate(d: { guestFirstName?: string; code: string; minutes: number }) {
+  const subject = `${d.code} is your C'est La Stay sign-in code`;
+  const body = (code: string) => `
+    <p>Hi${d.guestFirstName ? ` ${d.guestFirstName}` : ''},</p>
+    <p>Use this code to open your stay in the guest portal:</p>
+    <p style="font-size:28px; letter-spacing:6px; font-family:monospace; font-weight:bold; margin:20px 0;">${code}</p>
+    <p>It expires in ${d.minutes} minutes and works once. If you didn't ask for it, you can ignore this email.</p>`;
+  return {
+    subject,
+    html: wrapper('Your sign-in code', body(d.code)),
+    // The subject carries the code too, so the log keeps a redacted copy of both.
+    logSubject: "Your C'est La Stay sign-in code",
+    logBody: wrapper('Your sign-in code', body('••••••')),
+  };
+}

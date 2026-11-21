@@ -44,7 +44,7 @@ export class GuestsService {
 
   async findOrCreate(dto: CreateGuestDto) {
     const existing = await this.prisma.guest.findFirst({
-      where: { email: dto.email },
+      where: { email: { equals: dto.email.trim(), mode: 'insensitive' } },
     });
     if (existing) return existing;
     return this.create(dto);

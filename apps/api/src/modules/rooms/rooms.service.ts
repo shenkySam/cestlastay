@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RoomStatus } from '@hms/shared';
+import { startOfDay } from 'date-fns';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { UpdateRoomStatusDto } from './dto/update-room-status.dto';
@@ -11,6 +12,20 @@ import { RoomsGateway } from './rooms.gateway';
 const ROOM_INCLUDE = {
   category: true,
 } as const;
+
+/**
+ * Room statuses that rule a room out for a stay starting on `checkIn`.
+ *
+ * A room's status is its state right now, so it only says something about a
+ * stay that starts today: then an OCCUPIED room isn't free yet (CLEANING and
+ * RESERVED will be ready by arrival). Future dates are decided by overlapping
+ * bookings alone, so a stale RESERVED/OCCUPIED status can't block them.
+ * OUT_OF_ORDER and MAINTENANCE rooms are never offered.
+ */
+export function unbookableStatuses(checkIn: Date, now = new Date()): RoomStatus[] {
+  const blocked = [RoomStatus.OUT_OF_ORDER, RoomStatus.MAINTENANCE];
+  return startOfDay(checkIn) <= startOfDay(now) ? [...blocked, RoomStatus.OCCUPIED] : blocked;
+}
 
 @Injectable()
 export class RoomsService {
@@ -119,7 +134,7 @@ export class RoomsService {
 
     return this.prisma.room.findMany({
       where: {
-        status: 'AVAILABLE' as any,
+        status: { notIn: unbookableStatuses(checkIn) as any },
         id: { notIn: [...occupiedRoomIds] },
         ...(categoryId && { categoryId }),
       },

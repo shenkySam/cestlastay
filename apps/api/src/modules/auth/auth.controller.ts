@@ -4,6 +4,7 @@ import { UserRole } from '@hms/shared';
 import { AuthService } from './auth.service';
 import { OAuthLoginDto } from './dto/oauth-login.dto';
 import { GuestPortalDto } from './dto/guest-portal.dto';
+import { GuestHandoffDto, GuestOtpRequestDto, GuestOtpVerifyDto } from './dto/guest-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -60,6 +61,40 @@ export class AuthController {
   @SkipThrottle(SKIP_HOURLY)
   guestGoogleLogin(@Body() dto: OAuthLoginDto) {
     return this.authService.guestGoogleLogin(dto.idToken);
+  }
+
+  /**
+   * Email a 6-digit sign-in code to the address on a current or upcoming stay.
+   * Always 204, whether or not the email has a booking.
+   */
+  @Public()
+  @Post('guest/otp/request')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ minute: { limit: 5, ttl: minutes(1) }, hour: { limit: 20, ttl: hours(1) } })
+  async guestOtpRequest(@Body() dto: GuestOtpRequestDto) {
+    await this.authService.requestGuestOtp(dto.email);
+  }
+
+  /** Each code also allows only 5 attempts, so this per-IP cap is a second line. */
+  @Public()
+  @Post('guest/otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ minute: { limit: 10, ttl: minutes(1) }, hour: { limit: 40, ttl: hours(1) } })
+  guestOtpVerify(@Body() dto: GuestOtpVerifyDto) {
+    return this.authService.verifyGuestOtp(dto.email, dto.code, dto.handoff === true);
+  }
+
+  /** Portal side of the landing-site handoff: one-time code → guest session. */
+  @Public()
+  @Post('guest/handoff')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle(OAUTH_LIMIT)
+  @SkipThrottle(SKIP_HOURLY)
+  guestHandoff(@Body() dto: GuestHandoffDto) {
+    return this.authService.guestHandoff(dto.code);
   }
 
   /** Current booking for a guest token (status changes, e.g. after check-in). */

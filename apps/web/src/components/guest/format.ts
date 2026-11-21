@@ -11,6 +11,14 @@ export function stayDate(iso: string): Date {
   return new Date(`${dateKey(iso)}T00:00:00`);
 }
 
+/**
+ * Signed in before the stay starts: confirmed, or still awaiting staff
+ * confirmation (PENDING — read-only). Requests and ratings open at check-in.
+ */
+export function isPreArrival(status?: string): boolean {
+  return status === 'CONFIRMED' || status === 'PENDING';
+}
+
 /** "Today, 14:32", "Yesterday, 09:10", "12 Oct, 14:32"; `midSentence` lowercases today/yesterday. */
 export function stamp(iso: string, midSentence = false): string {
   const d = new Date(iso);

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { OAuthVerifierService } from './oauth-verifier.service';
+import { GuestOtpService } from './guest-otp.service';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const ACCESS_SECRET = 'a'.repeat(40);
@@ -63,6 +64,7 @@ function setup() {
     jwt,
     config,
     {} as OAuthVerifierService,
+    {} as GuestOtpService,
   );
   // signTokens is private; it's the same path oauthLogin uses after verifying.
   type SignTokens = (

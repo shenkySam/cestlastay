@@ -20,7 +20,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { ServiceType, ServiceStatus } from '@shared/index';
 import { riseItem, stagger } from '@/components/admin/ui/motion';
-import { stamp } from '@/components/guest/format';
+import { isPreArrival, stamp } from '@/components/guest/format';
 import { Badge, EmptyNote, ErrorNote, FieldError, IconTile, PageIntro, Pending, Skeleton, Tone } from '@/components/guest/ui';
 import { Sheet, SheetBody, SheetFooter } from '@/components/guest/Sheet';
 import { StarDisplay, StarPicker } from '@/components/guest/StarRating';
@@ -83,7 +83,7 @@ export default function GuestServiceRequestPage() {
 
   const guestId = user?.guest?.id;
   // Signed in before arrival — the API refuses requests until check-in
-  const preArrival = user?.booking?.status === 'CONFIRMED';
+  const preArrival = isPreArrival(user?.booking?.status);
 
   useEffect(() => {
     if (!guestId || preArrival) return;

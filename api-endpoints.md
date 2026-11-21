@@ -15,13 +15,16 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 | POST | `/auth/google` | [PUBLIC] | Staff sign-in. Body `{ idToken }` (Google Identity Services credential) → returns `user` + `accessToken` + `refreshToken` |
 | POST | `/auth/apple` | [PUBLIC] | Staff sign-in. Body `{ idToken }` (Sign in with Apple JS `authorization.id_token`) → same response as `/auth/google` |
 | POST | `/auth/guest-portal` | [PUBLIC] | Guest sign-in with booking number + lastName (case-insensitive) → `{ accessToken, booking }`, 24h token, no refresh. Only for an [active stay](#guest-sign-in); otherwise 404 `No current or upcoming stay found for that booking number and last name` |
-| POST | `/auth/guest/google` | [PUBLIC] | Guest sign-in with Google. Body `{ idToken }` → same response as `/auth/guest-portal`. Matches the verified Google email to the guest email on an active-stay booking; 404 `We couldn't find a current or upcoming stay booked under {email}. Try your booking number and last name.`; 401 for an invalid token or unverified email |
+| POST | `/auth/guest/google` | [PUBLIC] | Guest sign-in with Google. Body `{ idToken }` → same response as `/auth/guest-portal`. Matches the verified Google email to the guest email on an active-stay booking; 404 `We couldn't find a current or upcoming stay booked under {email}. Try "Email me a code", or your booking number and last name.`; 401 for an invalid token or unverified email |
+| POST | `/auth/guest/otp/request` | [PUBLIC] | Body `{ email }`. Emails a 6-digit sign-in code (10 min, one live code per email, 60 s resend cooldown) if the email has an [active stay](#guest-sign-in). Always `204`, so it can't reveal who has a booking. `POST /bookings/public` sends one automatically |
+| POST | `/auth/guest/otp/verify` | [PUBLIC] | Body `{ email, code, handoff? }` → same response as `/auth/guest-portal`; with `handoff: true` → `{ handoffCode }` instead (landing site). Signs in to the booking the code was sent for, else the guest's best active stay. 5 attempts per code; 401 `That code is wrong or has expired` |
+| POST | `/auth/guest/handoff` | [PUBLIC] | Body `{ code }` → same response as `/auth/guest-portal`. Exchanges a single-use handoff code (60 s) from `/auth/guest/otp/verify`; the portal's `/guest/continue#code=…` calls it. 401 when used or expired |
 | GET | `/auth/guest/me` | GUEST | `{ booking }` for the token's booking (same shape as at sign-in) — the web app refreshes the stored booking with it on load, e.g. after check-in |
 | POST | `/auth/refresh` | [PUBLIC] | Exchange refresh token for new access token |
 | GET | `/auth/me` | Any staff/admin | Returns current user profile. Not for guest tokens (returns an empty body) — use `/auth/guest/me` |
 | POST | `/auth/logout` | Any | Stateless logout |
 
-**Rate limits** (per client IP, `429` when exceeded; only these routes are throttled): `/auth/guest-portal` 5/min and 20/hour · `/auth/google`, `/auth/apple`, `/auth/guest/google` 10/min · `/auth/refresh` 30/min. Counters are in memory (one API instance). The API trusts one proxy hop (`trust proxy`) so the IP is the visitor's, not Railway's proxy.
+**Rate limits** (per client IP, `429` when exceeded; only these routes are throttled): `/auth/guest-portal` and `/auth/guest/otp/request` 5/min and 20/hour · `/auth/guest/otp/verify` 10/min and 40/hour · `/auth/google`, `/auth/apple`, `/auth/guest/google`, `/auth/guest/handoff` 10/min · `/auth/refresh` 30/min. Counters are in memory (one API instance). The API trusts one proxy hop (`trust proxy`) so the IP is the visitor's, not Railway's proxy.
 
 ### Sign-in (Google / Apple only)
 - There is **no email + password login** and **no self-signup**. An admin creates the user (`POST /users`, by email); the person then signs in with the Google or Apple account for that email.
@@ -30,9 +33,11 @@ Responses are plain JSON objects or arrays — **no pagination wrappers, no enve
 - `401` when: no user has that email, the email is unverified or an Apple "Hide My Email" relay address, the email's user is already linked to a different Google/Apple account, the user isn't `ACTIVE`, or it's the `system@hotel.com` account. `503` when that provider's client ID isn't configured.
 
 ### Guest sign-in
-- **Active stay** = booking `CHECKED_IN`, or `CONFIRMED` with `checkOutDate` today or later. `PENDING`, cancelled, checked-out and past bookings can't sign in. Guests can therefore sign in before arrival (e.g. from the booking-confirmation email).
-- Google: guest emails aren't unique, so the API matches **bookings** whose guest email equals the verified Google email, and picks the most recent `CHECKED_IN` one, else the soonest upcoming `CONFIRMED` one.
+- **Active stay** = booking `CHECKED_IN`, or `CONFIRMED` / `PENDING` with `checkOutDate` today or later. Cancelled, checked-out and past bookings can't sign in. Guests can therefore sign in before arrival (e.g. from the booking-confirmation email, or straight after booking with the emailed code).
+- Google: guest emails aren't unique, so the API matches **bookings** whose guest email equals the verified Google email, and picks the most recent `CHECKED_IN` one, else the soonest upcoming `CONFIRMED` one, else the soonest `PENDING` one. The emailed-code sign-in uses the same rule.
 - Before arrival (`CONFIRMED`) a guest can view the booking and bill, but `POST /services` returns 403 `Requests open once you've checked in` and `POST /ratings` returns 403.
+- While `PENDING` (awaiting staff confirmation) the guest is read-only: every non-GET request with that guest token returns 403 `Your booking is awaiting confirmation…` (global `PendingStayGuard`).
+- Landing-site flow: `POST /bookings/public` emails a code → the guest enters it on the Thank-you screen → `/auth/guest/otp/verify` with `handoff: true` → redirect to the portal's `/guest/continue#code=…` → `/auth/guest/handoff` → signed in, no login page.
 
 ### Guest token
 - `sub` in JWT = `guestId` (Guest table), not a userId; `bookingId` = the booking it's scoped to

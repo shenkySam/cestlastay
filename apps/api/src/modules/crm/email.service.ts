@@ -10,7 +10,8 @@ export type EmailType =
   | 'CHECK_OUT_THANK_YOU'
   | 'LOYALTY_DISCOUNT'
   | 'PROMOTIONAL'
-  | 'PASSWORD_RESET';
+  | 'PASSWORD_RESET'
+  | 'GUEST_LOGIN_CODE';
 
 interface SendEmailParams {
   to: string;
@@ -20,6 +21,15 @@ interface SendEmailParams {
   html: string;
   /** Extra MIME headers, e.g. List-Unsubscribe on marketing email */
   headers?: Record<string, string>;
+  /**
+   * Stored in email_logs instead of `html`, for emails that carry a secret
+   * (sign-in codes) which must not sit in the database in plain text.
+   */
+  logBody?: string;
+  /** Stored and logged instead of `subject`, for the same reason as logBody. */
+  logSubject?: string;
+  /** Printed with the stub-mode log line (no SendGrid key), outside production only. */
+  devNote?: string;
 }
 
 @Injectable()
@@ -51,8 +61,8 @@ export class EmailService {
         recipientName: params.toName,
         type: params.type as any,
         status: 'QUEUED' as any,
-        subject: params.subject,
-        body: params.html,
+        subject: params.logSubject ?? params.subject,
+        body: params.logBody ?? params.html,
       },
     });
 
@@ -62,7 +72,9 @@ export class EmailService {
         where: { id: log.id },
         data: { status: 'SENT' as any, sentAt: new Date() },
       });
-      this.logger.log(`[STUB EMAIL] ${params.type} → ${params.to} :: ${params.subject}`);
+      const note =
+        params.devNote && process.env.NODE_ENV !== 'production' ? ` :: ${params.devNote}` : '';
+      this.logger.log(`[STUB EMAIL] ${params.type} → ${params.to} :: ${params.logSubject ?? params.subject}${note}`);
       return log;
     }
 

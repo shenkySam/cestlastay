@@ -11,6 +11,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { CrmService } from '../crm/crm.service';
 import { GuestsService } from '../guests/guests.service';
 import { RoomsService } from '../rooms/rooms.service';
+import { GuestOtpService } from '../auth/guest-otp.service';
 import {
   retryOnUniqueViolation,
   isUniqueViolation,
@@ -40,6 +41,7 @@ export class BookingsService {
     private readonly crm: CrmService,
     private readonly guests: GuestsService,
     private readonly rooms: RoomsService,
+    private readonly guestOtp: GuestOtpService,
   ) {}
 
   async findAll(filters?: {
@@ -230,6 +232,13 @@ export class BookingsService {
       });
       this.crm.sendBookingConfirmation(booking.id).catch(() => undefined);
     }
+
+    // Sign-in code for the "Thank you" screen, so the guest lands in the portal
+    // without a login page. Sent for pending requests too (read-only portal).
+    this.guestOtp.sendOtpQuietly(booking.guest.email, {
+      bookingId: booking.id,
+      firstName: booking.guest.firstName,
+    });
 
     return booking;
   }
