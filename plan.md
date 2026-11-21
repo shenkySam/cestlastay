@@ -132,10 +132,10 @@ A comprehensive web-based Hotel Management System designed to streamline daily o
 ---
 
 ### Phase 5: CRM & Email Automation (Week 7) ✅ Complete
-**Goal:** Automated email campaigns via SendGrid
+**Goal:** Automated email campaigns (SendGrid at the time; Resend since Nov 2026)
 
 **Deliverables:**
-- ✅ SendGrid email automation (with fail-soft stub mode for local dev)
+- ✅ Email automation via Resend (with fail-soft stub mode for local dev)
 - ✅ Booking confirmation emails (fire on `POST /bookings`)
 - ✅ Check-in reminders (daily 09:00 cron, T-1 day)
 - ✅ Post-stay emails with auto-generated `LOYAL-XXXX` discount codes (daily 11:00 cron, T+1 after checkout)
@@ -146,7 +146,7 @@ A comprehensive web-based Hotel Management System designed to streamline daily o
 
 **Critical Files:**
 - `apps/api/src/modules/crm/crm.module.ts` - CrmModule
-- `apps/api/src/modules/crm/email.service.ts` - SendGrid wrapper + EmailLog persistence
+- `apps/api/src/modules/crm/email.service.ts` - Resend sender + EmailLog persistence
 - `apps/api/src/modules/crm/crm.service.ts` - Triggers, cron jobs, discount-code logic
 - `apps/api/src/modules/crm/email-templates.ts` - HTML templates
 - `apps/api/src/modules/crm/crm.controller.ts` - `/crm/emails` and `/crm/discount-codes` routes
@@ -215,7 +215,7 @@ pnpm install
 
 # Setup environment variables
 cp apps/api/.env.example apps/api/.env
-# Edit .env with your Neon (DATABASE_URL + DIRECT_URL), Stripe, SendGrid credentials
+# Edit .env with your Neon (DATABASE_URL + DIRECT_URL), Stripe, Resend credentials
 
 # Initialize database
 cd apps/api

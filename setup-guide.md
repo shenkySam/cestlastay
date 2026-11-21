@@ -44,9 +44,9 @@ Before starting, ensure you have the following installed:
    - Create account at: https://stripe.com
    - Use test mode for development
 
-3. **SendGrid** (Email Service)
-   - Create account at: https://sendgrid.com
-   - Free tier: 100 emails/day
+3. **Resend** (Email: outbound and inbound `stay@`)
+   - Create account at: https://resend.com
+   - Free plan covers development and a small hotel's volume
 
 4. **Twilio** (Optional - SMS)
    - Create account at: https://twilio.com
@@ -138,14 +138,13 @@ STRIPE_WEBHOOK_SECRET="whsec_..."
 
 
 # ===========================================
-# SENDGRID EMAIL
+# EMAIL (Resend)
 # ===========================================
-SENDGRID_API_KEY="SG...."
-SENDGRID_FROM_EMAIL="noreply@yourhotel.com"
-SENDGRID_FROM_NAME="Your Hotel Name"
+RESEND_API_KEY="re_..."
+EMAIL_FROM="C'est La Stay <stay@cestlastay.com>"
 
-# Get from: SendGrid Dashboard > Settings > API Keys
-# Must verify sender email first
+# Get from: Resend Dashboard > API Keys
+# The EMAIL_FROM domain must be verified in Resend > Domains
 
 
 # ===========================================
@@ -343,37 +342,23 @@ stripe listen --forward-to localhost:3000/api/v1/payments/webhook
 
 ---
 
-## SendGrid Configuration
+## Resend Configuration (email)
 
-### 1. Verify Sender Email
+Resend sends all outbound mail (booking confirmation, check-in reminder, loyalty offers, guest sign-in codes) and receives `stay@cestlastay.com`.
 
-1. Go to: https://app.sendgrid.com/settings/sender_auth
-2. Click "Create New Sender"
-3. Fill in your email details
-4. Verify email via link sent to your inbox
+### 1. Outbound
 
-### 2. Create API Key
+1. Resend Dashboard → **Domains** → add `cestlastay.com` and add the DNS records it shows. Wait for **Verified**.
+2. Resend Dashboard → **API Keys** → create a key with *Sending access* → `RESEND_API_KEY`.
+3. Optional: `EMAIL_FROM` (defaults to `C'est La Stay <stay@cestlastay.com>`); its domain must be the verified one.
 
-1. Go to: https://app.sendgrid.com/settings/api_keys
-2. Click "Create API Key"
-3. Name: `Hotel Management System`
-4. Permissions: Full Access
-5. Copy API key (starts with `SG.`)
-6. Add to `.env` as `SENDGRID_API_KEY`
+The API renders its own HTML (`apps/api/src/modules/crm/email-templates.ts`), so no templates are set up in Resend. Without `RESEND_API_KEY` the API runs in **stub mode**: emails are logged to `email_logs` and the console (`[STUB EMAIL] …`) but not sent. Outside production, the stub line for a sign-in code includes the code, so you can test locally without email.
 
-### 3. Email Templates (no SendGrid setup needed)
+### 2. Inbound `stay@` forwarding (optional)
 
-The API renders its own HTML. `apps/api/src/modules/crm/email-templates.ts` has `bookingConfirmationTemplate`, `checkInReminderTemplate` and `postStayDiscountTemplate`, so **no SendGrid dynamic templates are needed**. The `SENDGRID_TEMPLATE_*` keys in `.env.example` are unused leftovers.
+Only needed if you are working on the `stay@cestlastay.com` forwarding (`POST /api/v1/webhooks/resend`). Uses the same `RESEND_API_KEY`.
 
-Without a valid `SENDGRID_API_KEY` the API runs in **stub mode**: emails are logged to `email_logs` and the console (`[STUB EMAIL] …`) but not sent.
-
----
-
-## Resend Configuration (inbound `stay@` mail — optional)
-
-Only needed if you are working on the `stay@cestlastay.com` forwarding (`POST /api/v1/webhooks/resend`). Outbound transactional mail uses SendGrid, above.
-
-1. Resend Dashboard → **API Keys** → create a key → `RESEND_API_KEY`.
+1. Resend Dashboard → **API Keys** → the key above → `RESEND_API_KEY`.
 2. Resend Dashboard → **Webhooks** → add an endpoint for the event `email.received` → copy the signing secret (`whsec_…`) → `RESEND_WEBHOOK_SECRET`.
 3. Set `RESEND_FORWARD_TO` to a comma-separated list of inboxes.
 
@@ -519,13 +504,12 @@ pnpm install
 
 ---
 
-### Issue: "SendGrid emails not sending"
+### Issue: "Emails not sending"
 
 **Solution:**
-- Verify sender email is verified in SendGrid
-- Check API key is correct
-- Look for errors in backend logs
-- Check SendGrid Activity Feed for delivery status
+- No `RESEND_API_KEY` → stub mode (`[STUB EMAIL]` in the logs); nothing is sent
+- Check `email_logs`: `status = FAILED` rows have Resend's reason in `error_message` (e.g. the `EMAIL_FROM` domain isn't verified)
+- `SENT` rows carry Resend's id in `sendgrid_id` (old column name); look it up in Resend → Emails for delivery status
 
 ---
 

@@ -146,7 +146,7 @@ apps/api/
 │       │   ├── crm.module.ts
 │       │   ├── crm.controller.ts       # /crm/emails, /crm/triggers, /crm/discount-codes, /crm/subscribe (PUBLIC), /crm/subscribers
 │       │   ├── crm.service.ts          # email log queries, discount CRUD, newsletter upsert, @Cron triggers
-│       │   ├── email.service.ts        # SendGrid wrapper (STUB mode when no API key)
+│       │   ├── email.service.ts        # Resend sender (STUB mode when no API key)
 │       │   ├── email-templates.ts      # HTML email bodies
 │       │   └── dto/
 │       │       ├── create-discount.dto.ts
